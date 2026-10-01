@@ -919,3 +919,316 @@ Dónde queda registrada la información
 ```
 
 La aplicación puede evolucionar internamente sin romper ese contrato.
+
+
+---
+
+# 22. Catálogo de inputs y composición de formularios
+
+## 22.1. Principio
+
+Los inputs de la plataforma se definirán **en código** como componentes semánticos reutilizables.
+
+Cada oferta académica, cohorte, seminario o edición no define un formulario completo desde cero. En cambio, registra qué inputs utiliza, en qué orden deben aparecer y, cuando corresponda, si un campo normalmente opcional pasa a ser obligatorio.
+
+La configuración no podrá redefinir la semántica de un input.
+
+## 22.2. Diferencia entre tipo de input e input semántico
+
+Los tipos de control son conceptos técnicos:
+
+```ts
+type InputType =
+  | "text"
+  | "email"
+  | "tel"
+  | "date"
+  | "select"
+  | "textarea"
+  | "checkbox"
+  | "file";
+```
+
+Las ofertas no seleccionarán directamente tipos como `text`, `select` o `file`.
+
+Seleccionarán inputs semánticos conocidos, por ejemplo:
+
+```text
+nombre
+apellido
+email
+telefono
+documento
+fechaNacimiento
+orientacion
+mencion
+titulo
+escolaridad
+institucion
+ocupacion
+```
+
+Cada input semántico ya conoce:
+
+- su clave estable;
+- su etiqueta;
+- el tipo visual;
+- su validación;
+- su nombre de columna en Sheets;
+- su comportamiento;
+- su proveedor de opciones cuando corresponda.
+
+## 22.3. Registro central de inputs
+
+Ejemplo conceptual:
+
+```ts
+export interface InputDefinition {
+  key: string;
+  label: string;
+  type: InputType;
+  requiredByDefault?: boolean;
+  placeholder?: string;
+  helpText?: string;
+
+  validation?: {
+    minLength?: number;
+    maxLength?: number;
+    pattern?: RegExp;
+  };
+
+  spreadsheetColumn: string;
+  optionsSource?: OptionsSource;
+}
+```
+
+Registro:
+
+```ts
+export const INPUTS = {
+  nombre: {
+    key: "nombre",
+    label: "Nombre",
+    type: "text",
+    requiredByDefault: true,
+    spreadsheetColumn: "Nombre",
+  },
+
+  apellido: {
+    key: "apellido",
+    label: "Apellido",
+    type: "text",
+    requiredByDefault: true,
+    spreadsheetColumn: "Apellido",
+  },
+
+  email: {
+    key: "email",
+    label: "Correo electrónico",
+    type: "email",
+    requiredByDefault: true,
+    spreadsheetColumn: "Correo electrónico",
+  },
+
+  telefono: {
+    key: "telefono",
+    label: "Teléfono",
+    type: "tel",
+    spreadsheetColumn: "Teléfono",
+  },
+
+  orientacion: {
+    key: "orientacion",
+    label: "Orientación",
+    type: "select",
+    spreadsheetColumn: "Orientación",
+    optionsSource: "wordpress.orientaciones",
+  },
+
+  mencion: {
+    key: "mencion",
+    label: "Mención",
+    type: "select",
+    spreadsheetColumn: "Mención",
+    optionsSource: "wordpress.menciones",
+  },
+} satisfies Record<string, InputDefinition>;
+```
+
+## 22.4. Inputs universales
+
+Existirá un grupo de inputs que se incluirá automáticamente en todos los formularios.
+
+Ejemplo conceptual:
+
+```ts
+export const UNIVERSAL_INPUTS = [
+  "nombre",
+  "apellido",
+  "email",
+  "telefono",
+] as const;
+```
+
+La lista definitiva se fijará durante la implementación funcional.
+
+Cada formulario se construye como:
+
+```text
+inputs universales
++
+inputs específicos del destino académico
+```
+
+Esto evita duplicar los campos comunes en la configuración de cada oferta.
+
+## 22.5. Configuración por oferta, cohorte, seminario o edición
+
+La base de datos almacenará únicamente referencias a inputs conocidos.
+
+Ejemplo conceptual:
+
+```text
+academic_form_fields
+--------------------
+id
+academic_target_id
+input_key
+position
+required_override
+enabled
+```
+
+Ejemplo:
+
+```text
+DAVIA · Cohorte 11
+
+input_key          position
+---------------------------
+documento             10
+fechaNacimiento       20
+orientacion           30
+mencion               40
+titulo                50
+escolaridad           60
+```
+
+Los inputs universales no necesitan repetirse por cada formulario salvo que en el futuro exista una razón explícita para hacerlo.
+
+## 22.6. Responsabilidades de código y base de datos
+
+### El código decide
+
+- qué inputs existen;
+- qué significa cada input;
+- cómo se renderiza;
+- cómo se valida;
+- qué columna de Sheets representa;
+- cómo se normaliza;
+- de dónde obtiene sus opciones;
+- qué tipo de dato produce.
+
+### La base de datos decide
+
+- qué inputs específicos usa cada formulario;
+- en qué orden aparecen;
+- si están habilitados;
+- si un campo opcional pasa a ser obligatorio.
+
+La base de datos no podrá cambiar:
+
+- tipo visual;
+- nombre técnico;
+- nombre de columna;
+- reglas fundamentales de validación;
+- semántica del campo.
+
+## 22.7. Overrides limitados
+
+Una oferta podrá aplicar overrides controlados.
+
+Ejemplo:
+
+```text
+input_key: institucion
+required_override: true
+```
+
+No se crearán copias del input únicamente para cambiar obligatoriedad u orden.
+
+## 22.8. Fuentes dinámicas de opciones
+
+Los inputs `select` podrán usar proveedores de opciones.
+
+Ejemplo:
+
+```ts
+type OptionsSource =
+  | "static"
+  | "wordpress.orientaciones"
+  | "wordpress.menciones";
+```
+
+La definición del input permanece en código, mientras los valores disponibles pueden provenir de WordPress.
+
+Para orientación y mención:
+
+```text
+orientacion
+    ↓
+WordPress → orientaciones disponibles
+
+mencion
+    ↓
+WordPress → menciones válidas para la oferta/orientación
+```
+
+Si una mención depende de una orientación, esa relación debe validarse nuevamente en servidor durante el envío.
+
+## 22.9. Construcción del formulario
+
+Conceptualmente:
+
+```ts
+async function buildForm(target: AcademicTarget) {
+  const specificFields =
+    await formConfigRepository.getFields(target.id);
+
+  const keys = [
+    ...UNIVERSAL_INPUTS,
+    ...specificFields.map((field) => field.inputKey),
+  ];
+
+  return keys.map((key) => {
+    const definition = INPUTS[key];
+
+    return {
+      ...definition,
+      ...getOverrides(key, specificFields),
+    };
+  });
+}
+```
+
+El resultado debe alimentar una única cadena de responsabilidades:
+
+```text
+Catálogo de inputs
+        │
+        ▼
+Formulario final
+        │
+        ├── UI React
+        ├── validación cliente
+        ├── validación servidor
+        ├── columnas esperadas de Sheets
+        ├── normalización del POST
+        └── diagnóstico administrativo
+```
+
+## 22.10. Regla arquitectónica
+
+> Los inputs son componentes semánticos definidos en código. Cada destino académico solamente selecciona cuáles utiliza, en qué orden aparecen y qué overrides permitidos aplica.
+
+Esta regla evita convertir el panel administrativo en un constructor genérico de formularios y mantiene controlados el modelo de datos, la validación y el contrato con Google Sheets.
