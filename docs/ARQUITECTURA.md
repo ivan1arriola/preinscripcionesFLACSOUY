@@ -24,16 +24,30 @@ Cada sistema tendrá una responsabilidad explícita:
 | Google Drive | Documentación y estructura de archivos |
 | Servidor de Preinscripciones | Archivos temporales antes del envío |
 
-### 2.2. Sin base de datos de preinscripciones propia
+### 2.2. PostgreSQL como estado interno, no como fuente académica
 
-La nueva plataforma no tendrá PostgreSQL, MySQL ni otra base de datos como fuente de verdad de las preinscripciones.
+La plataforma utilizará **PostgreSQL** para su estado técnico y operativo interno.
 
-La persistencia final será:
+PostgreSQL podrá almacenar, entre otros:
 
-- Google Sheets para datos estructurados.
-- Google Drive para documentos.
+- configuración operativa;
+- caché de respuestas de WordPress;
+- referencias técnicas a carpetas y Spreadsheets;
+- sesiones de carga temporal;
+- metadata de archivos temporales;
+- errores y eventos del sistema;
+- estado de trabajos internos.
 
-Puede existir almacenamiento técnico de configuración, caché o logs si la implementación lo requiere, pero **no debe transformarse en una segunda fuente de verdad de los datos académicos o de las preinscripciones**.
+PostgreSQL **no será la fuente de verdad del catálogo académico** ni sustituirá a Google Sheets como espacio institucional de trabajo sobre las preinscripciones.
+
+Las fuentes de verdad quedan separadas:
+
+- **WordPress**: qué ofertas, cohortes, seminarios, ediciones, orientaciones, menciones y formularios existen, y si están abiertos.
+- **Google Sheets**: datos finales de las preinscripciones.
+- **Google Drive**: documentos definitivos.
+- **PostgreSQL**: estado técnico de la aplicación.
+
+Puede existir una copia técnica mínima de identificadores o estados de procesamiento, pero no debe transformarse en una segunda configuración académica independiente.
 
 ### 2.3. Formularios sin memoria
 
@@ -195,6 +209,8 @@ Para ofertas académicas:
 - orientaciones;
 - menciones;
 - relación entre orientación y mención;
+- lista ordenada de inputs específicos que utiliza el formulario;
+- overrides permitidos por input, cuando correspondan;
 - datos necesarios para construir el formulario.
 
 Para seminarios:
@@ -204,6 +220,8 @@ Para seminarios:
 - slug;
 - edición;
 - estado de preinscripción;
+- lista ordenada de inputs específicos que utiliza el formulario;
+- overrides permitidos por input, cuando correspondan;
 - datos necesarios para construir el formulario.
 
 ## 5.2. Responsabilidades de WordPress
@@ -222,7 +240,9 @@ Seminario
     └── abierta/cerrada
 ```
 
-La plataforma no debe mantener listas duplicadas de cohortes, orientaciones o menciones.
+WordPress también define **qué inputs específicos solicita cada destino académico y en qué orden**, utilizando únicamente claves de inputs soportadas por la plataforma.
+
+La plataforma no debe mantener listas duplicadas de ofertas, cohortes, seminarios, ediciones, orientaciones, menciones ni configuraciones de formulario por oferta.
 
 ## 5.3. API específica
 
@@ -246,36 +266,50 @@ El adaptador de WordPress debe transformar las respuestas en entidades del domin
 
 # 6. Formularios dinámicos
 
-## 6.1. Definición de formulario
+## 6.1. Composición de formulario
 
-Cada tipo de oferta académica o seminario puede tener campos diferentes.
+La plataforma no conoce de antemano qué ofertas académicas o seminarios existen.
 
-Debe existir un modelo explícito de definición de formulario.
+WordPress devuelve cada destino académico junto con la configuración de su formulario expresada como **claves de inputs soportadas por la aplicación**.
 
-Ejemplo conceptual:
+Ejemplo conceptual de una respuesta de WordPress:
 
-```ts
-interface FormDefinition {
-  id: string;
-  fields: FormField[];
-  spreadsheetColumns: SpreadsheetColumn[];
-}
-
-interface FormField {
-  key: string;
-  label: string;
-  type: "text" | "email" | "tel" | "date" | "select" | "textarea" | "file";
-  required: boolean;
-  options?: FormOption[];
+```json
+{
+  "id": "davia-c11",
+  "kind": "oferta",
+  "name": "DAVIA",
+  "registrationOpen": true,
+  "form": {
+    "inputs": [
+      { "key": "documento", "position": 10 },
+      { "key": "fechaNacimiento", "position": 20 },
+      { "key": "orientacion", "position": 30, "required": true },
+      { "key": "mencion", "position": 40 },
+      { "key": "titulo", "position": 50 }
+    ]
+  }
 }
 ```
 
-La definición debe ser la fuente común para:
+La aplicación combina:
 
-1. construir el formulario;
-2. validar el envío;
-3. conocer las columnas requeridas;
-4. escribir correctamente el Spreadsheet.
+```text
+inputs universales definidos en código
++
+inputs específicos pedidos por WordPress
+=
+formulario final
+```
+
+La aplicación resuelve cada clave contra su catálogo de inputs y genera a partir de esa composición:
+
+1. la interfaz;
+2. la validación cliente;
+3. la validación servidor;
+4. las columnas esperadas de Sheets;
+5. la normalización del envío;
+6. el diagnóstico administrativo.
 
 ## 6.2. Orientación y mención
 
@@ -435,19 +469,20 @@ Los demás datos del formulario no se persisten en el servidor.
 
 ## 9.2. Almacenamiento
 
-Los archivos deben guardarse en disco temporal fuera del web root.
+Los binarios se guardarán en un volumen persistente de Docker, fuera del web root.
 
-Ejemplo:
+Ejemplo lógico:
 
 ```text
-/var/tmp/preinscripciones/
+/app/storage/uploads/
 └── <upload-session-id>/
-    ├── manifest.json
     ├── <file-id-1>
     └── <file-id-2>
 ```
 
-No se recomienda almacenar los binarios en RAM.
+PostgreSQL mantendrá la metadata técnica de la sesión y de los archivos temporales.
+
+No se recomienda almacenar los binarios en PostgreSQL ni en RAM.
 
 ## 9.3. Sesión temporal
 
@@ -467,13 +502,7 @@ Una sesión temporal expira luego de **30 minutos sin actividad**.
 
 Cada nueva carga válida puede actualizar la última actividad.
 
-Un proceso periódico debe limpiar las sesiones expiradas.
-
-Ejemplo conceptual:
-
-```text
-*/5 * * * * cleanup-expired-uploads
-```
+Un worker de la aplicación consultará periódicamente PostgreSQL y eliminará las sesiones expiradas junto con sus archivos del volumen temporal.
 
 ## 9.5. Envío exitoso
 
@@ -801,6 +830,7 @@ src/
 │   └── errors/
 │
 └── infrastructure/
+    ├── database/
     ├── wordpress/
     ├── google-sheets/
     ├── google-drive/
@@ -885,7 +915,7 @@ La primera versión debe considerarse funcional cuando:
 2. puede resolver cohorte o edición;
 3. puede saber si una inscripción está abierta;
 4. puede obtener orientaciones y menciones;
-5. puede construir formularios diferentes según su definición;
+5. puede descubrir formularios y sus inputs específicos desde WordPress sin registrar ofertas localmente;
 6. puede cargar documentos temporalmente;
 7. elimina temporales luego de 30 minutos sin actividad;
 8. puede crear la estructura necesaria bajo una única carpeta raíz de Drive;
@@ -897,7 +927,9 @@ La primera versión debe considerarse funcional cuando:
 14. elimina temporales después de un envío exitoso;
 15. cuenta con un panel de administrador;
 16. muestra formularios, estados, enlaces y diagnósticos;
-17. registra errores útiles para administración técnica.
+17. registra errores útiles para administración técnica;
+18. detecta y bloquea formularios que solicitan inputs desconocidos;
+19. puede incorporar una nueva oferta publicada en WordPress sin alta manual en PostgreSQL, siempre que use inputs soportados.
 
 ---
 
@@ -927,15 +959,36 @@ La aplicación puede evolucionar internamente sin romper ese contrato.
 
 ## 22.1. Principio
 
-Los inputs de la plataforma se definirán **en código** como componentes semánticos reutilizables.
+Los inputs de la plataforma se definen **en código** como componentes semánticos reutilizables.
 
-Cada oferta académica, cohorte, seminario o edición no define un formulario completo desde cero. En cambio, registra qué inputs utiliza, en qué orden deben aparecer y, cuando corresponda, si un campo normalmente opcional pasa a ser obligatorio.
+La aplicación no mantiene una lista propia de ofertas ni configura qué campos usa DAVIA, MG, un seminario u otra propuesta concreta.
 
-La configuración no podrá redefinir la semántica de un input.
+Esa relación pertenece a WordPress.
 
-## 22.2. Diferencia entre tipo de input e input semántico
+La separación es:
 
-Los tipos de control son conceptos técnicos:
+```text
+WORDPRESS
+qué destinos académicos existen
+qué inputs específicos solicita cada uno
+en qué orden
+qué opciones académicas son válidas
+        │
+        ▼
+PREINSCRIPCIONES
+qué significa cada input
+cómo se renderiza
+cómo se valida
+cómo se guarda en Sheets
+        │
+        ▼
+SHEETS + DRIVE
+persistencia final
+```
+
+## 22.2. Diferencia entre tipo de control e input semántico
+
+Los tipos de control son detalles técnicos:
 
 ```ts
 type InputType =
@@ -949,9 +1002,9 @@ type InputType =
   | "file";
 ```
 
-Las ofertas no seleccionarán directamente tipos como `text`, `select` o `file`.
+WordPress no configura directamente esos tipos.
 
-Seleccionarán inputs semánticos conocidos, por ejemplo:
+WordPress referencia inputs semánticos conocidos:
 
 ```text
 nombre
@@ -968,15 +1021,16 @@ institucion
 ocupacion
 ```
 
-Cada input semántico ya conoce:
+Cada input semántico conoce en código:
 
-- su clave estable;
-- su etiqueta;
-- el tipo visual;
-- su validación;
-- su nombre de columna en Sheets;
-- su comportamiento;
-- su proveedor de opciones cuando corresponda.
+- clave estable;
+- etiqueta;
+- tipo visual;
+- validación;
+- nombre de columna de Sheets;
+- normalización;
+- comportamiento;
+- proveedor de opciones cuando corresponde.
 
 ## 22.3. Registro central de inputs
 
@@ -1002,7 +1056,7 @@ export interface InputDefinition {
 }
 ```
 
-Registro:
+Ejemplo de registro:
 
 ```ts
 export const INPUTS = {
@@ -1057,7 +1111,7 @@ export const INPUTS = {
 
 ## 22.4. Inputs universales
 
-Existirá un grupo de inputs que se incluirá automáticamente en todos los formularios.
+Existe un grupo de inputs incluido automáticamente en todos los formularios.
 
 Ejemplo conceptual:
 
@@ -1072,96 +1126,104 @@ export const UNIVERSAL_INPUTS = [
 
 La lista definitiva se fijará durante la implementación funcional.
 
-Cada formulario se construye como:
+WordPress no necesita repetir estos inputs para cada oferta.
 
-```text
-inputs universales
-+
-inputs específicos del destino académico
-```
+## 22.5. Configuración específica: responsabilidad de WordPress
 
-Esto evita duplicar los campos comunes en la configuración de cada oferta.
-
-## 22.5. Configuración por oferta, cohorte, seminario o edición
-
-La base de datos almacenará únicamente referencias a inputs conocidos.
+Cada oferta/cohorte o seminario/edición publicada por WordPress informa las claves de inputs específicos que requiere.
 
 Ejemplo conceptual:
 
-```text
-academic_form_fields
---------------------
-id
-academic_target_id
-input_key
-position
-required_override
-enabled
+```json
+{
+  "id": "davia-c11",
+  "form": {
+    "inputs": [
+      { "key": "documento", "position": 10 },
+      { "key": "fechaNacimiento", "position": 20 },
+      { "key": "orientacion", "position": 30, "required": true },
+      { "key": "mencion", "position": 40 },
+      { "key": "titulo", "position": 50 },
+      { "key": "escolaridad", "position": 60 }
+    ]
+  }
+}
 ```
 
-Ejemplo:
+La plataforma no guarda una tabla autoritativa del tipo:
 
 ```text
-DAVIA · Cohorte 11
-
-input_key          position
----------------------------
-documento             10
-fechaNacimiento       20
-orientacion           30
-mencion               40
-titulo                50
-escolaridad           60
+DAVIA → documento, orientación, mención...
+MG    → ...
 ```
 
-Los inputs universales no necesitan repetirse por cada formulario salvo que en el futuro exista una razón explícita para hacerlo.
+Puede cachear la respuesta de WordPress en PostgreSQL por rendimiento u observabilidad, pero el caché nunca es la configuración académica autoritativa.
 
-## 22.6. Responsabilidades de código y base de datos
+## 22.6. Responsabilidades
 
-### El código decide
+### WordPress decide
 
-- qué inputs existen;
+- qué ofertas académicas existen;
+- qué cohortes existen;
+- qué seminarios y ediciones existen;
+- cuáles están abiertas;
+- qué orientaciones existen;
+- qué menciones existen;
+- qué inputs específicos usa cada formulario;
+- en qué orden aparecen esos inputs;
+- qué overrides permitidos aplica cada input.
+
+### El código de Preinscripciones decide
+
+- qué inputs están soportados;
 - qué significa cada input;
 - cómo se renderiza;
 - cómo se valida;
-- qué columna de Sheets representa;
 - cómo se normaliza;
-- de dónde obtiene sus opciones;
-- qué tipo de dato produce.
+- qué columna de Sheets representa;
+- qué tipo de dato produce;
+- de dónde obtiene opciones dinámicas.
 
-### La base de datos decide
+### PostgreSQL puede almacenar
 
-- qué inputs específicos usa cada formulario;
-- en qué orden aparecen;
-- si están habilitados;
-- si un campo opcional pasa a ser obligatorio.
+- caché de la configuración recibida desde WordPress;
+- timestamps de sincronización;
+- referencias técnicas;
+- diagnóstico de compatibilidad.
 
-La base de datos no podrá cambiar:
+PostgreSQL no decide qué formulario pertenece a una oferta.
 
-- tipo visual;
-- nombre técnico;
-- nombre de columna;
-- reglas fundamentales de validación;
-- semántica del campo.
+## 22.7. Overrides permitidos
 
-## 22.7. Overrides limitados
-
-Una oferta podrá aplicar overrides controlados.
+WordPress puede solicitar overrides limitados que el contrato de la aplicación soporte explícitamente.
 
 Ejemplo:
 
-```text
-input_key: institucion
-required_override: true
+```json
+{
+  "key": "institucion",
+  "required": true,
+  "position": 30
+}
 ```
 
-No se crearán copias del input únicamente para cambiar obligatoriedad u orden.
+Los overrides iniciales permitidos serán:
+
+- orden/posición;
+- obligatoriedad;
+- habilitación, si fuera necesaria.
+
+WordPress no podrá redefinir:
+
+- el tipo visual;
+- la clave técnica;
+- la columna de Sheets;
+- las reglas estructurales de validación;
+- la semántica del input.
 
 ## 22.8. Fuentes dinámicas de opciones
 
-Los inputs `select` podrán usar proveedores de opciones.
-
-Ejemplo:
+Los inputs `select` pueden declarar proveedores de opciones.
 
 ```ts
 type OptionsSource =
@@ -1170,65 +1232,167 @@ type OptionsSource =
   | "wordpress.menciones";
 ```
 
-La definición del input permanece en código, mientras los valores disponibles pueden provenir de WordPress.
-
-Para orientación y mención:
+La definición del input vive en código; los valores académicos provienen de WordPress.
 
 ```text
 orientacion
     ↓
-WordPress → orientaciones disponibles
+WordPress → orientaciones válidas
 
 mencion
     ↓
 WordPress → menciones válidas para la oferta/orientación
 ```
 
-Si una mención depende de una orientación, esa relación debe validarse nuevamente en servidor durante el envío.
+La relación orientación/mención debe volver a validarse en servidor durante el envío.
 
 ## 22.9. Construcción del formulario
 
 Conceptualmente:
 
 ```ts
-async function buildForm(target: AcademicTarget) {
-  const specificFields =
-    await formConfigRepository.getFields(target.id);
+async function buildForm(targetId: string) {
+  const target = await academicCatalog.getTarget(targetId);
+
+  const requested = target.form.inputs
+    .sort((a, b) => a.position - b.position);
 
   const keys = [
-    ...UNIVERSAL_INPUTS,
-    ...specificFields.map((field) => field.inputKey),
+    ...UNIVERSAL_INPUTS.map((key) => ({ key })),
+    ...requested,
   ];
 
-  return keys.map((key) => {
-    const definition = INPUTS[key];
+  return keys.map((field) => {
+    const definition = INPUTS[field.key];
+
+    if (!definition) {
+      throw new UnsupportedInputError(field.key);
+    }
 
     return {
       ...definition,
-      ...getOverrides(key, specificFields),
+      ...allowedOverrides(field),
     };
   });
 }
 ```
 
-El resultado debe alimentar una única cadena de responsabilidades:
+El formulario resultante alimenta:
 
 ```text
-Catálogo de inputs
-        │
-        ▼
-Formulario final
-        │
-        ├── UI React
-        ├── validación cliente
-        ├── validación servidor
-        ├── columnas esperadas de Sheets
-        ├── normalización del POST
-        └── diagnóstico administrativo
+WordPress
+   │
+   ├── destino académico
+   └── claves de inputs específicos
+             │
+             ▼
+      catálogo INPUTS
+             │
+             ▼
+      formulario final
+             │
+     ┌───────┼─────────┐
+     ▼       ▼         ▼
+     UI   validación  Sheets
+                    + diagnóstico
 ```
 
-## 22.10. Regla arquitectónica
+## 22.10. Input desconocido
 
-> Los inputs son componentes semánticos definidos en código. Cada destino académico solamente selecciona cuáles utiliza, en qué orden aparecen y qué overrides permitidos aplica.
+Si WordPress solicita una clave que la aplicación no soporta, la plataforma debe considerarlo un error de compatibilidad.
 
-Esta regla evita convertir el panel administrativo en un constructor genérico de formularios y mantiene controlados el modelo de datos, la validación y el contrato con Google Sheets.
+Ejemplo:
+
+```text
+MG · Cohorte 9
+
+ERROR
+WordPress solicita un input no soportado:
+experiencia_profesional
+```
+
+La aplicación:
+
+1. no intenta adivinar su significado;
+2. no genera un input genérico;
+3. marca el formulario como no operativo;
+4. muestra el problema en el panel de diagnóstico;
+5. registra el error.
+
+Para habilitar ese campo debe agregarse primero una definición explícita al catálogo de inputs del código.
+
+## 22.11. Descubrimiento automático
+
+La aplicación no necesita una migración ni una configuración local cuando WordPress incorpora una nueva oferta, cohorte, seminario o edición.
+
+Si WordPress publica un nuevo destino que utiliza únicamente inputs soportados:
+
+```text
+WordPress publica nuevo destino
+        ↓
+Preinscripciones lo descubre
+        ↓
+resuelve sus inputs
+        ↓
+diagnostica Sheets/Drive
+        ↓
+formulario disponible
+```
+
+No existe un alta manual equivalente en PostgreSQL.
+
+## 22.12. Regla arquitectónica
+
+> **WordPress decide qué formularios existen y qué información necesita cada uno. Preinscripciones decide cómo interpretar, mostrar, validar y almacenar cada tipo de información.**
+
+Esta separación permite que WordPress sea realmente la fuente de verdad académica y mantiene a Preinscripciones desacoplada de ofertas concretas.
+
+---
+
+# 23. Implementación técnica acordada
+
+La implementación se realizará como un **monolito modular en TypeScript**, desplegado mediante Docker.
+
+Stack previsto:
+
+- Next.js para presentación pública, panel administrativo y endpoints de aplicación;
+- TypeScript;
+- PostgreSQL para estado técnico interno;
+- Prisma como acceso a PostgreSQL;
+- Docker Compose;
+- un contenedor de aplicación;
+- un contenedor worker basado en la misma imagen;
+- un contenedor PostgreSQL;
+- volumen persistente para PostgreSQL;
+- volumen persistente para archivos temporales;
+- API REST del plugin de WordPress;
+- Google Sheets API;
+- Google Drive API.
+
+Esquema conceptual:
+
+```text
+                 Apache
+                    │
+                    ▼
+          ┌─────────────────┐
+          │ app             │
+          │ Next.js         │
+          └────────┬────────┘
+                   │
+          ┌────────┴────────┐
+          ▼                 ▼
+┌─────────────────┐  ┌─────────────────┐
+│ PostgreSQL      │  │ worker          │
+│ estado interno  │  │ limpieza/jobs   │
+└─────────────────┘  └─────────────────┘
+          │
+          └──────────────┐
+                         ▼
+                  volumen uploads
+
+Integraciones externas:
+WordPress · Google Sheets · Google Drive
+```
+
+La arquitectura en capas debe mantenerse dentro del monolito; utilizar una sola aplicación desplegable no autoriza a que los componentes de presentación accedan directamente a Prisma, WordPress o Google APIs.
