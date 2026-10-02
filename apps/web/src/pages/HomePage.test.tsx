@@ -45,6 +45,15 @@ describe('HomePage Component', () => {
       status: 'incompatible',
       issues: ['Clave de input no soportada: campo_desconocido'],
     },
+    {
+      id: 'sem-1',
+      kind: 'seminar',
+      title: 'Seminario de Investigación Cualitativa',
+      registrationOpen: true,
+      configRevision: 'rev-4',
+      status: 'operational',
+      issues: [],
+    },
   ];
 
   beforeEach(() => {
@@ -63,14 +72,20 @@ describe('HomePage Component', () => {
       expect(screen.getByText('DAVIA Cohorte 11')).toBeInTheDocument();
       expect(screen.getByText('Maestría en Género Cohorte 8')).toBeInTheDocument();
       expect(screen.getByText('Oferta Incompatible')).toBeInTheDocument();
+      expect(screen.getByText('Seminario de Investigación Cualitativa')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Abierta')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Oferta académica' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Seminarios' })).toBeInTheDocument();
+    expect(screen.getByText('3 propuestas')).toBeInTheDocument();
+    expect(screen.getByText('1 propuesta')).toBeInTheDocument();
+
+    expect(screen.getAllByText('Abierta')).toHaveLength(2);
     expect(screen.getByText('Cerrada')).toBeInTheDocument();
     expect(screen.getByText('Incompatible')).toBeInTheDocument();
     expect(screen.getByText(/campo_desconocido/i)).toBeInTheDocument();
 
-    const openBtn = screen.getByRole('button', { name: /Completar preinscripción/i });
+    const openBtn = screen.getAllByRole('button', { name: /Completar preinscripción/i })[0]!;
     fireEvent.click(openBtn);
     expect(onSelect).toHaveBeenCalledWith('davia-c11');
   });

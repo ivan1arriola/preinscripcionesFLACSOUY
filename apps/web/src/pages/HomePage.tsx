@@ -51,6 +51,26 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
     );
   }
 
+  const academicOffers = targets.filter((target) => target.kind === 'academic_offer');
+  const seminars = targets.filter((target) => target.kind === 'seminar');
+
+  const renderSection = (title: string, description: string, sectionTargets: DiagnosticTarget[], sectionId: string) => (
+    <section aria-labelledby={sectionId} className="space-y-4">
+      <div className="border-b border-gray-200 pb-3">
+        <div className="flex items-baseline justify-between gap-4">
+          <h3 id={sectionId} className="text-xl font-bold text-gray-900">{title}</h3>
+          <span className="text-sm text-gray-500">{sectionTargets.length} propuesta{sectionTargets.length === 1 ? '' : 's'}</span>
+        </div>
+        <p className="text-sm text-gray-600 mt-1">{description}</p>
+      </div>
+      {sectionTargets.length > 0 ? <TargetList targets={sectionTargets} onSelectTarget={onSelectTarget} /> : (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-500">
+          No hay propuestas disponibles en esta categoría.
+        </div>
+      )}
+    </section>
+  );
+
   return (
     <div>
       <div className="mb-6">
@@ -60,7 +80,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
         </p>
       </div>
 
-      <TargetList targets={targets} onSelectTarget={onSelectTarget} />
+      <div className="space-y-10">
+        {renderSection('Oferta académica', 'Carreras, maestrías, especializaciones, diplomas y diplomados.', academicOffers, 'academic-offers-heading')}
+        {renderSection('Seminarios', 'Propuestas de formación breve y actualización.', seminars, 'seminars-heading')}
+      </div>
     </div>
   );
 };
