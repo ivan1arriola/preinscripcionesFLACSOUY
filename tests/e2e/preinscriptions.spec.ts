@@ -250,4 +250,78 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await expect(page.getByText(/Acceso exclusivo institucional/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /Iniciar sesión con Google/i })).toBeVisible();
   });
+
+  test('seminar legacy permalink resolves unique open edition, shows notice when closed, and warns on conflict', async ({ page }) => {
+    const semEd1 = {
+      id: 'sem-dcv-ed1',
+      kind: 'seminar',
+      title: 'Diseño de Cursos Virtuales - Edición 2026-01',
+      registrationOpen: false,
+      registrationAvailability: 'closed',
+      configRevision: 'rev-1',
+      status: 'closed',
+      issues: [],
+      urls: {
+        legacyRegistration: 'https://flacso.edu.uy/seminario/diseno-de-cursos-virtuales/',
+      },
+    };
+
+    const semEd2 = {
+      id: 'seminario-metodologia-ed3',
+      kind: 'seminar',
+      title: 'Seminario de Investigación Cualitativa - Edición 2026-03',
+      registrationOpen: true,
+      registrationAvailability: 'open',
+      configRevision: 'sem-met-ed3-v1',
+      status: 'operational',
+      issues: [],
+      urls: {
+        legacyRegistration: 'https://flacso.edu.uy/seminario/diseno-de-cursos-virtuales/',
+      },
+    };
+
+    // 1. One open and one closed edition: opens the open edition form
+    await page.route('**/api/targets', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ targets: [semEd1, semEd2] }),
+      });
+    });
+
+    await page.goto('/seminario/diseno-de-cursos-virtuales/');
+    await expect(page.getByText('Seminario de Investigación Cualitativa - Edición 2026-03')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Datos personales y demográficos' })).toBeVisible();
+
+    // 2. Both editions closed: displays closed notice
+    await page.route('**/api/targets', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          targets: [semEd1, { ...semEd2, registrationOpen: false, registrationAvailability: 'closed', status: 'closed' }],
+        }),
+      });
+    });
+
+    await page.goto('/seminario/diseno-de-cursos-virtuales/');
+    await expect(page.getByText(/Las preinscripciones para este seminario no se encuentran abiertas en este momento/i)).toBeVisible();
+
+    // 3. Both editions open: displays conflict notice
+    await page.route('**/api/targets', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          targets: [
+            { ...semEd1, registrationOpen: true, registrationAvailability: 'conflict', status: 'incompatible', issues: ['multiple_open_seminar_editions'] },
+            { ...semEd2, registrationOpen: true, registrationAvailability: 'conflict', status: 'incompatible', issues: ['multiple_open_seminar_editions'] },
+          ],
+        }),
+      });
+    });
+
+    await page.goto('/seminario/diseno-de-cursos-virtuales/');
+    await expect(page.getByText(/conflicto o inconsistencia en la configuración del catálogo/i)).toBeVisible();
+  });
 });

@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import type { AcademicTarget } from '@flacso/contracts';
+import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import { FixtureAcademicCatalog } from '../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../infrastructure/database/in-memory-submission-repository.js';
 import { MemoryFormProfileRepository } from '../infrastructure/fixtures/memory-form-profile-repository.js';
@@ -261,8 +263,8 @@ describe('submitPreinscription Use Case', () => {
       ];
       const mockCatalog: AcademicCatalog = {
         listTargets: async () => targets,
-        getTarget: async (id) => targets.find((t) => t.id === id) ?? null,
-        revalidateTarget: async (id) => targets.find((t) => t.id === id) ?? null,
+        getTarget: async (id: string) => targets.find((t) => t.id === id) ?? null,
+        revalidateTarget: async (id: string) => targets.find((t) => t.id === id) ?? null,
         revalidateTargets: async () => targets,
       };
 
@@ -314,8 +316,8 @@ describe('submitPreinscription Use Case', () => {
       ];
       const mockCatalog: AcademicCatalog = {
         listTargets: async () => targets,
-        getTarget: async (id) => targets.find((t) => t.id === id) ?? null,
-        revalidateTarget: async (id) => targets.find((t) => t.id === id) ?? null,
+        getTarget: async (id: string) => targets.find((t) => t.id === id) ?? null,
+        revalidateTarget: async (id: string) => targets.find((t) => t.id === id) ?? null,
         revalidateTargets: async () => targets,
       };
 

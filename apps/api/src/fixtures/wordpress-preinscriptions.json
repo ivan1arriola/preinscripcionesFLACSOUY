@@ -144,7 +144,8 @@
       "orientations": [],
       "mentions": [],
       "urls": {
-        "public": "https://flacso.edu.uy/seminarios/metodologia"
+        "public": "https://flacso.edu.uy/seminarios/metodologia",
+        "legacyRegistration": "https://flacso.edu.uy/seminario/metodologia/"
       }
     },
     {
