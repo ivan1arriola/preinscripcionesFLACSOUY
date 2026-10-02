@@ -20,6 +20,7 @@ describe('validateSubmission', () => {
       { key: 'documento', label: 'Documento', type: 'text', required: true, position: 7 },
       { key: 'paisEmisorDocumento', label: 'País emisor', type: 'text', required: true, position: 8 },
       { key: 'genero', label: 'Identidad de género', type: 'select', required: true, position: 9 },
+      { key: 'generoOtra', label: 'Especifique su identidad de género', type: 'text', required: false, position: 10 },
       { key: 'etnia', label: 'Raza / etnia', type: 'text', required: true, position: 10 },
       { key: 'celular', label: 'Celular', type: 'tel', required: true, position: 11 },
       { key: 'domicilio', label: 'Domicilio', type: 'text', required: true, position: 12 },
@@ -27,6 +28,7 @@ describe('validateSubmission', () => {
       { key: 'paisNacimiento', label: 'País de nacimiento', type: 'text', required: true, position: 14 },
       { key: 'paisResidencia', label: 'País de residencia', type: 'text', required: true, position: 15 },
       { key: 'tieneConvenio', label: '¿Te corresponde algún convenio?', type: 'select', required: true, position: 16 },
+      { key: 'convenioWordpressId', label: '¿Cuál convenio te corresponde?', type: 'text', required: false, position: 17 },
       { key: 'fuente', label: '¿Cómo conociste esta propuesta?', type: 'select', required: true, position: 17 },
       { key: 'aceptaDifusion', label: '¿Autorizás la difusión?', type: 'select', required: true, position: 18 },
       { key: 'estudios', label: 'Estudios cursados', type: 'textarea', required: true, position: 19 },
@@ -71,6 +73,7 @@ describe('validateSubmission', () => {
     documento: '1234567-8',
     paisEmisorDocumento: 'Uruguay',
     genero: 'Mujer',
+    generoOtra: '',
     etnia: 'No declara',
     celular: '099123456',
     domicilio: 'Montevideo',
@@ -78,6 +81,7 @@ describe('validateSubmission', () => {
     paisNacimiento: 'Uruguay',
     paisResidencia: 'Uruguay',
     tieneConvenio: 'No',
+    convenioWordpressId: '',
     fuente: 'Web',
     aceptaDifusion: 'No',
     estudios: 'Licenciatura',
@@ -136,5 +140,41 @@ describe('validateSubmission', () => {
     const result = validateSubmission(form, validValues, 'old-rev');
     expect(result.valid).toBe(false);
     expect(result.fieldErrors._form).toContain('El formulario ha sido actualizado. Por favor recargue la página.');
+  });
+
+  it('requires conditional details for document, gender, agreement and postgraduate answers', () => {
+    const result = validateSubmission(form, {
+      ...validValues,
+      tipoDocumento: 'pasaporte',
+      paisEmisorDocumento: '',
+      genero: 'Otra',
+      generoOtra: '',
+      tieneConvenio: 'Si',
+      convenioWordpressId: '',
+      posgradoFlacso: 'Si',
+      posgradoCual: '',
+    }, 'rev-xyz');
+
+    expect(result.valid).toBe(false);
+    expect(result.fieldErrors.paisEmisorDocumento).toBeDefined();
+    expect(result.fieldErrors.generoOtra).toBeDefined();
+    expect(result.fieldErrors.convenioWordpressId).toBeDefined();
+    expect(result.fieldErrors.posgradoCual).toBeDefined();
+  });
+
+  it('rejects unsupported document and select values', () => {
+    const result = validateSubmission(form, {
+      ...validValues,
+      tipoDocumento: 'documento-inventado',
+      genero: 'identidad-inventada',
+      aceptaDifusion: 'Tal vez',
+      posgradoFlacso: 'Quizás',
+    }, 'rev-xyz');
+
+    expect(result.valid).toBe(false);
+    expect(result.fieldErrors.tipoDocumento).toBeDefined();
+    expect(result.fieldErrors.genero).toBeDefined();
+    expect(result.fieldErrors.aceptaDifusion).toBeDefined();
+    expect(result.fieldErrors.posgradoFlacso).toBeDefined();
   });
 });

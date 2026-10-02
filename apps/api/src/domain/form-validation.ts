@@ -1,6 +1,12 @@
 import type { FormDefinition, ValidationResult } from '@flacso/contracts';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DOCUMENT_TYPES = new Set(['cedula_uruguaya', 'pasaporte', 'documento_extranjero']);
+const GENDER_VALUES = new Set([
+  'Mujer', 'Varon', 'Mujer trans', 'Varon trans',
+  'No binarie / no conforme', 'Otra', 'Prefiero no responder',
+]);
+const YES_NO_VALUES = new Set(['Si', 'No']);
 
 export function validateSubmission(
   form: FormDefinition,
@@ -50,6 +56,45 @@ export function validateSubmission(
 
   if (mencionVal && !(form.mentions ?? []).some((mention) => mention.id === mencionVal)) {
     addError('mencion', 'La mención seleccionada no es válida.');
+  }
+
+  const tipoDocumento = values.tipoDocumento?.trim();
+  if (tipoDocumento && !DOCUMENT_TYPES.has(tipoDocumento)) {
+    addError('tipoDocumento', 'El tipo de documento seleccionado no es válido.');
+  }
+
+  const paisEmisor = values.paisEmisorDocumento?.trim();
+  if (tipoDocumento && tipoDocumento !== 'cedula_uruguaya' && !paisEmisor) {
+    addError('paisEmisorDocumento', 'Indicá el país que emitió el documento.');
+  }
+
+  const genero = values.genero?.trim();
+  if (genero && !GENDER_VALUES.has(genero)) {
+    addError('genero', 'La identidad de género seleccionada no es válida.');
+  }
+  if (genero === 'Otra' && !values.generoOtra?.trim()) {
+    addError('generoOtra', 'Especificá tu identidad de género.');
+  }
+
+  const tieneConvenio = values.tieneConvenio?.trim();
+  if (tieneConvenio && !YES_NO_VALUES.has(tieneConvenio)) {
+    addError('tieneConvenio', 'La respuesta sobre convenio no es válida.');
+  }
+  if (tieneConvenio === 'Si' && !values.convenioWordpressId?.trim()) {
+    addError('convenioWordpressId', 'Seleccioná el convenio que te corresponde.');
+  }
+
+  const aceptaDifusion = values.aceptaDifusion?.trim();
+  if (aceptaDifusion && !YES_NO_VALUES.has(aceptaDifusion)) {
+    addError('aceptaDifusion', 'La respuesta sobre difusión no es válida.');
+  }
+
+  const posgradoFlacso = values.posgradoFlacso?.trim();
+  if (posgradoFlacso && !YES_NO_VALUES.has(posgradoFlacso)) {
+    addError('posgradoFlacso', 'La respuesta sobre posgrado no es válida.');
+  }
+  if (posgradoFlacso === 'Si' && !values.posgradoCual?.trim()) {
+    addError('posgradoCual', 'Indicá cuál posgrado cursaste en FLACSO.');
   }
 
   const valid = Object.keys(fieldErrors).length === 0;

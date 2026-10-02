@@ -66,6 +66,16 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
         })
         .execute();
 
+      await trx
+        .insertInto('submission_processing')
+        .values({
+          submission_id: submissionId,
+          status: 'pending',
+          error_message: null,
+          updated_at: new Date(),
+        })
+        .execute();
+
       // 4. Insert submission values
       for (const [key, value] of Object.entries(record.values)) {
         if (value !== undefined && value !== null && value.trim().length > 0) {

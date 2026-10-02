@@ -48,6 +48,13 @@ export interface SubmissionsTable {
   submitted_at: Generated<Date>;
 }
 
+export interface SubmissionProcessingTable {
+  submission_id: string;
+  status: 'pending' | 'success' | 'failed' | 'unknown';
+  error_message: string | null;
+  updated_at: Generated<Date>;
+}
+
 export interface SubmissionValuesTable {
   submission_id: string;
   input_key: string;
@@ -89,9 +96,9 @@ export interface DatabaseSchema {
   mentions: MentionsTable;
   orientation_mentions: OrientationMentionsTable;
   submissions: SubmissionsTable;
+  submission_processing: SubmissionProcessingTable;
   submission_values: SubmissionValuesTable;
   technical_cache: TechnicalCacheTable;
   target_spreadsheets: TargetSpreadsheetsTable;
   spreadsheet_operations: SpreadsheetOperationsTable;
 }
-
