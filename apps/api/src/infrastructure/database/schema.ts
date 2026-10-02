@@ -97,6 +97,21 @@ export interface UploadSessionFilesTable {
   uploaded_at: Generated<Date>;
 }
 
+export interface SystemErrorsTable {
+  id: string;
+  severity: string;
+  origin: string;
+  code: string;
+  message: string;
+  context: any;
+  target_id: string | null;
+  status: string;
+  resolved_at: Date | null;
+  resolved_by: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -111,6 +126,7 @@ export interface DatabaseSchema {
   spreadsheet_operations: SpreadsheetOperationsTable;
   upload_sessions: UploadSessionsTable;
   upload_session_files: UploadSessionFilesTable;
+  system_errors: SystemErrorsTable;
 }
 
 

@@ -9,6 +9,10 @@ import { WordPressClient } from './infrastructure/wordpress/wordpress-client.js'
 import { WordPressAcademicCatalog } from './infrastructure/wordpress/wordpress-academic-catalog.js';
 import { PostgresWordPressCache } from './infrastructure/wordpress/wordpress-cache.js';
 
+import { PostgresSystemErrorRepository } from './infrastructure/database/postgres-system-error-repository.js';
+import { AdminAuthService } from './infrastructure/auth/admin-auth.js';
+import { AdminService } from './application/admin/admin-service.js';
+
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
 
@@ -20,6 +24,24 @@ const catalog = process.env.WORDPRESS_URL
   : new FixtureAcademicCatalog();
 
 const repository = new PostgresSubmissionRepository(db);
+const errorRepository = new PostgresSystemErrorRepository(db);
+const authService = new AdminAuthService();
+
+const checkDb = async () => {
+  try {
+    await sql`SELECT 1`.execute(db);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const adminService = new AdminService({
+  catalog,
+  errorRepo: errorRepository,
+  db,
+  checkDatabase: checkDb,
+});
 
 // Attempt migration on startup if database is accessible
 try {
@@ -31,14 +53,10 @@ try {
 const app = createApp({
   catalog,
   repository,
-  checkDatabase: async () => {
-    try {
-      await sql`SELECT 1`.execute(db);
-      return true;
-    } catch {
-      return false;
-    }
-  },
+  errorRepository,
+  authService,
+  adminService,
+  checkDatabase: checkDb,
 });
 
 app.listen(port, () => {
