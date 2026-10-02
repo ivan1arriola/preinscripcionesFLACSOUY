@@ -2,6 +2,7 @@ import { createApp } from './presentation/http/app.js';
 import { FixtureAcademicCatalog } from './infrastructure/fixtures/fixture-academic-catalog.js';
 import { PostgresSubmissionRepository } from './infrastructure/database/postgres-submission-repository.js';
 import { PostgresFormProfileRepository } from './infrastructure/database/postgres-form-profile-repository.js';
+import { PostgresSystemSettingsRepository } from './infrastructure/database/postgres-system-settings-repository.js';
 import { createKyselyDb } from './infrastructure/database/kysely.js';
 import { runMigrations } from './infrastructure/database/migrate.js';
 import { sql } from 'kysely';
@@ -19,6 +20,7 @@ const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
 
 const formProfileRepository = new PostgresFormProfileRepository(db);
+const systemSettingsRepository = new PostgresSystemSettingsRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
   ? new WordPressAcademicCatalog(
@@ -35,10 +37,10 @@ const temporaryFileStorage = new TemporaryFileStorage({
   allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
 });
 const googleCreds = loadAllGoogleCredentials();
-const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || '1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e';
+const defaultDriveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || '1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e';
 
 if (googleCreds.serviceAccountPath) {
-  console.log(`[Google] Cuenta de servicio detectada: ${googleCreds.serviceAccountPath}`);
+  console.log(`[Google] Cuenta de servicio detectada: ${googleCreds.serviceAccountPath} (${googleCreds.clientEmail || 'sin email'})`);
 } else if (process.env.GOOGLE_ACCESS_TOKEN) {
   console.log('[Google] Token manual configurado en GOOGLE_ACCESS_TOKEN');
 } else {
@@ -47,9 +49,10 @@ if (googleCreds.serviceAccountPath) {
 
 const isMockDrive = process.env.GOOGLE_DRIVE_MOCK === 'true';
 
-const googleDriveRepository = !isMockDrive && googleCreds.tokenProvider && driveFolderId
+const googleDriveRepository = !isMockDrive && googleCreds.tokenProvider
   ? new GoogleDriveRepository({
-      folderId: driveFolderId,
+      folderIdOrProvider: async () =>
+        (await systemSettingsRepository.getSetting('google_drive_folder_id')) || defaultDriveFolderId,
       accessTokenOrProvider: googleCreds.tokenProvider,
     })
   : process.env.NODE_ENV !== 'production' || isMockDrive
@@ -98,6 +101,8 @@ const app = createApp({
   googleDriveRepository,
   formProfileRepository,
   googleIdentityVerifier,
+  systemSettingsRepository,
+  serviceAccountEmail: googleCreds.clientEmail,
   checkDatabase: checkDb,
 });
 

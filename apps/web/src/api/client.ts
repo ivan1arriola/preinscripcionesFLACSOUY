@@ -180,4 +180,34 @@ export const apiClient = {
       throw new ApiError(res.status, err.error?.code || 'ACTIVATE_VERSION_ERROR', err.error?.message || 'Error al activar versión');
     }
   },
+
+  async getAdminSettings(): Promise<{
+    googleDriveFolderId: string;
+    serviceAccountEmail: string | null;
+    updatedAt: string | null;
+    updatedBy: string | null;
+  }> {
+    const res = await fetch('/api/admin/settings');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'SETTINGS_ERROR', err.error?.message || 'Error al obtener configuración');
+    }
+    return res.json();
+  },
+
+  async updateGoogleDriveFolder(folderId: string, csrfToken: string): Promise<{ ok: boolean; googleDriveFolderId: string }> {
+    const res = await fetch('/api/admin/settings/google-drive', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+      },
+      body: JSON.stringify({ folderId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'UPDATE_SETTINGS_ERROR', err.error?.message || 'Error al actualizar carpeta de Google Drive');
+    }
+    return res.json();
+  },
 };

@@ -22,6 +22,9 @@ import {
   createAdminMeRoute,
 } from './admin-auth-routes.js';
 import { createAdminProfileRoutes } from './admin-profile-routes.js';
+import type { SystemSettingsRepository } from '../../ports/system-settings-repository.js';
+import { MemorySystemSettingsRepository } from '../../infrastructure/fixtures/memory-system-settings-repository.js';
+import { createAdminSettingsRoutes } from './admin-settings-routes.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -32,6 +35,8 @@ export interface AppDependencies {
   formProfileRepository?: FormProfileRepository;
   googleIdentityVerifier?: GoogleIdentityVerifierPort;
   adminSessionStore?: AdminSessionStore;
+  systemSettingsRepository?: SystemSettingsRepository;
+  serviceAccountEmail?: string;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
@@ -82,6 +87,9 @@ export function createApp(dependencies: AppDependencies): Express {
   }
   app.use('/api/admin', createAdminMeRoute(sessionStore));
   app.use('/api/admin/profiles', createAdminProfileRoutes(profileRepo, sessionStore));
+
+  const settingsRepo = dependencies.systemSettingsRepository ?? new MemorySystemSettingsRepository();
+  app.use('/api/admin/settings', createAdminSettingsRoutes(settingsRepo, sessionStore, dependencies.serviceAccountEmail));
 
   // Central error handler
   app.use(errorHandler);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiClient, ApiError } from '../api/client.js';
 import { ProfileVersionEditor } from '../components/ProfileVersionEditor.js';
+import { AdminDriveSettingsCard } from '../components/AdminDriveSettingsCard.js';
 
 interface AdminProfilesPageProps {
   onRequireLogin: () => void;
@@ -19,6 +20,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
   onRequireLogin,
   onLogout,
 }) => {
+  const [activeSection, setActiveSection] = useState<'profiles' | 'drive'>('profiles');
   const [adminUser, setAdminUser] = useState<any>(null);
   const [csrfToken, setCsrfToken] = useState<string>('');
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -150,49 +152,85 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
         </div>
       )}
 
-      {/* Tabs for Offer Types */}
-      <div className="flex border-b border-gray-200 mb-8 overflow-x-auto" role="tablist" aria-label="Tipos de oferta">
-        {['diploma', 'maestria', 'especializacion', 'diplomado', 'seminar'].map((type) => {
-          const profileItem = profiles.find((p) => p.type === type);
-          const isSelected = selectedType === type;
-          const label = profileItem?.name ?? PROFILE_TYPE_LABELS[type] ?? type;
-
-          return (
-            <button
-            key={type}
-            type="button"
-            role="tab"
-            aria-selected={isSelected}
-              onClick={() => setSelectedType(type)}
-              className={`py-3 px-6 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                isSelected
-                  ? 'border-blue-600 text-blue-600 font-semibold'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {label}
-            </button>
-          );
-        })}
+      {/* Main Section Navigation */}
+      <div className="flex gap-2 border-b border-gray-200 mb-6" role="tablist" aria-label="Secciones de administración">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'profiles'}
+          onClick={() => setActiveSection('profiles')}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            activeSection === 'profiles'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          📋 Perfiles de Formulario
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'drive'}
+          onClick={() => setActiveSection('drive')}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            activeSection === 'drive'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          📁 Almacenamiento Google Drive
+        </button>
       </div>
 
-      {/* Profile Detail and Editor */}
-      {loading ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Cargando perfil...</p>
-        </div>
-      ) : selectedProfileDetail ? (
-        <ProfileVersionEditor
-          profile={selectedProfileDetail.profile}
-          activeVersion={selectedProfileDetail.activeVersion}
-          versions={selectedProfileDetail.versions}
-          csrfToken={csrfToken}
-          onRefresh={() => {
-            loadProfiles();
-            loadProfileDetail(selectedType, true);
-          }}
-        />
-      ) : null}
+      {activeSection === 'drive' ? (
+        <AdminDriveSettingsCard csrfToken={csrfToken} />
+      ) : (
+        <>
+          {/* Tabs for Offer Types */}
+          <div className="flex border-b border-gray-200 mb-8 overflow-x-auto" role="tablist" aria-label="Tipos de oferta">
+            {['diploma', 'maestria', 'especializacion', 'diplomado', 'seminar'].map((type) => {
+              const profileItem = profiles.find((p) => p.type === type);
+              const isSelected = selectedType === type;
+              const label = profileItem?.name ?? PROFILE_TYPE_LABELS[type] ?? type;
+
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => setSelectedType(type)}
+                  className={`py-3 px-6 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                    isSelected
+                      ? 'border-blue-600 text-blue-600 font-semibold'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Profile Detail and Editor */}
+          {loading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Cargando perfil...</p>
+            </div>
+          ) : selectedProfileDetail ? (
+            <ProfileVersionEditor
+              profile={selectedProfileDetail.profile}
+              activeVersion={selectedProfileDetail.activeVersion}
+              versions={selectedProfileDetail.versions}
+              csrfToken={csrfToken}
+              onRefresh={() => {
+                loadProfiles();
+                loadProfileDetail(selectedType, true);
+              }}
+            />
+          ) : null}
+        </>
+      )}
     </div>
   );
 };

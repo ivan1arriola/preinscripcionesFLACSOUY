@@ -6,7 +6,6 @@ import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/googl
 import type { AdminUser } from '../../domain/form-profiles.js';
 import {
   ALLOWED_ADMIN_EMAIL,
-  getAllowedAdminEmails,
   ADMIN_SESSION_COOKIE,
   type AdminSessionStore,
   type RequestWithAdminSession,
@@ -68,12 +67,11 @@ export function createAdminAuthRoutes(
         expectedNonce: nonce,
       });
 
-      const allowedEmails = getAllowedAdminEmails();
-      if (!allowedEmails.includes(identity.email.toLowerCase())) {
+      if (identity.email.toLowerCase() !== ALLOWED_ADMIN_EMAIL) {
         res.status(403).json({
           error: {
             code: 'FORBIDDEN',
-            message: `El correo "${identity.email}" no está autorizado para acceder al panel administrativo. Solo están autorizados: ${allowedEmails.join(', ')}.`,
+            message: `El correo "${identity.email}" no está autorizado para acceder al panel administrativo. Solo está autorizado ${ALLOWED_ADMIN_EMAIL}.`,
           },
         });
         return;

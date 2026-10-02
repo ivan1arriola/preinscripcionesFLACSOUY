@@ -1,7 +1,8 @@
 import type { GoogleDriveRepositoryPort, StoreSubmissionFilesCommand, StoredDriveFile } from '../../ports/google-drive-repository.js';
 
 interface GoogleDriveRepositoryOptions {
-  folderId: string;
+  folderId?: string;
+  folderIdOrProvider?: string | (() => Promise<string>);
   accessTokenOrProvider: string | (() => Promise<string>);
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
@@ -9,6 +10,7 @@ interface GoogleDriveRepositoryOptions {
 
 export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
   private readonly tokenProvider: () => Promise<string>;
+  private readonly folderIdProvider: () => Promise<string>;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
 
@@ -16,18 +18,25 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
     this.tokenProvider = typeof options.accessTokenOrProvider === 'function'
       ? options.accessTokenOrProvider
       : async () => options.accessTokenOrProvider as string;
+
+    const rawFolder = options.folderIdOrProvider ?? options.folderId ?? '1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e';
+    this.folderIdProvider = typeof rawFolder === 'function'
+      ? rawFolder
+      : async () => rawFolder as string;
+
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 15000;
   }
 
   async storeSubmissionFiles(command: StoreSubmissionFilesCommand): Promise<StoredDriveFile[]> {
     const token = await this.tokenProvider();
+    const folderId = await this.folderIdProvider();
     const result: StoredDriveFile[] = [];
     for (const file of command.files) {
       const boundary = `flacso-${command.submissionId}-${file.token}`;
       const metadata = JSON.stringify({
         name: file.originalName,
-        parents: [this.options.folderId],
+        parents: [folderId],
         appProperties: { flacsoSubmissionId: command.submissionId, flacsoFileToken: file.token },
       });
       const body = Buffer.concat([

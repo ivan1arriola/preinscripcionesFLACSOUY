@@ -10,6 +10,7 @@ export interface LoadedGoogleOAuthConfig {
 
 export interface GoogleCredentialsResult {
   serviceAccountPath?: string;
+  clientEmail?: string;
   tokenProvider?: () => Promise<string>;
   oauthConfig: LoadedGoogleOAuthConfig;
 }
@@ -71,6 +72,7 @@ export function loadGoogleOAuthSecrets(explicitPath?: string): LoadedGoogleOAuth
 
 export function loadGoogleServiceAccountCredentials(explicitPath?: string): {
   serviceAccountPath?: string;
+  clientEmail?: string;
   tokenProvider?: () => Promise<string>;
 } {
   const file = findSecretFile(
@@ -79,6 +81,12 @@ export function loadGoogleServiceAccountCredentials(explicitPath?: string): {
   );
 
   if (file) {
+    let clientEmail: string | undefined;
+    try {
+      const saJson = JSON.parse(fs.readFileSync(file, 'utf8'));
+      clientEmail = saJson.client_email;
+    } catch {}
+
     const auth = new GoogleAuth({
       keyFile: file,
       scopes: [
@@ -89,6 +97,7 @@ export function loadGoogleServiceAccountCredentials(explicitPath?: string): {
 
     return {
       serviceAccountPath: file,
+      clientEmail,
       tokenProvider: async () => {
         const client = await auth.getClient();
         const tokenRes = await client.getAccessToken();
@@ -116,6 +125,7 @@ export function loadAllGoogleCredentials(): GoogleCredentialsResult {
 
   return {
     serviceAccountPath: sa.serviceAccountPath,
+    clientEmail: sa.clientEmail,
     tokenProvider: sa.tokenProvider,
     oauthConfig,
   };
