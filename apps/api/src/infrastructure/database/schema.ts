@@ -61,6 +61,26 @@ export interface TechnicalCacheTable {
   expires_at: Date;
 }
 
+export interface TargetSpreadsheetsTable {
+  target_id: string;
+  spreadsheet_id: string;
+  sheet_name: string;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface SpreadsheetOperationsTable {
+  id: string;
+  submission_id: string;
+  target_id: string;
+  spreadsheet_id: string;
+  status: 'pending' | 'success' | 'failed' | 'unknown';
+  error_message: string | null;
+  updated_range: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -71,5 +91,7 @@ export interface DatabaseSchema {
   submissions: SubmissionsTable;
   submission_values: SubmissionValuesTable;
   technical_cache: TechnicalCacheTable;
+  target_spreadsheets: TargetSpreadsheetsTable;
+  spreadsheet_operations: SpreadsheetOperationsTable;
 }
 
