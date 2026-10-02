@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "targets": [
+    {
+      "id": "davia-c11",
+      "kind": "academic_offer",
+      "title": "Diploma Superior en Aprendizaje Visual e Inteligencia Artificial - Cohorte 11",
+      "registrationOpen": true,
+      "registrationWindow": {
+        "from": "2026-09-01T00:00:00Z",
+        "until": "2026-11-30T23:59:59Z"
+      },
+      "configRevision": "davia-c11-v1",
+      "form": {
+        "valid": true,
+        "inputs": [
+          { "key": "documento", "position": 10, "required": true },
+          { "key": "fechaNacimiento", "position": 20, "required": true },
+          { "key": "orientacion", "position": 30, "required": true },
+          { "key": "mencion", "position": 40, "required": false },
+          { "key": "titulo", "position": 50, "required": true }
+        ],
+        "issues": []
+      },
+      "orientations": [
+        {
+          "id": "educacion",
+          "name": "Educación",
+          "mentions": [
+            { "id": "tec-edu", "name": "Tecnología Educativa" },
+            { "id": "gestion-edu", "name": "Gestión de Entornos Digitales" }
+          ]
+        },
+        {
+          "id": "politicas",
+          "name": "Políticas Públicas",
+          "mentions": [
+            { "id": "innovacion-publica", "name": "Innovación en el Sector Público" }
+          ]
+        }
+      ],
+      "urls": {
+        "public": "https://flacso.edu.uy/ofertas/davia",
+        "wordpress": "https://flacso.edu.uy/wp-admin/post.php?post=12295&action=edit",
+        "edit": "https://flacso.edu.uy/wp-admin/post.php?post=1234&action=edit",
+        "legacyRegistration": "https://flacso.edu.uy/preinscripcion-legacy"
+      }
+    },
+    {
+      "id": "mg-c8",
+      "kind": "academic_offer",
+      "title": "Maestría en Género, Sociedad y Políticas - Cohorte 8",
+      "registrationOpen": false,
+      "registrationWindow": {
+        "from": "2026-01-01T00:00:00Z",
+        "until": "2026-03-31T23:59:59Z"
+      },
+      "configRevision": "mg-c8-v1",
+      "form": {
+        "valid": true,
+        "inputs": [
+          { "key": "documento", "position": 10, "required": true },
+          { "key": "titulo", "position": 20, "required": true },
+          { "key": "escolaridad", "position": 30, "required": true }
+        ],
+        "issues": []
+      },
+      "orientations": [],
+      "urls": {
+        "public": "https://flacso.edu.uy/ofertas/mg"
+      }
+    },
+    {
+      "id": "seminario-metodologia-ed3",
+      "kind": "seminar",
+      "title": "Seminario de Investigación Cualitativa - Edición 2026-03",
+      "registrationOpen": true,
+      "registrationWindow": {
+        "from": "2026-08-01T00:00:00Z",
+        "until": "2026-10-31T23:59:59Z"
+      },
+      "configRevision": "sem-met-ed3-v1",
+      "form": {
+        "valid": true,
+        "inputs": [
+          { "key": "institucion", "position": 10, "required": false },
+          { "key": "ocupacion", "position": 20, "required": false }
+        ],
+        "issues": []
+      },
+      "orientations": [],
+      "urls": {
+        "public": "https://flacso.edu.uy/seminarios/metodologia"
+      }
+    },
+    {
+      "id": "oferta-incompatible",
+      "kind": "academic_offer",
+      "title": "Diplomatura en Nuevas Tendencias - Cohorte Incompatible",
+      "registrationOpen": true,
+      "registrationWindow": null,
+      "configRevision": "inc-v1",
+      "form": {
+        "valid": true,
+        "inputs": [
+          { "key": "experiencia_laboral_desconocida", "position": 10, "required": true }
+        ],
+        "issues": []
+      },
+      "orientations": [],
+      "urls": {
+        "public": "https://flacso.edu.uy/ofertas/incompatible"
+      }
+    }
+  ]
+}
