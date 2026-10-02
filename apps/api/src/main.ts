@@ -11,6 +11,8 @@ import { WordPressAcademicCatalog } from './infrastructure/wordpress/wordpress-a
 import { PostgresWordPressCache } from './infrastructure/wordpress/wordpress-cache.js';
 import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
 import { GoogleDriveRepository } from './infrastructure/google/google-drive-repository.js';
+import { loadAllGoogleCredentials } from './infrastructure/google/google-credentials.js';
+import { GoogleIdentityVerifier } from './infrastructure/auth/google-oidc.js';
 
 
 const port = Number(process.env.PORT || 3000);
@@ -32,12 +34,25 @@ const temporaryFileStorage = new TemporaryFileStorage({
   maxBytes: 10 * 1024 * 1024,
   allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
 });
-const googleDriveRepository = process.env.GOOGLE_DRIVE_FOLDER_ID && process.env.GOOGLE_ACCESS_TOKEN
+const googleCreds = loadAllGoogleCredentials();
+const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || '1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e';
+
+if (googleCreds.serviceAccountPath) {
+  console.log(`[Google] Cuenta de servicio detectada: ${googleCreds.serviceAccountPath}`);
+} else if (process.env.GOOGLE_ACCESS_TOKEN) {
+  console.log('[Google] Token manual configurado en GOOGLE_ACCESS_TOKEN');
+} else {
+  console.log('[Google] Sin credenciales de Google Service Account; usando simulador local en desarrollo');
+}
+
+const isMockDrive = process.env.GOOGLE_DRIVE_MOCK === 'true';
+
+const googleDriveRepository = !isMockDrive && googleCreds.tokenProvider && driveFolderId
   ? new GoogleDriveRepository({
-      folderId: process.env.GOOGLE_DRIVE_FOLDER_ID,
-      accessTokenOrProvider: process.env.GOOGLE_ACCESS_TOKEN,
+      folderId: driveFolderId,
+      accessTokenOrProvider: googleCreds.tokenProvider,
     })
-  : process.env.NODE_ENV !== 'production'
+  : process.env.NODE_ENV !== 'production' || isMockDrive
   ? {
       storeSubmissionFiles: async (command: any) =>
         command.files.map((f: any, i: number) => ({
@@ -46,6 +61,19 @@ const googleDriveRepository = process.env.GOOGLE_DRIVE_FOLDER_ID && process.env.
         })),
     }
   : undefined;
+
+const googleIdentityVerifier = googleCreds.oauthConfig.clientId
+  ? new GoogleIdentityVerifier({
+      clientId: googleCreds.oauthConfig.clientId,
+      clientSecret: googleCreds.oauthConfig.clientSecret,
+    })
+  : undefined;
+
+if (googleIdentityVerifier) {
+  console.log('[Google] Google OIDC verifier configurado para acceso administrativo');
+} else {
+  console.log('[Google] Google OIDC no configurado (falta archivo OAuth o variable GOOGLE_OIDC_CLIENT_ID)');
+}
 
 const checkDb = async () => {
   try {
@@ -69,6 +97,7 @@ const app = createApp({
   temporaryFileStorage,
   googleDriveRepository,
   formProfileRepository,
+  googleIdentityVerifier,
   checkDatabase: checkDb,
 });
 

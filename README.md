@@ -67,18 +67,32 @@ A partir de la actualización arquitectónica, la estructura del formulario (pas
 
 ### Administración con Google OIDC
 
-### Variables de Entorno
+### Configuración de Credenciales de Google (Drive, Sheets y OIDC)
 
-Copiar `.env.example` a `.env` y configurar las credenciales institucionales:
+El sistema soporta auto-detección de secretos mediante archivos JSON en la carpeta `.secrets/`, lo que permite iniciar el sistema copiando los archivos sin tener que editar manualmente el archivo `.env`:
+
+1. **Cuenta de Servicio (Google Drive y Google Sheets):**
+   Copiar el archivo de la cuenta de servicio como:
+   `.secrets/google-service-account.json`
+   El sistema lo detecta automáticamente, genera los tokens necesarios y se conecta a la carpeta oficial de Drive (`1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e`).
+
+2. **OAuth 2.0 Web Client (Login de Google para Panel Admin):**
+   Copiar el archivo de cliente web descargado de Google Cloud Console como:
+   `.secrets/google-oauth-web-client.json`
+   El sistema extrae automáticamente el `client_id` y `client_secret`.
+
+#### Anulación o Configuración Manual vía `.env` (Opcional)
+
+Si se prefiere configurar mediante variables de entorno en lugar de archivos JSON:
 
 ```bash
-# Google Drive (Documentación de preinscripciones)
+# Google Drive
 GOOGLE_DRIVE_FOLDER_ID=1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e
-GOOGLE_ACCESS_TOKEN=tu_access_token_o_service_account_token
+GOOGLE_ACCESS_TOKEN=tu_access_token_opcional
 
 # Google OIDC (Autenticación administrativa)
 GOOGLE_OIDC_CLIENT_ID=tu_cliente_id.apps.googleusercontent.com
 GOOGLE_OIDC_CLIENT_SECRET=tu_secreto_de_cliente
-GOOGLE_OIDC_REDIRECT_URI=https://preinscripciones.flacso.edu.uy/admin/perfiles
+GOOGLE_OIDC_REDIRECT_URI=http://localhost:5173/admin/perfiles
 ADMIN_ALLOWED_EMAILS=web@flacso.edu.uy
 ```

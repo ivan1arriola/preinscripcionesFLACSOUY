@@ -20,6 +20,7 @@ export default defineConfig({
       env: {
         POSTGRES_PORT: process.env.POSTGRES_PORT || '5433',
         ADMIN_ALLOWED_EMAILS: 'web@flacso.edu.uy',
+        GOOGLE_DRIVE_MOCK: 'true',
       },
     },
     {

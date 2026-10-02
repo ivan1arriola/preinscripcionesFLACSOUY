@@ -34,6 +34,8 @@ services:
       GOOGLE_OIDC_CLIENT_SECRET: ${GOOGLE_OIDC_CLIENT_SECRET:-}
       GOOGLE_OIDC_REDIRECT_URI: ${GOOGLE_OIDC_REDIRECT_URI:-http://localhost:5173/admin/perfiles}
       ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:-web@flacso.edu.uy}
+    volumes:
+      - ./.secrets:/app/.secrets:ro
     ports:
       - "3000:3000"
     healthcheck:
