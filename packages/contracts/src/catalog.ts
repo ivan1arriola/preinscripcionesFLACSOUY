@@ -1,14 +1,11 @@
 export type AcademicTargetKind = 'academic_offer' | 'seminar';
+export type OfferType = 'maestria' | 'especializacion' | 'diplomado' | 'diploma' | 'seminar';
 
-export interface Mention {
+export interface FormStepDefinition {
   id: string;
-  name: string;
-}
-
-export interface Orientation {
-  id: string;
-  name: string;
-  mentions?: Mention[];
+  title: string;
+  order: number;
+  description?: string;
 }
 
 export interface DocumentDefinition {
@@ -16,16 +13,7 @@ export interface DocumentDefinition {
   label: string;
   required: boolean;
   position?: number;
-  maxFiles?: number;
-  maxBytes?: number;
-  acceptedMimeTypes?: string[];
-  canDefer?: boolean;
-}
-
-export interface TargetDocumentConfig {
-  key: string;
-  required?: boolean;
-  position?: number;
+  stepId?: string;
   maxFiles?: number;
   maxBytes?: number;
   acceptedMimeTypes?: string[];
@@ -45,33 +33,48 @@ export interface InputDefinition {
   type: InputType;
   required: boolean;
   position?: number;
+  stepId?: string;
   placeholder?: string;
   helpText?: string;
   spreadsheetColumn?: string;
   optionsSource?: 'wordpress.orientaciones' | 'wordpress.menciones';
+  condition?: 'always' | 'has_orientations' | 'has_mentions';
 }
 
-export interface TargetInputConfig {
-  key: string;
-  position?: number;
-  required?: boolean;
+export interface WordPressTargetOffer {
+  id: number;
+  slug: string;
+  name: string;
+  type: string;
+  orientations?: string[];
+  mentions?: string[];
+}
+
+export interface WordPressTargetSeminar {
+  id: number;
+  slug: string;
+  name: string;
+  type: 'seminar';
 }
 
 export interface AcademicTarget {
   id: string;
   kind: AcademicTargetKind;
   title: string;
+  offerType?: string;
   registrationOpen: boolean;
   registrationWindow?: RegistrationWindow;
   configRevision: string;
-  form: {
-    valid: boolean;
-    inputs: TargetInputConfig[];
-    documents?: TargetDocumentConfig[];
-    issues: string[];
+  wordpress?: {
+    offerId?: number;
+    cohortId?: number;
+    seminarId?: number;
+    editionId?: number;
   };
-  orientations: Orientation[];
-  mentions?: Mention[];
+  offer?: WordPressTargetOffer;
+  seminar?: WordPressTargetSeminar;
+  orientations: string[];
+  mentions: string[];
   urls?: {
     public?: string;
     wordpress?: string;
@@ -84,12 +87,17 @@ export interface FormDefinition {
   targetId: string;
   kind: AcademicTargetKind;
   title: string;
+  offerType: string;
+  profileVersionId: string;
+  effectiveRevision: string;
   registrationOpen: boolean;
   configRevision: string;
+  steps: FormStepDefinition[];
   inputs: InputDefinition[];
-  orientations: Orientation[];
-  mentions?: Mention[];
-  documents?: DocumentDefinition[];
+  documents: DocumentDefinition[];
+  orientations: string[];
+  mentions: string[];
+  recommendationLettersCount?: number;
 }
 
 export type DiagnosticStatus = 'operational' | 'closed' | 'incompatible';
@@ -98,6 +106,7 @@ export interface DiagnosticTarget {
   id: string;
   kind: AcademicTargetKind;
   title: string;
+  offerType?: string;
   registrationOpen: boolean;
   configRevision: string;
   status: DiagnosticStatus;

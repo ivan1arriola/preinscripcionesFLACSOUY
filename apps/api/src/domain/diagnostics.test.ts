@@ -7,23 +7,26 @@ describe('diagnoseTarget', () => {
     id: 'davia-c11',
     kind: 'academic_offer',
     title: 'DAVIA Cohorte 11',
+    offerType: 'diploma',
+    offer: {
+      id: 100,
+      slug: 'davia',
+      name: 'DAVIA',
+      type: 'diploma',
+    },
     registrationOpen: true,
     configRevision: 'rev-1',
-    form: {
-      valid: true,
-      inputs: [{ key: 'documento', position: 10, required: true }],
-      issues: [],
-    },
     orientations: [],
+    mentions: [],
   };
 
-  it('diagnoses an open target with supported inputs as operational', () => {
+  it('diagnoses an open target with supported offer type as operational', () => {
     const diagnostic = diagnoseTarget(operationalTarget);
     expect(diagnostic.status).toBe('operational');
     expect(diagnostic.issues).toHaveLength(0);
   });
 
-  it('diagnoses a closed target with supported inputs as closed', () => {
+  it('diagnoses a closed target with supported offer type as closed', () => {
     const closedTarget: AcademicTarget = {
       ...operationalTarget,
       registrationOpen: false,
@@ -32,32 +35,30 @@ describe('diagnoseTarget', () => {
     expect(diagnostic.status).toBe('closed');
   });
 
-  it('diagnoses a target with unsupported input key as incompatible', () => {
-    const incompatibleTarget: AcademicTarget = {
+  it('diagnoses a target with doctorado as incompatible', () => {
+    const doctoradoTarget: AcademicTarget = {
       ...operationalTarget,
-      form: {
-        valid: true,
-        inputs: [{ key: 'campo_inexistente', position: 10 }],
-        issues: [],
+      offerType: 'doctorado',
+      offer: {
+        id: 101,
+        slug: 'doc',
+        name: 'Doctorado',
+        type: 'doctorado',
       },
     };
-    const diagnostic = diagnoseTarget(incompatibleTarget);
+    const diagnostic = diagnoseTarget(doctoradoTarget);
     expect(diagnostic.status).toBe('incompatible');
-    expect(diagnostic.issues.length).toBeGreaterThan(0);
-    expect(diagnostic.issues[0]).toContain('campo_inexistente');
+    expect(diagnostic.issues).toContain('unsupported_offer_type: doctorado');
   });
 
-  it('diagnoses a target with form.valid === false as incompatible', () => {
-    const invalidFormTarget: AcademicTarget = {
+  it('diagnoses a target without offer type as incompatible', () => {
+    const noTypeTarget: AcademicTarget = {
       ...operationalTarget,
-      form: {
-        valid: false,
-        inputs: [],
-        issues: ['Configuración corrupta en WordPress'],
-      },
+      offerType: undefined,
+      offer: undefined,
     };
-    const diagnostic = diagnoseTarget(invalidFormTarget);
+    const diagnostic = diagnoseTarget(noTypeTarget);
     expect(diagnostic.status).toBe('incompatible');
-    expect(diagnostic.issues).toContain('Configuración corrupta en WordPress');
+    expect(diagnostic.issues).toContain('Falta especificar el tipo de oferta académica');
   });
 });

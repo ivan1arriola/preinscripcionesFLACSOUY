@@ -3,7 +3,7 @@ import { WordPressClient, WordPressClientError } from './wordpress-client.js';
 import { WordPressAcademicCatalog } from './wordpress-academic-catalog.js';
 import { MemoryWordPressCache } from './wordpress-cache.js';
 
-const frozenV1Response = {
+const simplifiedV1Response = {
   version: 1,
   targets: [
     {
@@ -18,6 +18,9 @@ const frozenV1Response = {
         id: 12295,
         slug: 'davia',
         name: 'Diploma Superior en Aprendizaje Visual e Inteligencia Artificial',
+        type: 'diploma',
+        orientations: ['Educación', 'Políticas Públicas'],
+        mentions: ['Tecnología Educativa', 'Innovación Pública'],
       },
       cohort: {
         number: 11,
@@ -29,26 +32,8 @@ const frozenV1Response = {
         until: '2026-05-15T00:00:00Z',
       },
       configRevision: 'sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-      form: {
-        valid: true,
-        inputs: [
-          { key: 'documento', position: 10, required: true },
-          { key: 'orientacion', position: 20, required: true },
-          { key: 'mencion', position: 30, required: false },
-        ],
-        documents: [{ key: 'identidad', position: 40, required: true, maxFiles: 2 }],
-      },
-      orientations: [
-        {
-          id: 'educacion',
-          name: 'Educación',
-          mentions: [{ id: 'tec-edu', name: 'Tecnología Educativa' }],
-        },
-      ],
-      mentions: [
-        { id: 'tec-edu', name: 'Tecnología Educativa' },
-        { id: 'innovacion', name: 'Innovación Pública' },
-      ],
+      orientations: ['Educación', 'Políticas Públicas'],
+      mentions: ['Tecnología Educativa', 'Innovación Pública'],
       urls: {
         public: 'https://flacso.edu.uy/ofertas/davia',
         wordpress: 'https://flacso.edu.uy/cohortes/1234',
@@ -68,6 +53,7 @@ const frozenV1Response = {
         id: 200,
         slug: 'metodologia',
         name: 'Investigación Cualitativa',
+        type: 'seminar',
       },
       edition: {
         number: 3,
@@ -79,11 +65,8 @@ const frozenV1Response = {
         until: null,
       },
       configRevision: 'sha256:d41d8cd98f00b204e9800998ecf8427e',
-      form: {
-        valid: true,
-        inputs: [{ key: 'documento', position: 10, required: true }],
-      },
       orientations: [],
+      mentions: [],
       urls: {
         public: 'https://flacso.edu.uy/seminarios/metodologia',
         wordpress: 'https://flacso.edu.uy/ediciones/201',
@@ -99,11 +82,11 @@ describe('WordPress Client & Contract Adapter', () => {
     vi.restoreAllMocks();
   });
 
-  it('successfully fetches and validates frozen REST v1 response', async () => {
+  it('successfully fetches and validates simplified REST v1 response', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => frozenV1Response,
+      json: async () => simplifiedV1Response,
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -117,9 +100,82 @@ describe('WordPress Client & Contract Adapter', () => {
     expect(response.version).toBe(1);
     expect(response.targets).toHaveLength(2);
     expect(response.targets[0]!.id).toBe('target_davia_c11');
-    expect(response.targets[0]!.registrationOpen).toBe(true);
-    expect(response.targets[0]!.form.documents).toHaveLength(1);
+    expect(response.targets[0]!.offer?.type).toBe('diploma');
+    expect(response.targets[0]!.orientations).toEqual(['Educación', 'Políticas Públicas']);
+    expect(response.targets[0]!.mentions).toEqual(['Tecnología Educativa', 'Innovación Pública']);
     expect(response.targets[1]!.registrationOpen).toBe(false);
+    expect(response.targets[1]!.seminar?.type).toBe('seminar');
+  });
+
+  it('rejects WordPress records that try to supply objects with IDs in orientations', async () => {
+    const legacyOrientationResponse = {
+      version: 1,
+      targets: [
+        {
+          ...simplifiedV1Response.targets[0],
+          orientations: [{ id: 'educacion', name: 'Educación' }],
+        },
+      ],
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => legacyOrientationResponse,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+    await expect(client.getPreinscriptions()).rejects.toThrow();
+  });
+
+  it('rejects WordPress records that try to supply objects with IDs in mentions', async () => {
+    const legacyMentionResponse = {
+      version: 1,
+      targets: [
+        {
+          ...simplifiedV1Response.targets[0],
+          mentions: [{ id: 'tec-edu', name: 'Tecnología Educativa' }],
+        },
+      ],
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => legacyMentionResponse,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+    await expect(client.getPreinscriptions()).rejects.toThrow();
+  });
+
+  it('rejects academic_offer records missing offer.type', async () => {
+    const invalidTargetResponse = {
+      version: 1,
+      targets: [
+        {
+          ...simplifiedV1Response.targets[0],
+          offer: {
+            id: 12295,
+            slug: 'davia',
+            name: 'DAVIA',
+            // missing type
+          },
+        },
+      ],
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => invalidTargetResponse,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+    await expect(client.getPreinscriptions()).rejects.toThrow();
   });
 
   it('rejects HTTP non-200 responses with safe redacted error', async () => {
@@ -153,7 +209,7 @@ describe('WordPress Client & Contract Adapter', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ ...frozenV1Response, version: 2 }),
+      json: async () => ({ ...simplifiedV1Response, version: 2 }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -169,7 +225,7 @@ describe('WordPress Client & Contract Adapter', () => {
         return {
           ok: true,
           status: 200,
-          json: async () => frozenV1Response,
+          json: async () => simplifiedV1Response,
         };
       }
       throw new Error('Connection refused');
@@ -184,8 +240,8 @@ describe('WordPress Client & Contract Adapter', () => {
     const targets1 = await catalog.listTargets();
     expect(targets1).toHaveLength(2);
     expect(targets1[0]!.mentions).toEqual([
-      { id: 'tec-edu', name: 'Tecnología Educativa' },
-      { id: 'innovacion', name: 'Innovación Pública' },
+      'Tecnología Educativa',
+      'Innovación Pública',
     ]);
     expect(targets1[0]!.title).toBe('Diploma Superior en Aprendizaje Visual e Inteligencia Artificial — Cohorte XI');
 
@@ -199,7 +255,7 @@ describe('WordPress Client & Contract Adapter', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => frozenV1Response,
+      json: async () => simplifiedV1Response,
     });
     vi.stubGlobal('fetch', fetchMock);
 

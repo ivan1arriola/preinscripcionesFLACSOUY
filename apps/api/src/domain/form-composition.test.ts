@@ -1,151 +1,243 @@
 import { describe, it, expect } from 'vitest';
 import { composeForm } from './form-composition.js';
 import type { AcademicTarget } from '@flacso/contracts';
-import { UNIVERSAL_INPUTS } from './form-definition.js';
+import {
+  getDefaultProfileDefinition,
+  type EffectiveProfile,
+} from './form-profiles.js';
 
-describe('composeForm', () => {
+function mockEffectiveProfile(type: any): EffectiveProfile {
+  return {
+    profileId: `profile_${type}`,
+    type,
+    name: type.toUpperCase(),
+    versionId: `ver_${type}_v1`,
+    versionNumber: 1,
+    definition: getDefaultProfileDefinition(type),
+  };
+}
+
+describe('composeForm with Form Profiles', () => {
   const baseTarget: AcademicTarget = {
     id: 'davia-c11',
     kind: 'academic_offer',
     title: 'DAVIA Cohorte 11',
-    registrationOpen: true,
-    configRevision: 'rev-1',
-    form: {
-      valid: true,
-      inputs: [
-        { key: 'documento', position: 10, required: true },
-        { key: 'orientacion', position: 20, required: true },
-        { key: 'mencion', position: 30, required: false },
-      ],
-      issues: [],
+    offerType: 'diploma',
+    offer: {
+      id: 100,
+      slug: 'davia',
+      name: 'DAVIA',
+      type: 'diploma',
+      orientations: ['Educación', 'Políticas'],
+      mentions: ['Tecnología', 'Gestión'],
     },
-    orientations: [{ id: 'educacion', name: 'Educación', mentions: [] }],
-    mentions: [{ id: 'tec-edu', name: 'Tecnología Educativa' }],
+    registrationOpen: true,
+    configRevision: 'wp-rev-100',
+    orientations: ['Educación', 'Políticas'],
+    mentions: ['Tecnología', 'Gestión'],
   };
 
-  it('composes universal inputs with configured inputs sorted by position', () => {
-    const result = composeForm(baseTarget);
+  it('composes forms for all five recognized types using their respective profiles', () => {
+    const types = ['maestria', 'especializacion', 'diplomado', 'diploma', 'seminar'] as const;
+
+    for (const type of types) {
+      const target: AcademicTarget = {
+        ...baseTarget,
+        id: `target_${type}`,
+        kind: type === 'seminar' ? 'seminar' : 'academic_offer',
+        offerType: type,
+        offer: type !== 'seminar' ? {
+          id: 1,
+          slug: type,
+          name: type,
+          type,
+          orientations: ['O1'],
+          mentions: ['M1'],
+        } : undefined,
+        seminar: type === 'seminar' ? {
+          id: 2,
+          slug: 'seminario',
+          name: 'Seminario',
+          type: 'seminar',
+        } : undefined,
+        orientations: type === 'seminar' ? [] : ['O1'],
+        mentions: type === 'seminar' ? [] : ['M1'],
+      };
+
+      const profile = mockEffectiveProfile(type);
+      const result = composeForm(target, profile);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      expect(result.value.offerType).toBe(type);
+      expect(result.value.profileVersionId).toBe(profile.versionId);
+      expect(result.value.effectiveRevision).toMatch(/^sha256:[a-f0-9]{64}$/);
+
+      if (type === 'seminar') {
+        expect(result.value.steps.length).toBe(4);
+      } else {
+        expect(result.value.steps.length).toBe(5);
+      }
+    }
+  });
+
+  it('configures 2 recommendation letters and full documentation for maestria', () => {
+    const maestriaTarget: AcademicTarget = {
+      ...baseTarget,
+      offerType: 'maestria',
+      offer: {
+        id: 100,
+        slug: 'maestria',
+        name: 'Maestría',
+        type: 'maestria',
+        orientations: [],
+        mentions: [],
+      },
+    };
+
+    const profile = mockEffectiveProfile('maestria');
+    const result = composeForm(maestriaTarget, profile);
+
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const keys = result.value.inputs.map((i) => i.key);
-    expect(keys).toEqual(expect.arrayContaining(UNIVERSAL_INPUTS.map((input) => input.key)));
-    expect(keys).toContain('nombre1');
-    expect(keys).toContain('nombre2');
-    expect(keys).toContain('apellido1');
-    expect(keys).toContain('apellido2');
-    expect(keys).toContain('email');
-    expect(keys).toContain('celular');
-    expect(keys).toContain('documento');
-    expect(keys).toContain('orientacion');
-    expect(keys).toContain('mencion');
-
-    // Check positions are ascending
-    const inputs = result.value.inputs;
-    for (let i = 0; i < inputs.length - 1; i++) {
-      const posA = inputs[i]?.position ?? 0;
-      const posB = inputs[i + 1]?.position ?? 0;
-      expect(posA).toBeLessThanOrEqual(posB);
-    }
+    expect(result.value.recommendationLettersCount).toBe(2);
+    const docKeys = result.value.documents.map((d) => d.key);
+    expect(docKeys).toContain('identidad');
+    expect(docKeys).toContain('cv');
+    expect(docKeys).toContain('titulo');
+    expect(docKeys).toContain('cartaMotivacion');
+    expect(docKeys).toContain('cartaRecomendacion1');
+    expect(docKeys).toContain('cartaRecomendacion2');
   });
 
-  it('rejects unknown configured input key with an incompatibility error', () => {
-    const invalidTarget: AcademicTarget = {
+  it('rejects unsupported doctorado offer type as incompatible', () => {
+    const doctoradoTarget: AcademicTarget = {
       ...baseTarget,
-      form: {
-        valid: true,
-        inputs: [{ key: 'experiencia_profesional_desconocida', position: 10 }],
-        issues: [],
+      offerType: 'doctorado',
+      offer: {
+        id: 99,
+        slug: 'doctorado',
+        name: 'Doctorado',
+        type: 'doctorado',
+        orientations: [],
+        mentions: [],
       },
     };
 
-    const result = composeForm(invalidTarget);
+    // No profile exists for doctorado
+    const result = composeForm(doctoradoTarget, null);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error.issues).toContain(
-        'Clave de input no soportada: experiencia_profesional_desconocida'
-      );
+      expect(result.error.code).toBe('UNSUPPORTED_OFFER_TYPE');
+      expect(result.error.issues).toContain('unsupported_offer_type: doctorado');
     }
   });
 
-  it('rejects duplicate input keys', () => {
-    const duplicateTarget: AcademicTarget = {
-      ...baseTarget,
-      form: {
-        valid: true,
-        inputs: [
-          { key: 'documento', position: 10 },
-          { key: 'documento', position: 20 },
-        ],
-        issues: [],
-      },
-    };
+  describe('independent orientation and mencion conditions', () => {
+    it('includes orientacion and omits mencion when only orientations are present in target', () => {
+      const targetWithOrientationsOnly: AcademicTarget = {
+        ...baseTarget,
+        orientations: ['Educación', 'Políticas'],
+        mentions: [],
+      };
 
-    const result = composeForm(duplicateTarget);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.issues).toContain('Clave de input duplicada: documento');
-    }
-  });
+      const profile = mockEffectiveProfile('diploma');
+      const result = composeForm(targetWithOrientationsOnly, profile);
 
-  it('respects required overrides from target configuration', () => {
-    const overrideTarget: AcademicTarget = {
-      ...baseTarget,
-      form: {
-        valid: true,
-        inputs: [{ key: 'institucion', position: 10, required: true }],
-        issues: [],
-      },
-    };
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
 
-    const result = composeForm(overrideTarget);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    const institucion = result.value.inputs.find((i) => i.key === 'institucion');
-    expect(institucion?.required).toBe(true);
-  });
-
-  it('keeps orientation and mention independent', () => {
-    const result = composeForm({
-      ...baseTarget,
-      form: {
-        valid: true,
-        inputs: [
-          { key: 'orientacion', position: 10, required: false },
-          { key: 'mencion', position: 20, required: true },
-        ],
-        issues: [],
-      },
+      const keys = result.value.inputs.map((i) => i.key);
+      expect(keys).toContain('orientacion');
+      expect(keys).not.toContain('mencion');
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.inputs.find((input) => input.key === 'orientacion')?.required).toBe(false);
-    expect(result.value.inputs.find((input) => input.key === 'mencion')?.required).toBe(true);
-    expect(result.value.mentions).toEqual([{ id: 'tec-edu', name: 'Tecnología Educativa' }]);
+    it('includes mencion and omits orientacion when only mentions are present in target', () => {
+      const targetWithMentionsOnly: AcademicTarget = {
+        ...baseTarget,
+        orientations: [],
+        mentions: ['Tecnología Educativa'],
+      };
+
+      const profile = mockEffectiveProfile('diploma');
+      const result = composeForm(targetWithMentionsOnly, profile);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const keys = result.value.inputs.map((i) => i.key);
+      expect(keys).not.toContain('orientacion');
+      expect(keys).toContain('mencion');
+    });
+
+    it('omits both orientacion and mencion when both target lists are empty', () => {
+      const targetWithoutEither: AcademicTarget = {
+        ...baseTarget,
+        orientations: [],
+        mentions: [],
+      };
+
+      const profile = mockEffectiveProfile('diploma');
+      const result = composeForm(targetWithoutEither, profile);
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const keys = result.value.inputs.map((i) => i.key);
+      expect(keys).not.toContain('orientacion');
+      expect(keys).not.toContain('mencion');
+    });
   });
 
-  it('does not expose orientation or mention for seminars', () => {
-    const result = composeForm({
-      ...baseTarget,
+  it('excludes orientacion and mencion rules for seminar targets regardless', () => {
+    const seminarTarget: AcademicTarget = {
+      id: 'seminar-1',
       kind: 'seminar',
-      form: {
-        valid: true,
-        inputs: [
-          { key: 'orientacion', position: 10, required: true },
-          { key: 'mencion', position: 20, required: true },
-        ],
-        issues: [],
+      title: 'Seminario Metodología',
+      offerType: 'seminar',
+      seminar: {
+        id: 200,
+        slug: 'metodologia',
+        name: 'Metodología',
+        type: 'seminar',
       },
-    });
+      registrationOpen: true,
+      configRevision: 'rev-seminar',
+      orientations: [],
+      mentions: [],
+    };
+
+    const profile = mockEffectiveProfile('seminar');
+    const result = composeForm(seminarTarget, profile);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.inputs.map((input) => input.key)).not.toEqual(
-      expect.arrayContaining(['orientacion', 'mencion'])
-    );
-    expect(result.value.orientations).toEqual([]);
-    expect(result.value.mentions).toEqual([]);
+
+    expect(result.value.kind).toBe('seminar');
+    expect(result.value.steps.length).toBe(4);
+    const keys = result.value.inputs.map((i) => i.key);
+    expect(keys).not.toContain('orientacion');
+    expect(keys).not.toContain('mencion');
+  });
+
+  it('produces distinct effectiveRevision when configRevision or profileVersion changes', () => {
+    const profileV1 = mockEffectiveProfile('diploma');
+    const profileV2: EffectiveProfile = {
+      ...profileV1,
+      versionId: 'ver_diploma_v2',
+      versionNumber: 2,
+    };
+
+    const res1 = composeForm(baseTarget, profileV1);
+    const res2 = composeForm(baseTarget, profileV2);
+    const res3 = composeForm({ ...baseTarget, configRevision: 'wp-rev-changed' }, profileV1);
+
+    expect(res1.ok && res2.ok && res3.ok).toBe(true);
+    if (res1.ok && res2.ok && res3.ok) {
+      expect(res1.value.effectiveRevision).not.toBe(res2.value.effectiveRevision);
+      expect(res1.value.effectiveRevision).not.toBe(res3.value.effectiveRevision);
+    }
   });
 });

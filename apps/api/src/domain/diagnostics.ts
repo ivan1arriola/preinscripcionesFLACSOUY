@@ -1,21 +1,22 @@
 import type { AcademicTarget, DiagnosticTarget, DiagnosticStatus } from '@flacso/contracts';
-import { ALL_SUPPORTED_INPUT_KEYS } from './form-definition.js';
+import { SUPPORTED_OFFER_TYPES } from './form-profiles.js';
 
 export function diagnoseTarget(
   target: AcademicTarget,
-  supportedKeys: Set<string> = ALL_SUPPORTED_INPUT_KEYS
+  activeProfileTypes: Set<string> = new Set(SUPPORTED_OFFER_TYPES)
 ): DiagnosticTarget {
   const issues: string[] = [];
 
-  if (!target.form.valid) {
-    issues.push(...target.form.issues);
-  }
+  const offerType = target.kind === 'seminar'
+    ? 'seminar'
+    : target.offer?.type || target.offerType || '';
 
-  const configuredInputs = target.form.inputs ?? [];
-  for (const input of configuredInputs) {
-    if (!supportedKeys.has(input.key)) {
-      issues.push(`Clave de input no soportada: ${input.key}`);
-    }
+  if (!offerType) {
+    issues.push('Falta especificar el tipo de oferta académica');
+  } else if (offerType === 'doctorado') {
+    issues.push('unsupported_offer_type: doctorado');
+  } else if (!activeProfileTypes.has(offerType)) {
+    issues.push(`unsupported_offer_type: ${offerType}`);
   }
 
   let status: DiagnosticStatus = 'operational';
@@ -30,6 +31,7 @@ export function diagnoseTarget(
     id: target.id,
     kind: target.kind,
     title: target.title,
+    offerType: offerType || undefined,
     registrationOpen: target.registrationOpen,
     configRevision: target.configRevision,
     status,

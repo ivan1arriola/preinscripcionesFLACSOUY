@@ -62,32 +62,26 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
       ? `${raw.offer.name} — ${raw.title}`
       : raw.title;
 
+    const offerType = raw.kind === 'seminar'
+      ? 'seminar'
+      : raw.offer?.type;
+
     return {
       id: raw.id,
       kind: raw.kind,
       title,
+      offerType,
       registrationOpen: raw.registrationOpen,
       registrationWindow: {
         from: raw.registrationWindow?.from ?? null,
         until: raw.registrationWindow?.until ?? null,
       },
       configRevision: raw.configRevision,
-      form: {
-        valid: raw.form.valid,
-        inputs: raw.form.inputs.map((inp) => ({
-          key: inp.key,
-          position: inp.position,
-          required: inp.required,
-        })),
-        documents: raw.form.documents ?? [],
-        issues: raw.form.issues ?? [],
-      },
-      orientations: raw.orientations.map((o) => ({
-        id: o.id,
-        name: o.name,
-        mentions: [],
-      })),
-      mentions: raw.mentions ?? raw.orientations.flatMap((o) => o.mentions),
+      wordpress: raw.wordpress,
+      offer: raw.offer,
+      seminar: raw.seminar,
+      orientations: raw.orientations ?? [],
+      mentions: raw.mentions ?? [],
       urls: {
         public: raw.urls.public ?? undefined,
         wordpress: raw.urls.wordpress ?? undefined,

@@ -11,33 +11,27 @@
         "until": "2026-11-30T23:59:59Z"
       },
       "configRevision": "davia-c11-v1",
-      "form": {
-        "valid": true,
-        "inputs": [
-          { "key": "documento", "position": 10, "required": true },
-          { "key": "fechaNacimiento", "position": 20, "required": true },
-          { "key": "orientacion", "position": 30, "required": true },
-          { "key": "mencion", "position": 40, "required": false },
-          { "key": "titulo", "position": 50, "required": true }
+      "offer": {
+        "id": 12295,
+        "slug": "davia",
+        "name": "Diploma Superior en Aprendizaje Visual e Inteligencia Artificial",
+        "type": "diploma",
+        "orientations": [
+          "Educación",
+          "Políticas Públicas"
         ],
-        "issues": []
+        "mentions": [
+          "Tecnología Educativa",
+          "Gestión de Entornos Digitales"
+        ]
       },
       "orientations": [
-        {
-          "id": "educacion",
-          "name": "Educación",
-          "mentions": [
-            { "id": "tec-edu", "name": "Tecnología Educativa" },
-            { "id": "gestion-edu", "name": "Gestión de Entornos Digitales" }
-          ]
-        },
-        {
-          "id": "politicas",
-          "name": "Políticas Públicas",
-          "mentions": [
-            { "id": "innovacion-publica", "name": "Innovación en el Sector Público" }
-          ]
-        }
+        "Educación",
+        "Políticas Públicas"
+      ],
+      "mentions": [
+        "Tecnología Educativa",
+        "Gestión de Entornos Digitales"
       ],
       "urls": {
         "public": "https://flacso.edu.uy/ofertas/davia",
@@ -56,16 +50,16 @@
         "until": "2026-03-31T23:59:59Z"
       },
       "configRevision": "mg-c8-v1",
-      "form": {
-        "valid": true,
-        "inputs": [
-          { "key": "documento", "position": 10, "required": true },
-          { "key": "titulo", "position": 20, "required": true },
-          { "key": "escolaridad", "position": 30, "required": true }
-        ],
-        "issues": []
+      "offer": {
+        "id": 12296,
+        "slug": "mg",
+        "name": "Maestría en Género, Sociedad y Políticas",
+        "type": "maestria",
+        "orientations": [],
+        "mentions": []
       },
       "orientations": [],
+      "mentions": [],
       "urls": {
         "public": "https://flacso.edu.uy/ofertas/mg"
       }
@@ -80,15 +74,14 @@
         "until": "2026-10-31T23:59:59Z"
       },
       "configRevision": "sem-met-ed3-v1",
-      "form": {
-        "valid": true,
-        "inputs": [
-          { "key": "institucion", "position": 10, "required": false },
-          { "key": "ocupacion", "position": 20, "required": false }
-        ],
-        "issues": []
+      "seminar": {
+        "id": 200,
+        "slug": "metodologia",
+        "name": "Investigación Cualitativa",
+        "type": "seminar"
       },
       "orientations": [],
+      "mentions": [],
       "urls": {
         "public": "https://flacso.edu.uy/seminarios/metodologia"
       }
@@ -96,18 +89,20 @@
     {
       "id": "oferta-incompatible",
       "kind": "academic_offer",
-      "title": "Diplomatura en Nuevas Tendencias - Cohorte Incompatible",
+      "title": "Doctorado en Ciencias Sociales - Cohorte 1",
       "registrationOpen": true,
       "registrationWindow": null,
       "configRevision": "inc-v1",
-      "form": {
-        "valid": true,
-        "inputs": [
-          { "key": "experiencia_laboral_desconocida", "position": 10, "required": true }
-        ],
-        "issues": []
+      "offer": {
+        "id": 999,
+        "slug": "doctorado-cs",
+        "name": "Doctorado en Ciencias Sociales",
+        "type": "doctorado",
+        "orientations": [],
+        "mentions": []
       },
       "orientations": [],
+      "mentions": [],
       "urls": {
         "public": "https://flacso.edu.uy/ofertas/incompatible"
       }

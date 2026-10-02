@@ -1,6 +1,8 @@
 import type { FormDefinition } from '@flacso/contracts';
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
+import type { FormProfileRepository } from '../ports/form-profile-repository.js';
 import { composeForm } from '../domain/form-composition.js';
+import { isSupportedOfferType } from '../domain/form-profiles.js';
 
 export type GetTargetFormResult =
   | { ok: true; form: FormDefinition }
@@ -8,7 +10,8 @@ export type GetTargetFormResult =
 
 export async function getTargetForm(
   catalog: AcademicCatalog,
-  targetId: string
+  profileRepository: FormProfileRepository,
+  targetId: string,
 ): Promise<GetTargetFormResult> {
   const target = await catalog.getTarget(targetId);
 
@@ -20,7 +23,15 @@ export async function getTargetForm(
     };
   }
 
-  const composition = composeForm(target);
+  const offerType = target.kind === 'seminar'
+    ? 'seminar'
+    : target.offer?.type || target.offerType || '';
+
+  const activeProfile = isSupportedOfferType(offerType)
+    ? await profileRepository.getActive(offerType)
+    : null;
+
+  const composition = composeForm(target, activeProfile);
   if (!composition.ok) {
     return {
       ok: false,

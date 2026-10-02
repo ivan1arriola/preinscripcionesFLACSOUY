@@ -51,15 +51,13 @@ describe('validateSubmission', () => {
         optionsSource: 'wordpress.menciones',
       },
     ],
-    orientations: [
-      { id: 'educacion', name: 'Educación', mentions: [] },
-      { id: 'politicas', name: 'Políticas Públicas', mentions: [] },
-    ],
-    mentions: [
-      { id: 'tec-edu', name: 'Tecnología Educativa' },
-      { id: 'gestion-edu', name: 'Gestión Educativa' },
-      { id: 'gestion-pub', name: 'Gestión Pública' },
-    ],
+    orientations: ['educacion', 'politicas'],
+    mentions: ['tec-edu', 'gestion-edu', 'gestion-pub'],
+    offerType: 'diploma',
+    profileVersionId: 'ver_diploma_v1',
+    effectiveRevision: 'sha256:effective_rev_test',
+    steps: [],
+    documents: [],
   };
 
   const validValues = {

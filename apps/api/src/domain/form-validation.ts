@@ -50,12 +50,12 @@ export function validateSubmission(
   const mencionVal = values.mencion?.trim();
 
   if (orientacionVal) {
-    if (!form.orientations.some((orientation) => orientation.id === orientacionVal)) {
+    if (!form.orientations.includes(orientacionVal)) {
       addError('orientacion', 'La orientación seleccionada no es válida.');
     }
   }
 
-  if (mencionVal && !(form.mentions ?? []).some((mention) => mention.id === mencionVal)) {
+  if (mencionVal && !(form.mentions ?? []).includes(mencionVal)) {
     addError('mencion', 'La mención seleccionada no es válida.');
   }
 

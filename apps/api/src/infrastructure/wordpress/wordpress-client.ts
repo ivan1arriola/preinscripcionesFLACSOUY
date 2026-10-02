@@ -7,43 +7,27 @@ export class WordPressClientError extends Error {
   }
 }
 
-export const TargetInputSchema = z.object({
-  key: z.string(),
-  position: z.number(),
-  required: z.boolean(),
-});
-
-export const FormStateSchema = z.object({
-  valid: z.boolean(),
-  inputs: z.array(TargetInputSchema),
-  documents: z.array(z.object({
-    key: z.string(),
-    position: z.number().optional(),
-    required: z.boolean().optional(),
-    maxFiles: z.number().optional(),
-    maxBytes: z.number().optional(),
-    acceptedMimeTypes: z.array(z.string()).optional(),
-    canDefer: z.boolean().optional(),
-  })).optional(),
-  issues: z.array(z.string()).optional(),
-});
-
-export const OrientationMentionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-});
-
-export const OrientationSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  mentions: z.array(OrientationMentionSchema),
-});
-
 export const TargetUrlsSchema = z.object({
   public: z.string().nullable().optional(),
   wordpress: z.string().nullable().optional(),
   edit: z.string().nullable().optional(),
   legacyRegistration: z.string().nullable().optional(),
+});
+
+export const WordPressOfferSchema = z.object({
+  id: z.number(),
+  slug: z.string(),
+  name: z.string(),
+  type: z.string().min(1),
+  orientations: z.array(z.string()).optional(),
+  mentions: z.array(z.string()).optional(),
+});
+
+export const WordPressSeminarSchema = z.object({
+  id: z.number(),
+  slug: z.string(),
+  name: z.string(),
+  type: z.literal('seminar'),
 });
 
 export const WordPressTargetSchema = z.object({
@@ -56,15 +40,35 @@ export const WordPressTargetSchema = z.object({
     until: z.string().nullable().optional(),
   }),
   configRevision: z.string(),
-  form: FormStateSchema,
-  offer: z.object({
-    id: z.number(),
-    slug: z.string(),
-    name: z.string(),
+  wordpress: z.object({
+    offerId: z.number().optional(),
+    cohortId: z.number().optional(),
+    seminarId: z.number().optional(),
+    editionId: z.number().optional(),
   }).optional(),
-  orientations: z.array(OrientationSchema),
-  mentions: z.array(OrientationMentionSchema).optional(),
+  offer: WordPressOfferSchema.optional(),
+  seminar: WordPressSeminarSchema.optional(),
+  cohort: z.object({
+    number: z.union([z.number(), z.string()]).optional(),
+    name: z.string().optional(),
+  }).optional(),
+  edition: z.object({
+    number: z.union([z.number(), z.string()]).optional(),
+    name: z.string().optional(),
+  }).optional(),
+  orientations: z.array(z.string()),
+  mentions: z.array(z.string()).optional(),
   urls: TargetUrlsSchema,
+}).superRefine((val, ctx) => {
+  if (val.kind === 'academic_offer') {
+    if (!val.offer || !val.offer.type) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Academic offer targets must provide offer.type',
+        path: ['offer', 'type'],
+      });
+    }
+  }
 });
 
 export const WordPressV1ResponseSchema = z.object({
@@ -98,27 +102,25 @@ export class WordPressClient {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(this.timeoutMs),
       });
-    } catch (err) {
-      throw new WordPressClientError(
-        `Error al conectar con WordPress en ${this.baseUrl}: ${err instanceof Error ? err.message : 'timeout o fallo de red'}`
-      );
+    } catch (err: any) {
+      throw new WordPressClientError(`No se pudo conectar con WordPress: ${err.message}`);
     }
 
     if (!response.ok) {
       throw new WordPressClientError(
-        `WordPress devolvió un estado HTTP no exitoso: ${response.status}`,
+        `Error HTTP ${response.status} al consultar WordPress`,
         response.status
       );
     }
 
-    let json: unknown;
+    let payload: unknown;
     try {
-      json = await response.json();
+      payload = await response.json();
     } catch {
-      throw new WordPressClientError('WordPress no devolvió una respuesta JSON válida');
+      throw new WordPressClientError('Respuesta de WordPress no es un JSON válido');
     }
 
-    const parseResult = WordPressV1ResponseSchema.safeParse(json);
+    const parseResult = WordPressV1ResponseSchema.safeParse(payload);
     if (!parseResult.success) {
       const issueDetails = parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
       throw new WordPressClientError(

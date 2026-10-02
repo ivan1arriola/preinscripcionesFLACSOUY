@@ -1,118 +1,130 @@
+import crypto from 'node:crypto';
 import type {
   AcademicTarget,
   FormDefinition,
   InputDefinition,
+  DocumentDefinition,
 } from '@flacso/contracts';
 import {
   UNIVERSAL_INPUTS,
   SUPPORTED_SPECIFIC_INPUTS,
   DOCUMENT_DEFINITIONS,
-  ALL_SUPPORTED_INPUT_KEYS,
 } from './form-definition.js';
+import type { EffectiveProfile } from './form-profiles.js';
 
 export type CompositionResult =
   | { ok: true; value: FormDefinition }
   | { ok: false; error: { code: string; message: string; issues: string[] } };
 
-export function composeForm(target: AcademicTarget): CompositionResult {
-  const issues: string[] = [];
+export function composeForm(
+  target: AcademicTarget,
+  effectiveProfile: EffectiveProfile | null,
+): CompositionResult {
+  const offerType = target.kind === 'seminar'
+    ? 'seminar'
+    : target.offer?.type || target.offerType || '';
 
-  if (!target.form.valid) {
-    issues.push(...target.form.issues);
-  }
-
-  const seenKeys = new Set<string>();
-  const configuredInputs = (target.form.inputs ?? []).filter(
-    (configured) => target.kind !== 'seminar' || !['orientacion', 'mencion'].includes(configured.key)
-  );
-
-  // Check for duplicates and unknown keys in configured inputs
-  for (const configured of configuredInputs) {
-    if (seenKeys.has(configured.key)) {
-      issues.push(`Clave de input duplicada: ${configured.key}`);
-    } else {
-      seenKeys.add(configured.key);
-    }
-
-    if (!ALL_SUPPORTED_INPUT_KEYS.has(configured.key)) {
-      issues.push(`Clave de input no soportada: ${configured.key}`);
-    }
-  }
-
-  if (issues.length > 0) {
+  if (offerType === 'doctorado') {
     return {
       ok: false,
       error: {
-        code: 'INCOMPATIBLE_FORM',
-        message: 'El formulario contiene definiciones incompatibles o no soportadas.',
-        issues,
+        code: 'UNSUPPORTED_OFFER_TYPE',
+        message: 'Doctorados no están soportados actualmente.',
+        issues: ['unsupported_offer_type: doctorado'],
       },
     };
   }
 
-  // Merge universal inputs with configured inputs
+  if (!effectiveProfile) {
+    return {
+      ok: false,
+      error: {
+        code: 'NO_ACTIVE_PROFILE',
+        message: `No hay un perfil activo configurado para ${offerType || target.title}.`,
+        issues: [`no_active_profile: ${offerType}`],
+      },
+    };
+  }
+
+  if (target.kind === 'seminar' && effectiveProfile.type !== 'seminar') {
+    return {
+      ok: false,
+      error: {
+        code: 'PROFILE_MISMATCH',
+        message: 'El perfil no coincide con el tipo de destino.',
+        issues: ['profile_mismatch'],
+      },
+    };
+  }
+
+  const { steps, fields, documents: docRules, recommendationLettersCount } = effectiveProfile.definition;
+
+  // Compose inputs
+  const targetOrientations = target.orientations ?? [];
+  const targetMentions = target.mentions ?? [];
+
   const finalInputs: InputDefinition[] = [];
 
-  // Add universal inputs (unless overridden by specific configuration)
-  for (const universal of UNIVERSAL_INPUTS) {
-    const override = configuredInputs.find((c) => c.key === universal.key);
-    if (override) {
-      finalInputs.push({
-        ...universal,
-        position: override.position ?? universal.position,
-        required: override.required ?? universal.required,
-      });
-    } else {
-      finalInputs.push({ ...universal });
+  for (const fieldRule of fields) {
+    // Condition checks
+    if (fieldRule.condition === 'has_orientations' && targetOrientations.length === 0) {
+      continue;
     }
+    if (fieldRule.condition === 'has_mentions' && targetMentions.length === 0) {
+      continue;
+    }
+
+    const baseUniversal = UNIVERSAL_INPUTS.find((u) => u.key === fieldRule.key);
+    const baseSpecific = SUPPORTED_SPECIFIC_INPUTS[fieldRule.key];
+    const base = baseUniversal ?? baseSpecific;
+
+    finalInputs.push({
+      key: fieldRule.key,
+      label: fieldRule.label ?? base?.label ?? fieldRule.key,
+      type: base?.type ?? 'text',
+      required: fieldRule.required,
+      position: fieldRule.order,
+      stepId: fieldRule.stepId,
+      condition: fieldRule.condition,
+      optionsSource:
+        fieldRule.key === 'orientacion'
+          ? 'wordpress.orientaciones'
+          : fieldRule.key === 'mencion'
+          ? 'wordpress.menciones'
+          : base?.optionsSource,
+      spreadsheetColumn: base?.spreadsheetColumn ?? base?.label,
+    });
   }
 
-  // Add specific configured inputs
-  for (const configured of configuredInputs) {
-    if (UNIVERSAL_INPUTS.some((u) => u.key === configured.key)) {
-      continue; // already handled
-    }
-
-    const baseDef = SUPPORTED_SPECIFIC_INPUTS[configured.key];
-    if (baseDef) {
-      finalInputs.push({
-        ...baseDef,
-        position: configured.position ?? 99,
-        required: configured.required ?? baseDef.required,
-      });
-    }
-  }
-
-  // Sort inputs by position ascending
   finalInputs.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
-  const documents = (target.form.documents ?? []).flatMap((configured) => {
-    const base = DOCUMENT_DEFINITIONS[configured.key];
-    if (!base) {
-      issues.push(`Clave de documento no soportada: ${configured.key}`);
-      return [];
-    }
-    return [{
-      ...base,
-      position: configured.position ?? 99,
-      required: configured.required ?? base.required,
-      maxFiles: configured.maxFiles ?? base.maxFiles,
-      maxBytes: configured.maxBytes ?? base.maxBytes,
-      acceptedMimeTypes: configured.acceptedMimeTypes ?? base.acceptedMimeTypes,
-      canDefer: configured.canDefer ?? base.canDefer,
-    }];
-  });
+  // Compose documents
+  const finalDocuments: DocumentDefinition[] = [];
 
-  if (issues.length > 0) {
-    return {
-      ok: false,
-      error: {
-        code: 'INCOMPATIBLE_FORM',
-        message: 'El formulario contiene definiciones incompatibles o no soportadas.',
-        issues,
-      },
-    };
+  for (const docRule of docRules) {
+    const base = DOCUMENT_DEFINITIONS[docRule.key];
+
+    finalDocuments.push({
+      key: docRule.key,
+      label: docRule.label ?? base?.label ?? docRule.key,
+      required: docRule.required,
+      canDefer: docRule.canDefer,
+      maxFiles: docRule.maxFiles ?? base?.maxFiles ?? 1,
+      maxBytes: docRule.maxBytes ?? base?.maxBytes ?? 10 * 1024 * 1024,
+      acceptedMimeTypes: docRule.acceptedMimeTypes ?? base?.acceptedMimeTypes ?? ['application/pdf'],
+      position: docRule.order,
+      stepId: docRule.stepId,
+    });
   }
+
+  finalDocuments.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+  // Compute effective revision
+  const revisionPayload = `${target.configRevision}:${effectiveProfile.versionId}:${JSON.stringify(effectiveProfile.definition)}`;
+  const hash = crypto.createHash('sha256').update(revisionPayload).digest('hex');
+  const effectiveRevision = `sha256:${hash}`;
+
+  const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
 
   return {
     ok: true,
@@ -120,14 +132,17 @@ export function composeForm(target: AcademicTarget): CompositionResult {
       targetId: target.id,
       kind: target.kind,
       title: target.title,
+      offerType: effectiveProfile.type,
+      profileVersionId: effectiveProfile.versionId,
+      effectiveRevision,
       registrationOpen: target.registrationOpen,
       configRevision: target.configRevision,
+      steps: sortedSteps,
       inputs: finalInputs,
-      orientations: target.kind === 'seminar' ? [] : target.orientations ?? [],
-      mentions: target.kind === 'seminar'
-        ? []
-        : target.mentions ?? target.orientations.flatMap((orientation) => orientation.mentions ?? []),
-      documents,
+      documents: finalDocuments,
+      orientations: targetOrientations,
+      mentions: targetMentions,
+      recommendationLettersCount,
     },
   };
 }
