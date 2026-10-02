@@ -67,11 +67,16 @@ A partir de la actualización arquitectónica, la estructura del formulario (pas
 
 ### Administración con Google OIDC
 
-El panel de administración (`/admin/perfiles`) está restringido exclusivamente a cuentas institucionales verificadas (`web@flacso.edu.uy`).
+### Variables de Entorno
 
-Variables de entorno requeridas en producción (configurar en `.env` sin subir credenciales al repositorio):
+Copiar `.env.example` a `.env` y configurar las credenciales institucionales:
 
 ```bash
+# Google Drive (Documentación de preinscripciones)
+GOOGLE_DRIVE_FOLDER_ID=1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e
+GOOGLE_ACCESS_TOKEN=tu_access_token_o_service_account_token
+
+# Google OIDC (Autenticación administrativa)
 GOOGLE_OIDC_CLIENT_ID=tu_cliente_id.apps.googleusercontent.com
 GOOGLE_OIDC_CLIENT_SECRET=tu_secreto_de_cliente
 GOOGLE_OIDC_REDIRECT_URI=https://preinscripciones.flacso.edu.uy/admin/perfiles

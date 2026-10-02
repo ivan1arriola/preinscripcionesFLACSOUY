@@ -28,6 +28,12 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgres://flacso:flacso_password@postgres:5432/flacso_preinscripciones
       WORDPRESS_URL: ${WORDPRESS_URL:-https://flacso.edu.uy}
+      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e}
+      GOOGLE_ACCESS_TOKEN: ${GOOGLE_ACCESS_TOKEN:-}
+      GOOGLE_OIDC_CLIENT_ID: ${GOOGLE_OIDC_CLIENT_ID:-}
+      GOOGLE_OIDC_CLIENT_SECRET: ${GOOGLE_OIDC_CLIENT_SECRET:-}
+      GOOGLE_OIDC_REDIRECT_URI: ${GOOGLE_OIDC_REDIRECT_URI:-http://localhost:5173/admin/perfiles}
+      ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:-web@flacso.edu.uy}
     ports:
       - "3000:3000"
     healthcheck:
