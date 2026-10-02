@@ -89,7 +89,14 @@ export function createApp(dependencies: AppDependencies): Express {
   app.use('/api/admin/profiles', createAdminProfileRoutes(profileRepo, sessionStore));
 
   const settingsRepo = dependencies.systemSettingsRepository ?? new MemorySystemSettingsRepository();
-  app.use('/api/admin/settings', createAdminSettingsRoutes(settingsRepo, sessionStore, dependencies.serviceAccountEmail));
+  app.use('/api/admin/settings', createAdminSettingsRoutes(
+    settingsRepo,
+    sessionStore,
+    dependencies.serviceAccountEmail,
+    dependencies.googleDriveRepository?.inspectFolder
+      ? { inspectFolder: dependencies.googleDriveRepository.inspectFolder.bind(dependencies.googleDriveRepository) }
+      : undefined,
+  ));
 
   // Central error handler
   app.use(errorHandler);

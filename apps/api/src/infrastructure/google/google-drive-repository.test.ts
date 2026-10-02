@@ -27,4 +27,28 @@ describe('GoogleDriveRepository', () => {
     const repository = new GoogleDriveRepository({ folderId: 'folder-1', accessTokenOrProvider: 'token', fetchImpl: async () => new Response('denied', { status: 403 }) });
     await expect(repository.storeSubmissionFiles({ submissionId: 'sub_1', files: [{ token: 'tmp-token', originalName: 'cv.pdf', mimeType: 'application/pdf', data: Buffer.from('pdf') }] })).rejects.toThrow('Google Drive API respondió con error HTTP 403');
   });
+
+  it('reads the folder name and creation capability for admin configuration', async () => {
+    let request: Request | undefined;
+    const repository = new GoogleDriveRepository({
+      accessTokenOrProvider: 'token',
+      fetchImpl: async (input, init) => {
+        request = new Request(input, init);
+        return new Response(JSON.stringify({
+          id: 'folder-1',
+          name: 'Preinscripciones FLACSO',
+          mimeType: 'application/vnd.google-apps.folder',
+          capabilities: { canAddChildren: true },
+        }), { status: 200 });
+      },
+    });
+
+    await expect(repository.inspectFolder('folder-1')).resolves.toEqual({
+      id: 'folder-1',
+      name: 'Preinscripciones FLACSO',
+      canAddChildren: true,
+    });
+    expect(request?.url).toContain('drive/v3/files/folder-1');
+    expect(request?.url).toContain('capabilities(canAddChildren)');
+  });
 });

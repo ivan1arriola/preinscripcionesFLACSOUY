@@ -6,6 +6,13 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
 
     await expect(page.getByText('Preinscripciones FLACSO Uruguay')).toBeVisible();
 
+    // Expand all accordion groups so all cards are visible
+    const groups = page.locator('details');
+    const count = await groups.count();
+    for (let i = 0; i < count; i++) {
+      await groups.nth(i).evaluate((el: HTMLDetailsElement) => { el.open = true; });
+    }
+
     // Verify operational academic targets are listed with Abierta badge
     const daviaCard = page.getByTestId('target-card-davia-c11');
     await expect(daviaCard).toBeVisible();
@@ -38,6 +45,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
   test('completes 5-step wizard for maestría with only orientations', async ({ page }) => {
     await page.goto('/');
 
+    await page.getByTestId('offer-group-maestria').locator('summary').click();
     const maestriaCard = page.getByTestId('target-card-maestria-genero-c9');
     await maestriaCard.getByRole('button', { name: /Completar preinscripción/i }).click();
 
@@ -124,6 +132,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
   test('completes wizard for diplomado with only mentions', async ({ page }) => {
     await page.goto('/');
 
+    await page.getByTestId('offer-group-diplomado').locator('summary').click();
     const diplomadoCard = page.getByTestId('target-card-diplomado-salud-c2');
     await diplomadoCard.getByRole('button', { name: /Completar preinscripción/i }).click();
 
@@ -167,6 +176,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
   test('seminar wizard renders 4 steps and no orientation/mention attributes', async ({ page }) => {
     await page.goto('/');
 
+    await page.getByTestId('offer-group-seminarios').locator('summary').click();
     const seminarCard = page.getByTestId('target-card-seminario-metodologia-ed3');
     await seminarCard.getByRole('button', { name: /Completar preinscripción/i }).click();
 

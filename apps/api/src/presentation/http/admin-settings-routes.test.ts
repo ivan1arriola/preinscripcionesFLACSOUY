@@ -38,6 +38,10 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       googleIdentityVerifier: mockVerifier,
       systemSettingsRepository: settingsRepository,
       serviceAccountEmail: 'preinscripciones@flacso-uruguay.iam.gserviceaccount.com',
+      googleDriveRepository: {
+        storeSubmissionFiles: async () => [],
+        inspectFolder: async (folderId) => ({ id: folderId, name: 'Preinscripciones FLACSO', canAddChildren: true }),
+      },
     });
 
     await new Promise<void>((resolve) => {
@@ -81,7 +85,31 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.googleDriveFolderId).toBe('1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e');
+    expect(body.googleDriveFolderName).toBe('Preinscripciones FLACSO');
+    expect(body.googleDriveCanAddChildren).toBe(true);
     expect(body.serviceAccountEmail).toBe('preinscripciones@flacso-uruguay.iam.gserviceaccount.com');
+  });
+
+  it('returns no Drive root until it is configured from the admin UI', async () => {
+    const emptySettings = new MemorySystemSettingsRepository();
+    const app = createApp({
+      catalog: new FixtureAcademicCatalog(),
+      repository: new InMemorySubmissionRepository(),
+      adminSessionStore: sessionStore,
+      googleIdentityVerifier: mockVerifier,
+      systemSettingsRepository: emptySettings,
+      serviceAccountEmail: 'preinscripciones@flacso-uruguay.iam.gserviceaccount.com',
+    });
+    const temporaryServer = app.listen(0);
+    await new Promise<void>((resolve) => temporaryServer.once('listening', () => resolve()));
+    const address = temporaryServer.address();
+    const url = `http://localhost:${(address as { port: number }).port}/api/admin/settings`;
+
+    const res = await fetch(url, { headers: { Cookie: validCookie } });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).googleDriveFolderId).toBeNull();
+    await new Promise<void>((resolve) => temporaryServer.close(() => resolve()));
   });
 
   it('rejects PUT /api/admin/settings/google-drive without CSRF token (403)', async () => {
@@ -136,6 +164,35 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
 
     const updated = await settingsRepository.getSetting('google_drive_folder_id');
     expect(updated).toBe('1customFolderIdFromFullUrl123');
+  });
+
+  it('does not save a folder that the service account cannot write to', async () => {
+    const readOnlySettings = new MemorySystemSettingsRepository();
+    const app = createApp({
+      catalog: new FixtureAcademicCatalog(),
+      repository: new InMemorySubmissionRepository(),
+      adminSessionStore: sessionStore,
+      googleIdentityVerifier: mockVerifier,
+      systemSettingsRepository: readOnlySettings,
+      googleDriveRepository: {
+        storeSubmissionFiles: async () => [],
+        inspectFolder: async (folderId) => ({ id: folderId, name: 'Solo lectura', canAddChildren: false }),
+      },
+    });
+    const temporaryServer = app.listen(0);
+    await new Promise<void>((resolve) => temporaryServer.once('listening', () => resolve()));
+    const address = temporaryServer.address();
+    const url = `http://localhost:${(address as { port: number }).port}/api/admin/settings/google-drive`;
+
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { Cookie: validCookie, 'x-csrf-token': csrfToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId: '1readOnlyFolder123456789' }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await readOnlySettings.getSetting('google_drive_folder_id')).toBeNull();
+    await new Promise<void>((resolve) => temporaryServer.close(() => resolve()));
   });
 
   it('rejects invalid folder ID formats', async () => {

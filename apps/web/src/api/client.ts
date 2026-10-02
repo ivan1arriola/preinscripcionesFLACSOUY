@@ -182,7 +182,9 @@ export const apiClient = {
   },
 
   async getAdminSettings(): Promise<{
-    googleDriveFolderId: string;
+    googleDriveFolderId: string | null;
+    googleDriveFolderName: string | null;
+    googleDriveCanAddChildren: boolean;
     serviceAccountEmail: string | null;
     updatedAt: string | null;
     updatedBy: string | null;
@@ -195,7 +197,12 @@ export const apiClient = {
     return res.json();
   },
 
-  async updateGoogleDriveFolder(folderId: string, csrfToken: string): Promise<{ ok: boolean; googleDriveFolderId: string }> {
+  async updateGoogleDriveFolder(folderId: string, csrfToken: string): Promise<{
+    ok: boolean;
+    googleDriveFolderId: string;
+    googleDriveFolderName: string;
+    googleDriveCanAddChildren: boolean;
+  }> {
     const res = await fetch('/api/admin/settings/google-drive', {
       method: 'PUT',
       headers: {

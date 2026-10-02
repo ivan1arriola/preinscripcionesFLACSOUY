@@ -7,7 +7,9 @@ interface AdminDriveSettingsCardProps {
 
 export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ csrfToken }) => {
   const [folderId, setFolderId] = useState('');
-  const [currentFolderId, setCurrentFolderId] = useState('');
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentFolderName, setCurrentFolderName] = useState<string | null>(null);
+  const [canAddChildren, setCanAddChildren] = useState(false);
   const [serviceAccountEmail, setServiceAccountEmail] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [updatedBy, setUpdatedBy] = useState<string | null>(null);
@@ -23,7 +25,9 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
     try {
       const data = await apiClient.getAdminSettings();
       setCurrentFolderId(data.googleDriveFolderId);
-      setFolderId(data.googleDriveFolderId);
+      setFolderId(data.googleDriveFolderId ?? '');
+      setCurrentFolderName(data.googleDriveFolderName);
+      setCanAddChildren(data.googleDriveCanAddChildren);
       setServiceAccountEmail(data.serviceAccountEmail);
       setUpdatedAt(data.updatedAt);
       setUpdatedBy(data.updatedBy);
@@ -48,6 +52,8 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
       const res = await apiClient.updateGoogleDriveFolder(folderId, csrfToken);
       setCurrentFolderId(res.googleDriveFolderId);
       setFolderId(res.googleDriveFolderId);
+      setCurrentFolderName(res.googleDriveFolderName);
+      setCanAddChildren(res.googleDriveCanAddChildren);
       setSuccess('Carpeta de Google Drive actualizada correctamente.');
       loadSettings();
     } catch (err) {
@@ -73,7 +79,7 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
     );
   }
 
-  const driveUrl = `https://drive.google.com/drive/folders/${currentFolderId}`;
+  const driveUrl = currentFolderId ? `https://drive.google.com/drive/folders/${currentFolderId}` : null;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-8">
@@ -87,7 +93,7 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
           </p>
         </div>
 
-        {currentFolderId && (
+        {currentFolderId && driveUrl && (
           <a
             href={driveUrl}
             target="_blank"
@@ -140,6 +146,14 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
           </p>
         </div>
       </form>
+
+      {currentFolderId && (
+        <div className={`mt-4 p-3 rounded-lg border text-xs ${canAddChildren ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+          <strong>{currentFolderName || 'Carpeta configurada'}</strong>
+          {' — '}
+          {canAddChildren ? 'La cuenta de servicio puede crear archivos y subcarpetas.' : 'La cuenta de servicio no tiene permisos suficientes para crear archivos o subcarpetas.'}
+        </div>
+      )}
 
       {/* Service Account sharing advice box */}
       {serviceAccountEmail && (

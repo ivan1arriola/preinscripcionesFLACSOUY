@@ -11,18 +11,6 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('updated_by', 'varchar(255)', (col) => col.defaultTo('system').notNull())
     .execute();
 
-  const initialFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || '1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e';
-
-  await db
-    .insertInto('system_settings')
-    .values({
-      key: 'google_drive_folder_id',
-      value: initialFolderId,
-      description: 'ID o URL de la carpeta de Google Drive donde se almacenan los archivos adjuntos de las preinscripciones',
-      updated_by: 'system',
-    })
-    .onConflict((oc) => oc.column('key').doNothing())
-    .execute();
 }
 
 export async function down(db: Kysely<any>): Promise<void> {

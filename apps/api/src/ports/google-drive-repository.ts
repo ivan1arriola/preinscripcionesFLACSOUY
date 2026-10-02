@@ -15,6 +15,13 @@ export interface StoredDriveFile {
   driveFileId: string;
 }
 
+export interface GoogleDriveFolderInfo {
+  id: string;
+  name: string;
+  canAddChildren: boolean;
+}
+
 export interface GoogleDriveRepositoryPort {
   storeSubmissionFiles(command: StoreSubmissionFilesCommand): Promise<StoredDriveFile[]>;
+  inspectFolder?(folderId: string): Promise<GoogleDriveFolderInfo>;
 }

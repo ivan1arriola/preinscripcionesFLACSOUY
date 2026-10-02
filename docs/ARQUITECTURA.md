@@ -414,13 +414,7 @@ La aplicación no debe:
 
 La aplicación solo necesitará conocer una **carpeta raíz del proyecto**.
 
-Ejemplo de variable:
-
-```text
-GOOGLE_DRIVE_ROOT_FOLDER_ID
-```
-
-Toda la estructura inferior será creada y administrada por la aplicación.
+El administrador ingresará el ID o la URL de esa carpeta desde el panel administrativo. La aplicación guardará el identificador en `system_settings`, comprobará el nombre y los permisos de escritura con la cuenta de servicio, y utilizará esa carpeta como raíz de toda la estructura. La carpeta raíz no se configura mediante una variable de entorno.
 
 ## 8.2. Estructura propuesta
 

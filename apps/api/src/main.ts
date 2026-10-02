@@ -37,8 +37,6 @@ const temporaryFileStorage = new TemporaryFileStorage({
   allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
 });
 const googleCreds = loadAllGoogleCredentials();
-const defaultDriveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID || '1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e';
-
 if (googleCreds.serviceAccountPath) {
   console.log(`[Google] Cuenta de servicio detectada: ${googleCreds.serviceAccountPath} (${googleCreds.clientEmail || 'sin email'})`);
 } else if (process.env.GOOGLE_ACCESS_TOKEN) {
@@ -52,7 +50,13 @@ const isMockDrive = process.env.GOOGLE_DRIVE_MOCK === 'true';
 const googleDriveRepository = !isMockDrive && googleCreds.tokenProvider
   ? new GoogleDriveRepository({
       folderIdOrProvider: async () =>
-        (await systemSettingsRepository.getSetting('google_drive_folder_id')) || defaultDriveFolderId,
+        await (async () => {
+          const configuredFolder = await systemSettingsRepository.getSetting('google_drive_folder_id');
+          if (!configuredFolder) {
+            throw new Error('La carpeta raíz de Google Drive todavía no está configurada desde el panel administrativo.');
+          }
+          return configuredFolder;
+        })(),
       accessTokenOrProvider: googleCreds.tokenProvider,
     })
   : process.env.NODE_ENV !== 'production' || isMockDrive
