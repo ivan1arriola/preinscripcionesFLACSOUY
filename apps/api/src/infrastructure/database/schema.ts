@@ -81,37 +81,6 @@ export interface SpreadsheetOperationsTable {
   updated_at: Generated<Date>;
 }
 
-export interface UploadSessionsTable {
-  id: string;
-  created_at: Generated<Date>;
-  last_activity_at: Generated<Date>;
-}
-
-export interface UploadSessionFilesTable {
-  id: string;
-  session_id: string;
-  original_name: string;
-  mime_type: string;
-  size_bytes: number;
-  storage_path: string;
-  uploaded_at: Generated<Date>;
-}
-
-export interface SystemErrorsTable {
-  id: string;
-  severity: string;
-  origin: string;
-  code: string;
-  message: string;
-  context: any;
-  target_id: string | null;
-  status: string;
-  resolved_at: Date | null;
-  resolved_by: string | null;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-}
-
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -124,9 +93,5 @@ export interface DatabaseSchema {
   technical_cache: TechnicalCacheTable;
   target_spreadsheets: TargetSpreadsheetsTable;
   spreadsheet_operations: SpreadsheetOperationsTable;
-  upload_sessions: UploadSessionsTable;
-  upload_session_files: UploadSessionFilesTable;
-  system_errors: SystemErrorsTable;
 }
-
 
