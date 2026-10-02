@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: preinscripciones-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: flacso_preinscripciones
+      POSTGRES_USER: flacso
+      POSTGRES_PASSWORD: flacso_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flacso -d flacso_preinscripciones"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: preinscripciones-api
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      NODE_ENV: production
+      DATABASE_URL: postgres://flacso:flacso_password@postgres:5432/flacso_preinscripciones
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: preinscripciones-web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:

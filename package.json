@@ -1,0 +1,16 @@
+{
+  "name": "preinscripciones-flacso",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "build": "pnpm -r run build",
+    "compose:up": "docker compose up"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
