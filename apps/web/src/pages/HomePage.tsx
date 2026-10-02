@@ -4,7 +4,7 @@ import { apiClient } from '../api/client.js';
 import { TargetList } from '../components/TargetList.js';
 
 interface HomePageProps {
-  onSelectTarget: (id: string) => void;
+  onSelectTarget: (target: DiagnosticTarget) => void;
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {

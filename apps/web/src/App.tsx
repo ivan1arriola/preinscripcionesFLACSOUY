@@ -1,12 +1,82 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { DiagnosticTarget } from '@flacso/contracts';
+import { apiClient } from './api/client';
 import { HomePage } from './pages/HomePage';
 import { TargetPage } from './pages/TargetPage';
 
+const HOME_PATH = '/';
+
+const normalizePath = (path: string): string => {
+  if (path === HOME_PATH) return HOME_PATH;
+  return path.endsWith('/') ? path : `${path}/`;
+};
+
+const legacyPathForTarget = (target: DiagnosticTarget): string | null => {
+  const legacyRegistration = target.urls?.legacyRegistration;
+  if (!legacyRegistration) return null;
+
+  const path = normalizePath(new URL(legacyRegistration).pathname);
+  return /^\/(oferta|seminario)\/[^/]+\/$/.test(path) ? path : null;
+};
+
 export function App() {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [path, setPath] = useState(() => normalizePath(window.location.pathname));
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onPopState = () => setPath(normalizePath(window.location.pathname));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (path === HOME_PATH) {
+      setSelectedTargetId(null);
+      setRouteError(null);
+      return;
+    }
+
+    let active = true;
+    setSelectedTargetId(null);
+    setRouteError(null);
+
+    apiClient.listTargets()
+      .then((targets) => {
+        if (!active) return;
+        const target = targets.find((candidate) => legacyPathForTarget(candidate) === path);
+        if (target) {
+          setSelectedTargetId(target.id);
+        } else {
+          setRouteError('No encontramos una preinscripción para este enlace.');
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setRouteError('No pudimos verificar este enlace. Intente nuevamente más tarde.');
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [path]);
 
   const handleGoHome = () => {
+    window.history.pushState({}, '', HOME_PATH);
+    setPath(HOME_PATH);
     setSelectedTargetId(null);
+  };
+
+  const handleSelectTarget = (target: DiagnosticTarget) => {
+    const legacyPath = legacyPathForTarget(target);
+    if (legacyPath) {
+      window.history.pushState({}, '', legacyPath);
+      setPath(legacyPath);
+      return;
+    }
+
+    setSelectedTargetId(target.id);
   };
 
   return (
@@ -31,9 +101,16 @@ export function App() {
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
         {selectedTargetId ? (
-          <TargetPage targetId={selectedTargetId} onBack={() => setSelectedTargetId(null)} />
+          <TargetPage targetId={selectedTargetId} onBack={handleGoHome} />
+        ) : routeError ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-900" role="alert">
+            <p className="font-medium">{routeError}</p>
+            <button type="button" onClick={handleGoHome} className="mt-3 text-sm font-medium text-blue-700 hover:underline">
+              Ver todas las preinscripciones
+            </button>
+          </div>
         ) : (
-          <HomePage onSelectTarget={(id: string) => setSelectedTargetId(id)} />
+          <HomePage onSelectTarget={handleSelectTarget} />
         )}
       </main>
 

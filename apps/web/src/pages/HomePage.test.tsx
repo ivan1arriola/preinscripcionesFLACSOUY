@@ -87,6 +87,6 @@ describe('HomePage Component', () => {
 
     const openBtn = screen.getAllByRole('button', { name: /Completar preinscripción/i })[0]!;
     fireEvent.click(openBtn);
-    expect(onSelect).toHaveBeenCalledWith('davia-c11');
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'davia-c11' }));
   });
 });

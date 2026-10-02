@@ -3,7 +3,7 @@ import type { DiagnosticTarget } from '@flacso/contracts';
 
 interface TargetListProps {
   targets: DiagnosticTarget[];
-  onSelectTarget: (id: string) => void;
+  onSelectTarget: (target: DiagnosticTarget) => void;
 }
 
 export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget }) => {
@@ -70,7 +70,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
               ) : (
                 <button
                   type="button"
-                  onClick={() => onSelectTarget(target.id)}
+                  onClick={() => onSelectTarget(target)}
                   className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 font-medium"
                 >
                   {isOperational ? 'Completar preinscripción' : 'Ver información del destino'}
