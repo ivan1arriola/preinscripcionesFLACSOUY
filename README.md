@@ -6,9 +6,7 @@ La aplicación tendrá una arquitectura en capas y utilizará:
 
 - **WordPress** como fuente de verdad del catálogo académico y del estado de las inscripciones.
 - **Google Sheets** como persistencia de las preinscripciones y espacio de trabajo editable por las asistentes.
-- **Google Drive** para la documentación adjunta y la estructura de archivos.
-- **PostgreSQL** para estado técnico interno, caché, errores y sesiones temporales.
-- **Almacenamiento temporal en volumen Docker** únicamente para archivos cargados antes de enviar un formulario.
+- **PostgreSQL** para estado técnico interno y caché.
 
 PostgreSQL no será una fuente de verdad académica ni reemplazará a Google Sheets como persistencia institucional de las preinscripciones.
 
@@ -19,15 +17,10 @@ La especificación funcional y arquitectónica se encuentra en:
 - [Arquitectura de la plataforma](docs/ARQUITECTURA.md)
 - [Integración con el plugin FLACSO / WordPress](docs/INTEGRACION_WORDPRESS.md)
 - [Documentación y Operación del MVP](docs/MVP.md)
-- [Manual de Operación y Observabilidad](docs/OPERACION.md)
-- [Plan de Rollout Reversible](docs/ROLLOUT.md)
 
 ## Ejecución Local y Docker
 
 ```bash
-# Copiar plantilla de variables de entorno
-cp .env.example .env
-
 # Iniciar servicios con Docker Compose
 docker compose up -d --build
 
@@ -37,14 +30,8 @@ pnpm --filter api db:migrate
 # Ejecutar pruebas unitarias y de integración
 pnpm test
 
-# Ejecutar pruebas de extremo a extremo (E2E) con Playwright
-pnpm e2e
-
-# Realizar respaldo de PostgreSQL
-./scripts/backup-db.sh
-
-# Limpiar archivos temporales expirados
-./scripts/cleanup-uploads.sh
+# Construir las aplicaciones
+pnpm build
 ```
 
 ## Principios principales
@@ -55,7 +42,5 @@ pnpm e2e
 4. WordPress define qué ofertas, cohortes, seminarios, ediciones, orientaciones y menciones existen.
 5. WordPress determina si una preinscripción está abierta o cerrada y qué inputs específicos utiliza cada formulario.
 6. La aplicación define en código qué inputs existen, cómo se validan, renderizan y guardan.
-7. Google Sheets y Google Drive son la persistencia final de datos y documentos.
+7. Google Sheets es la persistencia final de las preinscripciones.
 8. Los formularios no mantienen borradores ni sesiones de datos personales.
-9. Los archivos adjuntos se conservan temporalmente durante un máximo de 30 minutos sin actividad.
-10. Existe un único usuario administrador para configuración, diagnóstico y revisión de errores.
