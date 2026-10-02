@@ -55,6 +55,20 @@ export interface SubmissionProcessingTable {
   updated_at: Generated<Date>;
 }
 
+export interface SubmissionFilesTable {
+  token: string;
+  submission_id: string;
+  field_key: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  status: 'pending' | 'success' | 'failed' | 'unknown';
+  drive_file_id: string | null;
+  error_message: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface SubmissionValuesTable {
   submission_id: string;
   input_key: string;
@@ -97,6 +111,7 @@ export interface DatabaseSchema {
   orientation_mentions: OrientationMentionsTable;
   submissions: SubmissionsTable;
   submission_processing: SubmissionProcessingTable;
+  submission_files: SubmissionFilesTable;
   submission_values: SubmissionValuesTable;
   technical_cache: TechnicalCacheTable;
   target_spreadsheets: TargetSpreadsheetsTable;
