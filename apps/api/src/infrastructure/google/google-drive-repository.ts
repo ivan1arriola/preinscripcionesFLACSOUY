@@ -81,8 +81,9 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
       throw new Error(`Error al buscar carpeta en Google Drive (HTTP ${searchResponse.status})`);
     }
     const searchPayload = await searchResponse.json() as { files?: { id: string }[] };
-    if (searchPayload.files && searchPayload.files.length > 0 && searchPayload.files[0].id) {
-      return searchPayload.files[0].id;
+    const firstFile = searchPayload.files?.[0];
+    if (firstFile && firstFile.id) {
+      return firstFile.id;
     }
 
     const createUrl = 'https://www.googleapis.com/drive/v3/files?supportsAllDrives=true';
