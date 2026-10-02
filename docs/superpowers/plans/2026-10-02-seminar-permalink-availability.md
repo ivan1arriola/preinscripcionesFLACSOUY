@@ -117,33 +117,33 @@
 - Add optional `registrationAvailability` to `DiagnosticTarget` so the web can distinguish a closed permalink from a catalog conflict.
 - Add a pure function `resolveSeminarPermalinks(targets: AcademicTarget[]): Map<string, SeminarPermalinkResolution>` that returns `open`, `closed`, or `conflict` plus the selected target ID when applicable.
 
-- [ ] **Step 1: Escribir pruebas de resolución pura**
+- [x] **Step 1: Escribir pruebas de resolución pura**
 
   Probar un permalink con una edición abierta y una cerrada, un permalink sin edición abierta, dos abiertas, destinos sin permalink y ofertas académicas con el mismo path. Afirmar que solo la edición abierta se selecciona y que el conflicto no selecciona ninguna.
 
-- [ ] **Step 2: Ejecutar las pruebas nuevas y verificar que fallan**
+- [x] **Step 2: Ejecutar las pruebas nuevas y verificar que fallan**
 
   Run: `pnpm --filter api test -- seminar-permalink-availability.test.ts`
 
   Expected: FAIL porque la resolución agrupada aún no existe.
 
-- [ ] **Step 3: Implementar el contrato y la resolución**
+- [x] **Step 3: Implementar el contrato y la resolución**
 
   Validar el nuevo campo con Zod sin romper respuestas antiguas. En la API, aplicar la resolución agrupada antes de construir diagnósticos: un conflicto debe producir `status: incompatible` e issue estable `multiple_open_seminar_editions`; sin edición abierta debe seguir siendo `closed`. No modificar el cálculo de ofertas académicas.
 
   Si las ediciones de un mismo seminario tienen permalinks distintos, el diagnóstico debe usar `status: incompatible` e issue estable `inconsistent_seminar_permalink`.
 
-- [ ] **Step 4: Actualizar fixtures y pruebas de contrato**
+- [x] **Step 4: Actualizar fixtures y pruebas de contrato**
 
   Añadir `registrationAvailability` a los fixtures de seminarios, conservar al menos un fixture legacy sin el campo y verificar que ambos se parsean según la política de compatibilidad.
 
-- [ ] **Step 5: Ejecutar API y typecheck**
+- [x] **Step 5: Ejecutar API y typecheck**
 
   Run: `pnpm --filter api test && pnpm --filter api typecheck`
 
   Expected: PASS.
 
-- [ ] **Step 6: Commit de la API y contratos**
+- [x] **Step 6: Commit de la API y contratos**
 
   `git add packages/contracts apps/api && git commit -m "feat(api): resolve seminar availability by permalink"`
 
@@ -162,27 +162,27 @@
 - Add `revalidateTargets(): Promise<AcademicTarget[]>` to `AcademicCatalog` for checks that depend on sibling editions.
 - Reuse `resolveSeminarPermalinks()` from Task 3 in both application services.
 
-- [ ] **Step 1: Escribir pruebas de rechazo**
+- [x] **Step 1: Escribir pruebas de rechazo**
 
   Verificar que `getTargetForm` rechaza una edición cerrada o en conflicto, que `submitPreinscription` devuelve `CLOSED` sin persistir y que una edición que se cerró después de cargar el formulario también es rechazada. Verificar que una edición abierta única continúa componiendo y guardando la solicitud.
 
-- [ ] **Step 2: Ejecutar pruebas y verificar que fallan**
+- [x] **Step 2: Ejecutar pruebas y verificar que fallan**
 
   Run: `pnpm --filter api test -- get-target-form.test.ts submit-preinscription.test.ts`
 
   Expected: FAIL porque actualmente `getTargetForm` compone formularios cerrados y el envío solo valida el booleano del destino individual.
 
-- [ ] **Step 3: Implementar la revalidación autoritativa**
+- [x] **Step 3: Implementar la revalidación autoritativa**
 
   La implementación WordPress debe ignorar la caché al ejecutar `revalidateTargets()`. La implementación fixture debe devolver una copia aislada. Antes de componer o persistir, resolver el permalink del seminario y aceptar únicamente la edición abierta única.
 
-- [ ] **Step 4: Ejecutar pruebas de aplicación y regresión**
+- [x] **Step 4: Ejecutar pruebas de aplicación y regresión**
 
   Run: `pnpm --filter api test`
 
   Expected: PASS sin cambiar códigos públicos existentes salvo el rechazo correcto de destinos cerrados o conflictivos.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   `git add apps/api/src/ports apps/api/src/infrastructure apps/api/src/application && git commit -m "fix(api): reject closed seminar submissions authoritatively"`
 
@@ -202,31 +202,31 @@
 - Produce `resolveLegacyPermalink(targets: DiagnosticTarget[], path: string): { kind: 'target'; target: DiagnosticTarget } | { kind: 'closed'; title?: string } | { kind: 'conflict'; title?: string } | { kind: 'not_found' }`.
 - `ClosedRegistrationNotice` recibe `title?: string`, `onBack: () => void` y muestra el copy aprobado para seminarios cerrados.
 
-- [ ] **Step 1: Escribir pruebas de resolución y UI**
+- [x] **Step 1: Escribir pruebas de resolución y UI**
 
   Probar que una ruta con edición cerrada y abierta carga solo la abierta; que una ruta con todas las ediciones cerradas muestra el aviso y no llama a `getTarget`; que dos abiertas muestran conflicto; y que la ruta académica existente sigue cargando como antes. Probar que la home no duplica tarjetas del mismo seminario por edición histórica.
 
-- [ ] **Step 2: Ejecutar las pruebas y verificar que fallan**
+- [x] **Step 2: Ejecutar las pruebas y verificar que fallan**
 
   Run: `pnpm --filter web test -- App.test.tsx HomePage.test.tsx legacy-permalink-resolution.test.ts`
 
   Expected: FAIL porque `App.tsx` usa `targets.find(...)` y `HomePage` lista cada edición por separado.
 
-- [ ] **Step 3: Implementar la resolución pura y la pantalla cerrada**
+- [x] **Step 3: Implementar la resolución pura y la pantalla cerrada**
 
   Normalizar la ruta antes de agrupar. Para seminarios, usar `registrationAvailability` cuando exista y como fallback `registrationOpen`; nunca usar el primer candidato. La pantalla cerrada debe conservar el permalink, permitir volver al listado y no renderizar campos deshabilitados como si fueran un formulario disponible. El conflicto debe usar un aviso distinto y no iniciar el formulario.
 
-- [ ] **Step 4: Agrupar la presentación pública de seminarios**
+- [x] **Step 4: Agrupar la presentación pública de seminarios**
 
   En la home, agrupar por permalink y conservar como representante la edición abierta única; sin edición abierta, mostrar una sola tarjeta cerrada. Mantener la separación de secciones y grupos de ofertas académicas.
 
-- [ ] **Step 5: Ejecutar pruebas web, typecheck y build**
+- [x] **Step 5: Ejecutar pruebas web, typecheck y build**
 
   Run: `pnpm --filter web test && pnpm --filter web typecheck && pnpm --filter web build`
 
   Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   `git add apps/web/src && git commit -m "fix(web): resolve seminar permalinks by open edition"`
 
@@ -237,17 +237,17 @@
 - Modify: `docs/superpowers/plans/2026-10-02-seminar-permalink-availability.md` para marcar pasos completados.
 - Test: `e2e/` o el archivo Playwright existente que cubra rutas públicas.
 
-- [ ] **Step 1: Agregar escenario E2E con permalink histórico**
+- [x] **Step 1: Agregar escenario E2E con permalink histórico**
 
   Configurar fixtures con dos ediciones del mismo seminario, una abierta y una cerrada, y verificar que `/seminario/diseno-de-cursos-virtuales/` abre el formulario de la edición abierta. Repetir con ninguna abierta y verificar el aviso textual; repetir con dos abiertas y verificar el aviso de conflicto.
 
-- [ ] **Step 2: Ejecutar la validación completa local**
+- [x] **Step 2: Ejecutar la validación completa local**
 
   Run: `pnpm test && pnpm typecheck && pnpm build && pnpm e2e`
 
   Expected: PASS.
 
-- [ ] **Step 3: Revisar el diff y los contratos publicados**
+- [x] **Step 3: Revisar el diff y los contratos publicados**
 
   Confirmar que no se incluyeron `.env`, secretos, credenciales, datos personales ni cambios de despliegue no solicitados. Confirmar que el plugin y la app tienen commits separados y que ambos usan el mismo nombre y semántica de `registrationAvailability`.
 
@@ -255,6 +255,6 @@
 
   Publicar primero el plugin, verificar el endpoint REST actualizado, luego publicar la app. Informar por separado commit local, push, CI, deploy y verificación pública; un push exitoso no se considera despliegue verificado.
 
-- [ ] **Step 5: Commit final de documentación**
+- [x] **Step 5: Commit final de documentación**
 
   `git add docs/superpowers/specs/2026-10-02-seminar-permalink-availability.md docs/superpowers/plans/2026-10-02-seminar-permalink-availability.md && git commit -m "docs: plan seminar permalink availability"`
