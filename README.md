@@ -17,6 +17,7 @@ PostgreSQL no será una fuente de verdad académica ni reemplazará a Google She
 La especificación funcional y arquitectónica se encuentra en:
 
 - [Arquitectura de la plataforma](docs/ARQUITECTURA.md)
+- [Integración con el plugin FLACSO / WordPress](docs/INTEGRACION_WORDPRESS.md)
 
 ## Principios principales
 
