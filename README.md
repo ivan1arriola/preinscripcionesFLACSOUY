@@ -17,6 +17,7 @@ La especificación funcional y arquitectónica se encuentra en:
 - [Arquitectura de la plataforma](docs/ARQUITECTURA.md)
 - [Integración con el plugin FLACSO / WordPress](docs/INTEGRACION_WORDPRESS.md)
 - [Documentación y Operación del MVP](docs/MVP.md)
+- [Deploy productivo y rollback](docs/DEPLOY.md)
 
 ## Ejecución Local y Docker
 
@@ -74,6 +75,6 @@ Variables de entorno requeridas en producción (configurar en `.env` sin subir c
 ```bash
 GOOGLE_OIDC_CLIENT_ID=tu_cliente_id.apps.googleusercontent.com
 GOOGLE_OIDC_CLIENT_SECRET=tu_secreto_de_cliente
-GOOGLE_OIDC_REDIRECT_URI=https://preinscripciones.flacso.edu.uy/admin/perfiles
+GOOGLE_OIDC_REDIRECT_URI=https://preinscripciones.flacso.edu.uy/accounts/google/login/callback/
 ADMIN_ALLOWED_EMAILS=web@flacso.edu.uy
 ```
