@@ -17,6 +17,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
         return (
           <div
             key={target.id}
+            data-testid={`target-card-${target.id}`}
             className="border rounded-lg p-5 bg-white shadow-sm hover:shadow transition"
           >
             <div className="flex items-start justify-between">

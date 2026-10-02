@@ -1,26 +1,36 @@
-import express, { type Express } from 'express';
-import { healthResponse } from './presentation/http/health.js';
+import { createApp } from './presentation/http/app.js';
+import { FixtureAcademicCatalog } from './infrastructure/fixtures/fixture-academic-catalog.js';
+import { PostgresSubmissionRepository } from './infrastructure/database/postgres-submission-repository.js';
+import { createKyselyDb } from './infrastructure/database/kysely.js';
+import { runMigrations } from './infrastructure/database/migrate.js';
+import { sql } from 'kysely';
 
-export function createApp(): Express {
-  const app = express();
+const port = Number(process.env.PORT || 3000);
+const db = createKyselyDb();
 
-  app.use(express.json());
+const catalog = new FixtureAcademicCatalog();
+const repository = new PostgresSubmissionRepository(db);
 
-  app.get('/api/health', (_req, res) => {
-    const health = healthResponse({ database: 'up' });
-    const statusCode = health.status === 'ok' ? 200 : 503;
-    res.status(statusCode).json(health);
-  });
-
-  return app;
+// Attempt migration on startup if database is accessible
+try {
+  await runMigrations(db);
+} catch (err) {
+  console.warn('Could not run migrations on startup (database might be initializing or degraded):', err);
 }
 
-const PORT = Number(process.env.PORT) || 3000;
+const app = createApp({
+  catalog,
+  repository,
+  checkDatabase: async () => {
+    try {
+      await sql`SELECT 1`.execute(db);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+});
 
-export const app = createApp();
-
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`API server listening on port ${PORT}`);
-  });
-}
+app.listen(port, () => {
+  console.log(`API server listening on port ${port}`);
+});

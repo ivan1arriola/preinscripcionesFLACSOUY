@@ -18,6 +18,20 @@ La especificación funcional y arquitectónica se encuentra en:
 
 - [Arquitectura de la plataforma](docs/ARQUITECTURA.md)
 - [Integración con el plugin FLACSO / WordPress](docs/INTEGRACION_WORDPRESS.md)
+- [Documentación y Operación del MVP](docs/MVP.md)
+
+## Ejecución del MVP
+
+```bash
+# Iniciar servicios con Docker Compose
+docker compose up -d --build
+
+# Ejecutar pruebas unitarias y de integración
+pnpm test
+
+# Ejecutar pruebas de extremo a extremo (E2E) con Playwright
+pnpm e2e
+```
 
 ## Principios principales
 
