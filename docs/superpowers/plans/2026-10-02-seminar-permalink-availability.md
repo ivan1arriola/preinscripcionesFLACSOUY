@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-02-seminar-permalink-availability.md`
 
+**Execution ownership:** Las tareas del plugin de WordPress (Tasks 1 y 2) las implemento yo directamente en `/home/ivan/repositorios/FLACSO Uruguay/Migrar/flacso-uruguay-plugin`. Las tareas de API, contratos, web y E2E (Tasks 3 a 6) se delegan a Agy en `/home/ivan/repositorios/FLACSO Uruguay/preinscripcionesFLACSOUY`. Agy no debe modificar el checkout del plugin.
+
 ## Global Constraints
 
 - El permalink permanece en `urls.legacyRegistration` y no cambia por edición.
