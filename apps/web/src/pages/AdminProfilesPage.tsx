@@ -7,6 +7,14 @@ interface AdminProfilesPageProps {
   onLogout: () => void;
 }
 
+const PROFILE_TYPE_LABELS: Record<string, string> = {
+  diploma: 'Diplomas',
+  maestria: 'Maestrías',
+  especializacion: 'Especializaciones',
+  diplomado: 'Diplomados',
+  seminar: 'Seminarios',
+};
+
 export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
   onRequireLogin,
   onLogout,
@@ -143,16 +151,18 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
       )}
 
       {/* Tabs for Offer Types */}
-      <div className="flex border-b border-gray-200 mb-8 overflow-x-auto">
+      <div className="flex border-b border-gray-200 mb-8 overflow-x-auto" role="tablist" aria-label="Tipos de oferta">
         {['diploma', 'maestria', 'especializacion', 'diplomado', 'seminar'].map((type) => {
           const profileItem = profiles.find((p) => p.type === type);
           const isSelected = selectedType === type;
-          const label = profileItem?.name ?? type.toUpperCase();
+          const label = profileItem?.name ?? PROFILE_TYPE_LABELS[type] ?? type;
 
           return (
             <button
-              key={type}
-              type="button"
+            key={type}
+            type="button"
+            role="tab"
+            aria-selected={isSelected}
               onClick={() => setSelectedType(type)}
               className={`py-3 px-6 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 isSelected

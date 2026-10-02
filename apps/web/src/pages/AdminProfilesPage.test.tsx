@@ -38,8 +38,8 @@ describe('AdminProfilesPage Component', () => {
       versionNumber: 1,
       definition: {
         steps: [{ id: 'personal', title: 'Personal', order: 1 }],
-        fields: [],
-        documents: [],
+        fields: [{ key: 'email', stepId: 'personal', order: 1, label: 'Correo electrónico', required: true, condition: 'always' }],
+        documents: [{ key: 'identidad', stepId: 'personal', order: 1, label: 'Documento de identidad', required: true, canDefer: false, maxFiles: 1 }],
       },
     },
     versions: [
@@ -49,8 +49,8 @@ describe('AdminProfilesPage Component', () => {
         createdBy: 'web@flacso.edu.uy',
         definition: {
           steps: [{ id: 'personal', title: 'Personal', order: 1 }],
-          fields: [],
-          documents: [],
+          fields: [{ key: 'email', stepId: 'personal', order: 1, label: 'Correo electrónico', required: true, condition: 'always' }],
+          documents: [{ key: 'identidad', stepId: 'personal', order: 1, label: 'Documento de identidad', required: true, canDefer: false, maxFiles: 1 }],
         },
       },
     ],
@@ -81,8 +81,8 @@ describe('AdminProfilesPage Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Perfiles de Formulario')).toBeInTheDocument();
       expect(screen.getByText('web@flacso.edu.uy')).toBeInTheDocument();
-      expect(screen.getByText('Perfil: Diploma (diploma)')).toBeInTheDocument();
-      expect(screen.getByText(/Versión activa actual:/i)).toBeInTheDocument();
+      expect(screen.getByText('Perfil: Diploma')).toBeInTheDocument();
+      expect(screen.getByText(/versión activa/i)).toBeInTheDocument();
     });
   });
 
@@ -97,6 +97,7 @@ describe('AdminProfilesPage Component', () => {
       expect(screen.getByRole('button', { name: /Crear nueva versión/i })).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole('tab', { name: 'Avanzado' }));
     const textarea = screen.getByRole('textbox');
     fireEvent.change(textarea, { target: { value: 'invalid-json' } });
 
@@ -104,6 +105,22 @@ describe('AdminProfilesPage Component', () => {
 
     expect(screen.getByText(/El contenido debe ser un JSON válido/i)).toBeInTheDocument();
     expect(apiClient.createProfileVersion).not.toHaveBeenCalled();
+  });
+
+  it('shows guided profile editing before exposing the JSON editor', async () => {
+    vi.mocked(apiClient.getAdminMe).mockResolvedValue({ user: mockAdminUser, csrfToken: 'csrf-123' });
+    vi.mocked(apiClient.listAdminProfiles).mockResolvedValue(mockProfiles);
+    vi.mocked(apiClient.getAdminProfile).mockResolvedValue(mockDiplomaDetail);
+
+    render(<AdminProfilesPage onRequireLogin={vi.fn()} onLogout={vi.fn()} />);
+
+    expect(await screen.findByRole('heading', { name: 'Campos del formulario' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Correo electrónico')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Avanzado' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Definición JSON del perfil')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Avanzado' }));
+    expect(screen.getByLabelText('Definición JSON del perfil')).toBeInTheDocument();
   });
 
   it('creates new version and activates it', async () => {
