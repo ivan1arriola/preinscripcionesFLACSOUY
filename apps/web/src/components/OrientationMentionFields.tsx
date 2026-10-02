@@ -3,6 +3,7 @@ import type { Orientation } from '@flacso/contracts';
 
 interface OrientationMentionFieldsProps {
   orientations: Orientation[];
+  mentions?: Array<{ id: string; name: string }>;
   selectedOrientation: string;
   selectedMention: string;
   onOrientationChange: (orientationId: string) => void;
@@ -16,6 +17,7 @@ interface OrientationMentionFieldsProps {
 
 export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> = ({
   orientations,
+  mentions = [],
   selectedOrientation,
   selectedMention,
   onOrientationChange,
@@ -26,27 +28,15 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
   mentionError,
   disabled = false,
 }) => {
-  const currentOrientationObj = orientations.find((o) => o.id === selectedOrientation);
-  const availableMentions = currentOrientationObj?.mentions ?? [];
+  const handleOrientationSelect = (e: React.ChangeEvent<HTMLSelectElement>) => onOrientationChange(e.target.value);
 
-  const handleOrientationSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newOrientation = e.target.value;
-    onOrientationChange(newOrientation);
-
-    // If current selected mention is not valid for new orientation, clear it
-    const newObj = orientations.find((o) => o.id === newOrientation);
-    if (!newObj?.mentions.some((m) => m.id === selectedMention)) {
-      onMentionChange('');
-    }
-  };
-
-  if (orientations.length === 0) {
+  if (orientations.length === 0 && mentions.length === 0) {
     return null;
   }
 
   return (
     <div className="space-y-4">
-      <div className="field-group">
+      {orientations.length > 0 && <div className="field-group">
         <label htmlFor="input-orientacion" className="block text-sm font-medium text-gray-700">
           Orientación {orientationRequired && <span className="text-red-600">*</span>}
         </label>
@@ -66,9 +56,9 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
           ))}
         </select>
         {orientationError && <p className="mt-1 text-sm text-red-600">{orientationError}</p>}
-      </div>
+      </div>}
 
-      {availableMentions.length > 0 && (
+      {mentions.length > 0 && (
         <div className="field-group">
           <label htmlFor="input-mencion" className="block text-sm font-medium text-gray-700">
             Mención {mentionRequired && <span className="text-red-600">*</span>}
@@ -78,11 +68,11 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
             name="mencion"
             value={selectedMention}
             onChange={(e) => onMentionChange(e.target.value)}
-            disabled={disabled || !selectedOrientation}
+            disabled={disabled}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           >
             <option value="">-- Seleccione una mención (opcional) --</option>
-            {availableMentions.map((m) => (
+            {mentions.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>

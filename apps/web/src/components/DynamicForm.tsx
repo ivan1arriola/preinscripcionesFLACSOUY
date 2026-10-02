@@ -1,130 +1,94 @@
 import React, { useState } from 'react';
-import type { FormDefinition } from '@flacso/contracts';
+import type { FormDefinition, SubmissionFileToken } from '@flacso/contracts';
+import { apiClient } from '../api/client.js';
 import { OrientationMentionFields } from './OrientationMentionFields.js';
+import { UniversalFields } from './UniversalFields.js';
+import { DocumentUploadFields } from './DocumentUploadFields.js';
 
 interface DynamicFormProps {
   form: FormDefinition;
-  onSubmit: (values: Record<string, string>) => Promise<void>;
+  onSubmit: (values: Record<string, string>, files?: SubmissionFileToken[]) => Promise<void>;
   isSubmitting?: boolean;
   serverErrors?: Record<string, string[]>;
 }
 
-export const DynamicForm: React.FC<DynamicFormProps> = ({
-  form,
-  onSubmit,
-  isSubmitting = false,
-  serverErrors = {},
-}) => {
+export const DynamicForm: React.FC<DynamicFormProps> = ({ form, onSubmit, isSubmitting = false, serverErrors = {} }) => {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<SubmissionFileToken[]>([]);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
-
-  const hasOrientationInput = form.inputs.some((i) => i.key === 'orientacion');
-  const hasMentionInput = form.inputs.some((i) => i.key === 'mencion');
-  const orientacionInput = form.inputs.find((i) => i.key === 'orientacion');
-  const mencionInput = form.inputs.find((i) => i.key === 'mencion');
+  const hasOrientationInput = form.inputs.some((input) => input.key === 'orientacion');
+  const hasMentionInput = form.inputs.some((input) => input.key === 'mencion');
+  const orientacionInput = form.inputs.find((input) => input.key === 'orientacion');
+  const mencionInput = form.inputs.find((input) => input.key === 'mencion');
 
   const handleInputChange = (key: string, value: string) => {
-    setValues((prev) => ({ ...prev, [key]: value }));
-    if (clientErrors[key]) {
-      setClientErrors((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    }
+    setValues((current) => ({ ...current, [key]: value }));
+    setClientErrors((current) => { const next = { ...current }; delete next[key]; return next; });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const visibleInput = (key: string) => {
+    if (key === 'generoOtra') return values.genero === 'Otra';
+    if (key === 'convenioWordpressId') return values.tieneConvenio === 'Si';
+    if (key === 'posgradoCual') return values.posgradoFlacso === 'Si';
+    return true;
+  };
 
-    if (!form.registrationOpen) {
-      return;
-    }
-
-    // Client-side required validation
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!form.registrationOpen) return;
     const errors: Record<string, string> = {};
     for (const input of form.inputs) {
-      const val = (values[input.key] || '').trim();
-      if (input.required && val.length === 0) {
-        errors[input.key] = `El campo ${input.label} es obligatorio.`;
+      if (!visibleInput(input.key)) continue;
+      if (input.required && !(values[input.key] || '').trim()) errors[input.key] = `El campo ${input.label} es obligatorio.`;
+    }
+    for (const document of form.documents ?? []) {
+      if (document.required && !document.canDefer && !files.some((file) => file.fieldKey === document.key)) {
+        errors[document.key] = `El documento ${document.label} es obligatorio.`;
       }
     }
-
     if (Object.keys(errors).length > 0) {
       setClientErrors(errors);
       return;
     }
-
     setClientErrors({});
-    await onSubmit(values);
+    await onSubmit(values, files);
   };
 
-  // Filter out orientacion and mencion from standard input loop if handled by composite
-  const regularInputs = form.inputs.filter(
-    (i) => i.key !== 'orientacion' && i.key !== 'mencion'
-  );
+  const errors: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(clientErrors)) errors[key] = value;
+  for (const [key, messages] of Object.entries(serverErrors)) errors[key] = messages.join(', ');
+  const regularInputs = form.inputs.filter((input) => input.key !== 'orientacion' && input.key !== 'mencion');
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
-      {!form.registrationOpen && (
-        <div className="p-4 mb-4 text-sm text-amber-800 rounded-lg bg-amber-50 border border-amber-200" role="alert">
-          <strong>Preinscripción cerrada:</strong> Este destino académico no se encuentra aceptando preinscripciones actualmente.
-        </div>
-      )}
-
-      {serverErrors._form && (
-        <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 border border-red-200" role="alert">
-          {serverErrors._form.join(', ')}
-        </div>
-      )}
-
-      {regularInputs.map((input) => {
-        const value = values[input.key] || '';
-        const error = clientErrors[input.key] || serverErrors[input.key]?.join(', ');
-
-        return (
-          <div key={input.key} className="field-group">
-            <label htmlFor={`input-${input.key}`} className="block text-sm font-medium text-gray-700">
-              {input.label} {input.required && <span className="text-red-600">*</span>}
-            </label>
-            <input
-              id={`input-${input.key}`}
-              name={input.key}
-              type={input.type === 'tel' ? 'tel' : input.type === 'email' ? 'email' : input.type === 'date' ? 'date' : 'text'}
-              value={value}
-              onChange={(e) => handleInputChange(input.key, e.target.value)}
-              disabled={!form.registrationOpen || isSubmitting}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-          </div>
-        );
+  return <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
+    {!form.registrationOpen && <div className="p-4 mb-4 text-sm text-amber-800 rounded-lg bg-amber-50 border border-amber-200" role="alert"><strong>Preinscripción cerrada:</strong> Este destino académico no se encuentra aceptando preinscripciones actualmente.</div>}
+    {serverErrors._form && <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 border border-red-200" role="alert">{serverErrors._form.join(', ')}</div>}
+    <UniversalFields inputs={regularInputs} values={values} errors={errors} disabled={!form.registrationOpen || isSubmitting} onChange={handleInputChange} />
+    {(hasOrientationInput || hasMentionInput) && (form.orientations.length > 0 || (form.mentions?.length ?? 0) > 0) && <OrientationMentionFields
+      orientations={form.orientations}
+      mentions={form.mentions ?? []}
+      selectedOrientation={values.orientacion || ''}
+      selectedMention={values.mencion || ''}
+      onOrientationChange={(value) => handleInputChange('orientacion', value)}
+      onMentionChange={(value) => handleInputChange('mencion', value)}
+      orientationRequired={orientacionInput?.required ?? true}
+      mentionRequired={mencionInput?.required ?? false}
+      orientationError={errors.orientacion}
+      mentionError={errors.mencion}
+      disabled={!form.registrationOpen || isSubmitting}
+    />}
+    <DocumentUploadFields
+      documents={form.documents ?? []}
+      files={files}
+      disabled={!form.registrationOpen || isSubmitting}
+      errors={errors}
+      onUpload={(fieldKey, file) => apiClient.upload(form.targetId, fieldKey, file)}
+      onFileToken={(file) => setFiles((current) => {
+        const definition = (form.documents ?? []).find((document) => document.key === file.fieldKey);
+        if (definition?.maxFiles === 1) return [...current.filter((item) => item.fieldKey !== file.fieldKey), file];
+        return [...current, file];
       })}
-
-      {(hasOrientationInput || hasMentionInput) && form.orientations.length > 0 && (
-        <OrientationMentionFields
-          orientations={form.orientations}
-          selectedOrientation={values.orientacion || ''}
-          selectedMention={values.mencion || ''}
-          onOrientationChange={(val) => handleInputChange('orientacion', val)}
-          onMentionChange={(val) => handleInputChange('mencion', val)}
-          orientationRequired={orientacionInput?.required ?? true}
-          mentionRequired={mencionInput?.required ?? false}
-          orientationError={clientErrors.orientacion || serverErrors.orientacion?.join(', ')}
-          mentionError={clientErrors.mencion || serverErrors.mencion?.join(', ')}
-          disabled={!form.registrationOpen || isSubmitting}
-        />
-      )}
-
-      <div className="pt-4">
-        <button
-          type="submit"
-          disabled={!form.registrationOpen || isSubmitting}
-          className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? 'Enviando preinscripción...' : form.registrationOpen ? 'Enviar preinscripción' : 'Inscripción cerrada'}
-        </button>
-      </div>
-    </form>
-  );
+      onRemoveToken={(file) => setFiles((current) => current.filter((item) => item.token !== file.token))}
+    />
+    <div className="pt-4"><button type="submit" disabled={!form.registrationOpen || isSubmitting} className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">{isSubmitting ? 'Enviando preinscripción...' : form.registrationOpen ? 'Enviar preinscripción' : 'Inscripción cerrada'}</button></div>
+  </form>;
 };

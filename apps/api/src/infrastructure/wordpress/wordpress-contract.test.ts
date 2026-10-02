@@ -36,6 +36,7 @@ const frozenV1Response = {
           { key: 'orientacion', position: 20, required: true },
           { key: 'mencion', position: 30, required: false },
         ],
+        documents: [{ key: 'identidad', position: 40, required: true, maxFiles: 2 }],
       },
       orientations: [
         {
@@ -43,6 +44,10 @@ const frozenV1Response = {
           name: 'Educación',
           mentions: [{ id: 'tec-edu', name: 'Tecnología Educativa' }],
         },
+      ],
+      mentions: [
+        { id: 'tec-edu', name: 'Tecnología Educativa' },
+        { id: 'innovacion', name: 'Innovación Pública' },
       ],
       urls: {
         public: 'https://flacso.edu.uy/ofertas/davia',
@@ -113,6 +118,7 @@ describe('WordPress Client & Contract Adapter', () => {
     expect(response.targets).toHaveLength(2);
     expect(response.targets[0]!.id).toBe('target_davia_c11');
     expect(response.targets[0]!.registrationOpen).toBe(true);
+    expect(response.targets[0]!.form.documents).toHaveLength(1);
     expect(response.targets[1]!.registrationOpen).toBe(false);
   });
 
@@ -177,6 +183,10 @@ describe('WordPress Client & Contract Adapter', () => {
     // First call: populates cache
     const targets1 = await catalog.listTargets();
     expect(targets1).toHaveLength(2);
+    expect(targets1[0]!.mentions).toEqual([
+      { id: 'tec-edu', name: 'Tecnología Educativa' },
+      { id: 'innovacion', name: 'Innovación Pública' },
+    ]);
 
     // Second call: upstream fails, but cache provides targets
     const targets2 = await catalog.listTargets();

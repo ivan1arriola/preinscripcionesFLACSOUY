@@ -16,6 +16,15 @@ export const TargetInputSchema = z.object({
 export const FormStateSchema = z.object({
   valid: z.boolean(),
   inputs: z.array(TargetInputSchema),
+  documents: z.array(z.object({
+    key: z.string(),
+    position: z.number().optional(),
+    required: z.boolean().optional(),
+    maxFiles: z.number().optional(),
+    maxBytes: z.number().optional(),
+    acceptedMimeTypes: z.array(z.string()).optional(),
+    canDefer: z.boolean().optional(),
+  })).optional(),
   issues: z.array(z.string()).optional(),
 });
 
@@ -49,6 +58,7 @@ export const WordPressTargetSchema = z.object({
   configRevision: z.string(),
   form: FormStateSchema,
   orientations: z.array(OrientationSchema),
+  mentions: z.array(OrientationMentionSchema).optional(),
   urls: TargetUrlsSchema,
 });
 

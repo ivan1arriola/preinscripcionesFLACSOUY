@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { FormDefinition } from '@flacso/contracts';
+import type { FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { apiClient, ApiError } from '../api/client.js';
 import { DynamicForm } from '../components/DynamicForm.js';
 
@@ -44,13 +44,13 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
     };
   }, [targetId]);
 
-  const handleSubmit = async (values: Record<string, string>) => {
+  const handleSubmit = async (values: Record<string, string>, files: SubmissionFileToken[] = []) => {
     if (!form) return;
     setIsSubmitting(true);
     setServerErrors({});
 
     try {
-      const res = await apiClient.submit(targetId, form.configRevision, values);
+      const res = await apiClient.submit(targetId, form.configRevision, values, files);
       setSubmissionId(res.submissionId);
     } catch (err) {
       if (err instanceof ApiError) {

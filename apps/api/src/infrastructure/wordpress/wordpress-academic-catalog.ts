@@ -74,16 +74,15 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
           position: inp.position,
           required: inp.required,
         })),
+        documents: raw.form.documents ?? [],
         issues: raw.form.issues ?? [],
       },
       orientations: raw.orientations.map((o) => ({
         id: o.id,
         name: o.name,
-        mentions: o.mentions.map((m) => ({
-          id: m.id,
-          name: m.name,
-        })),
+        mentions: [],
       })),
+      mentions: raw.mentions ?? raw.orientations.flatMap((o) => o.mentions),
       urls: {
         public: raw.urls.public ?? undefined,
         wordpress: raw.urls.wordpress ?? undefined,

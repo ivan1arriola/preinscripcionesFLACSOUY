@@ -35,13 +35,17 @@ describe('DynamicForm Component', () => {
       {
         id: 'educacion',
         name: 'Educación',
-        mentions: [{ id: 'tec-edu', name: 'Tecnología Educativa' }],
+        mentions: [],
       },
       {
         id: 'politicas',
         name: 'Políticas Públicas',
-        mentions: [{ id: 'innovacion', name: 'Innovación Pública' }],
+        mentions: [],
       },
+    ],
+    mentions: [
+      { id: 'tec-edu', name: 'Tecnología Educativa' },
+      { id: 'innovacion', name: 'Innovación Pública' },
     ],
   };
 
@@ -65,20 +69,14 @@ describe('DynamicForm Component', () => {
     expect(screen.getByText(/El campo Nombre es obligatorio/i)).toBeInTheDocument();
   });
 
-  it('filters mentions when orientation is selected and clears when orientation changes', () => {
+  it('shows orientation and mention as independent choices', () => {
     render(<DynamicForm form={openForm} onSubmit={vi.fn()} />);
 
     const orientacionSelect = screen.getByLabelText(/Orientación/i);
 
-    // Select 'educacion'
     fireEvent.change(orientacionSelect, { target: { value: 'educacion' } });
     expect(screen.getByText('Tecnología Educativa')).toBeInTheDocument();
-    expect(screen.queryByText('Innovación Pública')).not.toBeInTheDocument();
-
-    // Select 'politicas'
-    fireEvent.change(orientacionSelect, { target: { value: 'politicas' } });
     expect(screen.getByText('Innovación Pública')).toBeInTheDocument();
-    expect(screen.queryByText('Tecnología Educativa')).not.toBeInTheDocument();
   });
 
   it('disables submit when registration is closed', () => {
