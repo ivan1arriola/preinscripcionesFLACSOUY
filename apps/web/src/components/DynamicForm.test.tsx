@@ -8,8 +8,12 @@ describe('DynamicForm Component', () => {
     targetId: 'davia-c11',
     title: 'DAVIA Cohorte 11',
     kind: 'academic_offer',
+    offerType: 'diploma',
     registrationOpen: true,
     configRevision: 'rev-1',
+    effectiveRevision: 'rev-1',
+    profileVersionId: 'ver_diploma_v1',
+    steps: [{ id: 'personal', title: 'Personal', order: 1 }],
     inputs: [
       { key: 'nombre', label: 'Nombre', type: 'text', required: true, position: 1 },
       { key: 'email', label: 'Correo electrónico', type: 'email', required: true, position: 2 },
@@ -31,22 +35,9 @@ describe('DynamicForm Component', () => {
         optionsSource: 'wordpress.menciones',
       },
     ],
-    orientations: [
-      {
-        id: 'educacion',
-        name: 'Educación',
-        mentions: [],
-      },
-      {
-        id: 'politicas',
-        name: 'Políticas Públicas',
-        mentions: [],
-      },
-    ],
-    mentions: [
-      { id: 'tec-edu', name: 'Tecnología Educativa' },
-      { id: 'innovacion', name: 'Innovación Pública' },
-    ],
+    documents: [],
+    orientations: ['Educación', 'Políticas Públicas'],
+    mentions: ['Tecnología Educativa', 'Innovación Pública'],
   };
 
   it('renders all configured fields and labels', () => {

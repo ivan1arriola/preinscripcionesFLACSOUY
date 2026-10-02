@@ -4,6 +4,7 @@ import { apiClient } from '../api/client.js';
 import { OrientationMentionFields } from './OrientationMentionFields.js';
 import { UniversalFields } from './UniversalFields.js';
 import { DocumentUploadFields } from './DocumentUploadFields.js';
+import { PreinscriptionWizard } from './PreinscriptionWizard.js';
 
 interface DynamicFormProps {
   form: FormDefinition;
@@ -53,6 +54,17 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({ form, onSubmit, isSubm
     setClientErrors({});
     await onSubmit(values, files);
   };
+
+  if (form.steps && form.steps.length > 0) {
+    return (
+      <PreinscriptionWizard
+        form={form}
+        onSubmit={(vals, fls) => onSubmit(vals, fls)}
+        isSubmitting={isSubmitting}
+        serverErrors={serverErrors}
+      />
+    );
+  }
 
   const errors: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(clientErrors)) errors[key] = value;

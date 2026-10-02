@@ -21,13 +21,19 @@ describe('TargetPage Component', () => {
     targetId: 'davia-c11',
     title: 'DAVIA Cohorte 11',
     kind: 'academic_offer',
+    offerType: 'diploma',
     registrationOpen: true,
     configRevision: 'rev-davia',
+    effectiveRevision: 'rev-davia',
+    profileVersionId: 'ver_diploma_v1',
+    steps: [{ id: 'personal', title: 'Personal', order: 1 }],
     inputs: [
       { key: 'nombre', label: 'Nombre', type: 'text', required: true, position: 1 },
       { key: 'email', label: 'Correo electrónico', type: 'email', required: true, position: 2 },
     ],
+    documents: [],
     orientations: [],
+    mentions: [],
   };
 
   beforeEach(() => {

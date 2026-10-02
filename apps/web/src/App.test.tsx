@@ -33,11 +33,17 @@ describe('App legacy registration routes', () => {
   const form: FormDefinition = {
     targetId: target.id,
     kind: target.kind,
+    offerType: 'maestria',
     title: target.title,
     registrationOpen: true,
     configRevision: target.configRevision,
+    effectiveRevision: target.configRevision,
+    profileVersionId: 'ver_maestria_v1',
+    steps: [{ id: 'personal', title: 'Personal', order: 1 }],
     inputs: [],
+    documents: [],
     orientations: [],
+    mentions: [],
   };
 
   beforeEach(() => {

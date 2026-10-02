@@ -3,6 +3,8 @@ import type { DiagnosticTarget } from '@flacso/contracts';
 import { apiClient } from './api/client';
 import { HomePage } from './pages/HomePage';
 import { TargetPage } from './pages/TargetPage';
+import { AdminLoginPage } from './pages/AdminLoginPage';
+import { AdminProfilesPage } from './pages/AdminProfilesPage';
 
 const HOME_PATH = '/';
 
@@ -23,6 +25,7 @@ export function App() {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [path, setPath] = useState(() => normalizePath(window.location.pathname));
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [adminView, setAdminView] = useState<'login' | 'profiles'>('login');
 
   useEffect(() => {
     const onPopState = () => setPath(normalizePath(window.location.pathname));
@@ -30,7 +33,16 @@ export function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  const isAdmin = path.startsWith('/admin');
+
   useEffect(() => {
+    if (isAdmin) {
+      apiClient.getAdminMe()
+        .then(() => setAdminView('profiles'))
+        .catch(() => setAdminView('login'));
+      return;
+    }
+
     if (path === HOME_PATH) {
       setSelectedTargetId(null);
       setRouteError(null);
@@ -96,11 +108,47 @@ export function App() {
             </div>
           </div>
 
+          <div className="flex items-center space-x-4">
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={handleGoHome}
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Volver al sitio público
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  window.history.pushState({}, '', '/admin/');
+                  setPath('/admin/');
+                }}
+                className="text-xs font-medium text-gray-500 hover:text-gray-700 hover:underline"
+              >
+                Administración
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
-        {selectedTargetId ? (
+        {isAdmin ? (
+          adminView === 'profiles' ? (
+            <AdminProfilesPage
+              onRequireLogin={() => setAdminView('login')}
+              onLogout={() => {
+                setAdminView('login');
+                handleGoHome();
+              }}
+            />
+          ) : (
+            <AdminLoginPage
+              onLoginSuccess={() => setAdminView('profiles')}
+            />
+          )
+        ) : selectedTargetId ? (
           <TargetPage targetId={selectedTargetId} onBack={handleGoHome} />
         ) : routeError ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-900" role="alert">
