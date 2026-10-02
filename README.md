@@ -19,18 +19,31 @@ La especificación funcional y arquitectónica se encuentra en:
 - [Arquitectura de la plataforma](docs/ARQUITECTURA.md)
 - [Integración con el plugin FLACSO / WordPress](docs/INTEGRACION_WORDPRESS.md)
 - [Documentación y Operación del MVP](docs/MVP.md)
+- [Manual de Operación y Observabilidad](docs/OPERACION.md)
 
-## Ejecución del MVP
+## Ejecución Local y Docker
 
 ```bash
+# Copiar plantilla de variables de entorno
+cp .env.example .env
+
 # Iniciar servicios con Docker Compose
 docker compose up -d --build
+
+# Ejecutar migraciones (si se corre fuera de Docker)
+pnpm --filter api db:migrate
 
 # Ejecutar pruebas unitarias y de integración
 pnpm test
 
 # Ejecutar pruebas de extremo a extremo (E2E) con Playwright
 pnpm e2e
+
+# Realizar respaldo de PostgreSQL
+./scripts/backup-db.sh
+
+# Limpiar archivos temporales expirados
+./scripts/cleanup-uploads.sh
 ```
 
 ## Principios principales

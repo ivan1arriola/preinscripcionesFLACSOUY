@@ -11,6 +11,17 @@ import type { SystemErrorRepository } from '../../ports/system-error-repository.
 import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
 import type { DriveRepository } from '../../ports/drive-repository.js';
 import { errorHandler } from './error-handler.js';
+import {
+  createSecurityHeadersMiddleware,
+  createCorsMiddleware,
+  createRateLimitMiddleware,
+  MemoryRateLimiter,
+} from './security.js';
+import {
+  createCorrelationIdMiddleware,
+  createRequestLoggingMiddleware,
+} from '../../infrastructure/observability/logger.js';
+import { createReadinessHandler } from './readiness.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -21,14 +32,30 @@ export interface AppDependencies {
   errorRepository?: SystemErrorRepository;
   spreadsheetRepository?: SpreadsheetRepository;
   driveRepository?: DriveRepository;
+  allowedOrigins?: string[];
+  rateLimiter?: MemoryRateLimiter;
+  uploadsDir?: string;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
 
-  app.use(express.json());
+  // 1. Observability & Correlation ID
+  app.use(createCorrelationIdMiddleware());
+  app.use(createRequestLoggingMiddleware());
 
-  // Health endpoint
+  // 2. Security headers, CORS, Rate Limiting
+  app.use(createSecurityHeadersMiddleware());
+  if (dependencies.allowedOrigins) {
+    app.use(createCorsMiddleware(dependencies.allowedOrigins));
+  }
+  const limiter = dependencies.rateLimiter || new MemoryRateLimiter(60000, 600);
+  app.use(createRateLimitMiddleware(limiter));
+
+  // 3. Body parser with strict size limit
+  app.use(express.json({ limit: '2mb' }));
+
+  // 4. Liveness and Readiness probes
   app.get('/api/health', async (_req, res) => {
     let dbStatus: 'up' | 'down' = 'up';
     if (dependencies.checkDatabase) {
@@ -44,6 +71,14 @@ export function createApp(dependencies: AppDependencies): Express {
     const statusCode = payload.status === 'ok' ? 200 : 503;
     res.status(statusCode).json(payload);
   });
+
+  app.get(
+    '/api/ready',
+    createReadinessHandler({
+      checkDatabase: dependencies.checkDatabase,
+      uploadsDir: dependencies.uploadsDir,
+    })
+  );
 
   // Admin routes
   const authService = dependencies.authService || new AdminAuthService();
