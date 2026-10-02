@@ -5,6 +5,8 @@ interface AdminLoginPageProps {
   onLoginSuccess: (user: any, csrfToken: string) => void;
 }
 
+const GOOGLE_CALLBACK_PATH = '/accounts/google/login/callback/';
+
 export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +18,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
     if (code) {
       setLoading(true);
       setError(null);
-      const redirectUri = `${window.location.origin}${window.location.pathname}`;
+      const redirectUri = `${window.location.origin}${GOOGLE_CALLBACK_PATH}`;
       apiClient
         .adminLogin(code, redirectUri)
         .then((res) => {
@@ -39,7 +41,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
     setLoading(true);
     setError(null);
     try {
-      const redirectUri = `${window.location.origin}${window.location.pathname}`;
+      const redirectUri = `${window.location.origin}${GOOGLE_CALLBACK_PATH}`;
       const { url } = await apiClient.getAdminAuthUrl(redirectUri);
       window.location.href = url;
     } catch (err) {

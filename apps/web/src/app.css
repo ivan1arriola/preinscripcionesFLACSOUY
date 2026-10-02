@@ -20,6 +20,7 @@ a { color: inherit; }
 .flex-1 { flex: 1 1 0%; }
 .items-center { align-items: center; }
 .items-start { align-items: flex-start; }
+.items-baseline { align-items: baseline; }
 .justify-between { justify-content: space-between; }
 .justify-center { justify-content: center; }
 .mx-auto { margin-left: auto; margin-right: auto; }
@@ -27,6 +28,9 @@ a { color: inherit; }
 .max-w-5xl { max-width: 64rem; }
 .max-w-2xl { max-width: 42rem; }
 .max-w-xl { max-width: 36rem; }
+.gap-3 { gap: .75rem; }
+.gap-4 { gap: 1rem; }
+.space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: .75rem; }
 .space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
 .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.5rem; }
 .space-x-3 > :not([hidden]) ~ :not([hidden]) { margin-left: .75rem; }
@@ -61,6 +65,7 @@ a { color: inherit; }
 .font-medium { font-weight: 500; }
 .font-semibold { font-weight: 600; }
 .font-bold { font-weight: 700; }
+.font-normal { font-weight: 400; }
 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .uppercase { text-transform: uppercase; }
 .tracking-wider { letter-spacing: .08em; }
@@ -92,12 +97,15 @@ a { color: inherit; }
 .border-b { border-bottom: 1px solid #eaecf0; }
 .border-t { border-top: 1px solid #eaecf0; }
 .border-transparent { border-color: transparent; }
+.border-gray-100 { border-color: #f2f4f7; }
+.border-gray-200 { border-color: #eaecf0; }
 .border-gray-300 { border-color: #d0d5dd; }
 .border-red-200 { border-color: #fecdca; }
 .border-amber-200 { border-color: #fedf89; }
 .rounded { border-radius: .375rem; }
 .rounded-md { border-radius: .5rem; }
 .rounded-lg { border-radius: .75rem; }
+.rounded-xl { border-radius: 1rem; }
 .rounded-full { border-radius: 9999px; }
 .shadow { box-shadow: 0 8px 24px rgba(16, 24, 40, .08); }
 .shadow-sm { box-shadow: 0 1px 3px rgba(16, 24, 40, .08); }
@@ -111,8 +119,14 @@ a { color: inherit; }
 .cursor-pointer { cursor: pointer; }
 .cursor-not-allowed { cursor: not-allowed; }
 .block { display: block; }
+.list-none { list-style: none; }
 .list-disc { list-style-type: disc; }
 .list-inside { list-style-position: inside; }
+
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+.transition-transform { transition: transform .2s ease; }
+.group[open] .group-open\\:rotate-90 { transform: rotate(90deg); }
 
 button.bg-blue-600, .bg-blue-600 { border: 0; }
 button.bg-blue-600:hover, .hover\\:bg-blue-700:hover { background: #1849a9; }

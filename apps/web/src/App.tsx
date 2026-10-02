@@ -7,11 +7,15 @@ import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminProfilesPage } from './pages/AdminProfilesPage';
 
 const HOME_PATH = '/';
+const ADMIN_CALLBACK_PATH = '/accounts/google/login/callback/';
 
 const normalizePath = (path: string): string => {
   if (path === HOME_PATH) return HOME_PATH;
   return path.endsWith('/') ? path : `${path}/`;
 };
+
+const isAdminPath = (path: string): boolean =>
+  path.startsWith('/admin') || path === ADMIN_CALLBACK_PATH;
 
 const legacyPathForTarget = (target: DiagnosticTarget): string | null => {
   const legacyRegistration = target.urls?.legacyRegistration;
@@ -34,7 +38,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (path.startsWith('/admin')) {
+    if (isAdminPath(path)) {
       setSelectedTargetId(null);
       setRouteError(null);
       return;
@@ -88,6 +92,14 @@ export function App() {
     setSelectedTargetId(target.id);
   };
 
+  const handleAdminLoginSuccess = () => {
+    setIsAdminLoggedIn(true);
+    if (path === ADMIN_CALLBACK_PATH) {
+      window.history.replaceState({}, '', '/admin/perfiles/');
+      setPath('/admin/perfiles/');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b shadow-sm">
@@ -106,7 +118,7 @@ export function App() {
           </div>
 
           <div>
-            {path.startsWith('/admin') ? (
+            {isAdminPath(path) ? (
               <button
                 type="button"
                 onClick={handleGoHome}
@@ -131,7 +143,7 @@ export function App() {
       </header>
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
-        {path.startsWith('/admin') ? (
+        {isAdminPath(path) ? (
           isAdminLoggedIn ? (
             <AdminProfilesPage
               onRequireLogin={() => setIsAdminLoggedIn(false)}
@@ -142,7 +154,7 @@ export function App() {
             />
           ) : (
             <AdminLoginPage
-              onLoginSuccess={() => setIsAdminLoggedIn(true)}
+              onLoginSuccess={handleAdminLoginSuccess}
             />
           )
         ) : selectedTargetId ? (

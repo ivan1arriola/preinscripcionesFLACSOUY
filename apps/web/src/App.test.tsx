@@ -78,4 +78,13 @@ describe('App legacy registration routes', () => {
       expect(apiClient.getTarget).toHaveBeenCalledWith(target.id);
     });
   });
+
+  it('renders the Google OAuth callback as the administrative login route', async () => {
+    window.history.replaceState({}, '', '/accounts/google/login/callback/');
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Acceso Administrativo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Iniciar sesión con Google (FLACSO)' })).toBeInTheDocument();
+  });
 });
