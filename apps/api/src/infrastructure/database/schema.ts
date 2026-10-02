@@ -46,6 +46,8 @@ export interface SubmissionsTable {
   target_id: string;
   config_revision: string;
   submitted_at: Generated<Date>;
+  profile_version_id: string | null;
+  profile_snapshot: unknown | null;
 }
 
 export interface SubmissionProcessingTable {
@@ -102,6 +104,45 @@ export interface SpreadsheetOperationsTable {
   updated_at: Generated<Date>;
 }
 
+export interface AdminUsersTable {
+  id: string;
+  google_subject: string;
+  email: string;
+  name: string;
+  picture_url: string | null;
+  role: string;
+  created_at: Generated<Date>;
+  last_login_at: Date | null;
+}
+
+export interface FormProfilesTable {
+  id: string;
+  type: string;
+  name: string;
+  active_version_id: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface FormProfileVersionsTable {
+  id: string;
+  profile_id: string;
+  version_number: number;
+  definition: unknown;
+  created_by: string;
+  created_at: Generated<Date>;
+}
+
+export interface FormProfileAuditEventsTable {
+  id: string;
+  profile_id: string;
+  version_id: string | null;
+  action: string;
+  actor_email: string;
+  details: unknown | null;
+  created_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -116,4 +157,8 @@ export interface DatabaseSchema {
   technical_cache: TechnicalCacheTable;
   target_spreadsheets: TargetSpreadsheetsTable;
   spreadsheet_operations: SpreadsheetOperationsTable;
+  admin_users: AdminUsersTable;
+  form_profiles: FormProfilesTable;
+  form_profile_versions: FormProfileVersionsTable;
+  form_profile_audit_events: FormProfileAuditEventsTable;
 }

@@ -4,6 +4,7 @@ import * as wordpressCacheSchema from './migrations/002_wordpress_cache.js';
 import * as spreadsheetOperationsSchema from './migrations/003_spreadsheet_operations.js';
 import * as completeFormSubmissionsSchema from './migrations/004_complete_form_submissions.js';
 import * as submissionFilesSchema from './migrations/005_submission_files.js';
+import * as formProfilesAndAdminAuthSchema from './migrations/006_form_profiles_and_admin_auth.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -12,6 +13,7 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await spreadsheetOperationsSchema.up(db);
   await completeFormSubmissionsSchema.up(db);
   await submissionFilesSchema.up(db);
+  await formProfilesAndAdminAuthSchema.up(db);
   console.log('Migrations complete.');
 }
 

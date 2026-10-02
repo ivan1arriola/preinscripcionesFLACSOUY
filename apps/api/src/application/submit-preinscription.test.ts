@@ -14,11 +14,11 @@ describe('submitPreinscription Use Case', () => {
     email: 'valeria@example.com',
     fechaNacimiento: '1990-05-15',
     tipoDocumento: 'cedula_uruguaya',
-    documento: '4.567.890-1',
+    documento: '34567894',
     paisEmisorDocumento: 'Uruguay',
     genero: 'Mujer',
     etnia: 'No declara',
-    celular: '098765432',
+    celular: '099123456',
     domicilio: 'Montevideo',
     ocupacion: 'Docente',
     paisNacimiento: 'Uruguay',
@@ -56,6 +56,8 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions[0]?.targetId).toBe('davia-c11');
     expect(repo.submissions[0]?.configRevision).toBe('davia-c11-v1');
     expect(repo.submissions[0]?.values.nombre1).toBe('Valeria');
+    expect(repo.submissions[0]?.values.documento).toBe('3.456.789-4');
+    expect(repo.submissions[0]?.values.celular).toBe('+59899123456');
   });
 
   it('rejects a closed target and does not persist', async () => {

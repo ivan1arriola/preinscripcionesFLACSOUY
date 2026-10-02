@@ -70,12 +70,12 @@ describe('validateSubmission', () => {
     email: 'ana@example.com',
     fechaNacimiento: '1980-01-01',
     tipoDocumento: 'cedula_uruguaya',
-    documento: '1234567-8',
+    documento: '34567894',
     paisEmisorDocumento: 'Uruguay',
     genero: 'Mujer',
     generoOtra: '',
     etnia: 'No declara',
-    celular: '099123456',
+    celular: '+59899123456',
     domicilio: 'Montevideo',
     ocupacion: 'Docente',
     paisNacimiento: 'Uruguay',
@@ -176,5 +176,17 @@ describe('validateSubmission', () => {
     expect(result.fieldErrors.genero).toBeDefined();
     expect(result.fieldErrors.aceptaDifusion).toBeDefined();
     expect(result.fieldErrors.posgradoFlacso).toBeDefined();
+  });
+
+  it('rejects an invalid Uruguayan identity card and a non-international phone number', () => {
+    const result = validateSubmission(form, {
+      ...validValues,
+      documento: '34567890',
+      celular: '123',
+    }, 'rev-xyz');
+
+    expect(result.valid).toBe(false);
+    expect(result.fieldErrors.documento).toContain('La cédula o su dígito verificador no son válidos.');
+    expect(result.fieldErrors.celular).toContain('Ingresá un número de teléfono válido con su código de país.');
   });
 });

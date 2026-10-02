@@ -14,8 +14,8 @@ const target = {
 
 const values = {
   nombre1: 'Ana', nombre2: '', apellido1: 'Pérez', apellido2: '', email: 'ana@example.com', fechaNacimiento: '1980-01-01',
-  tipoDocumento: 'cedula_uruguaya', documento: '1234567-8', paisEmisorDocumento: 'Uruguay', genero: 'Mujer', generoOtra: '',
-  etnia: 'No declara', celular: '099123456', domicilio: 'Montevideo', ocupacion: 'Docente', paisNacimiento: 'Uruguay', paisResidencia: 'Uruguay',
+  tipoDocumento: 'cedula_uruguaya', documento: '34567894', paisEmisorDocumento: 'Uruguay', genero: 'Mujer', generoOtra: '',
+  etnia: 'No declara', celular: '+59899123456', domicilio: 'Montevideo', ocupacion: 'Docente', paisNacimiento: 'Uruguay', paisResidencia: 'Uruguay',
   tieneConvenio: 'No', convenioWordpressId: '', fuente: 'Web', aceptaDifusion: 'No', estudios: 'Licenciatura', posgradoFlacso: 'No', posgradoCual: '',
 };
 

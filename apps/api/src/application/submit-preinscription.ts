@@ -2,6 +2,7 @@ import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../ports/submission-repository.js';
 import { composeForm } from '../domain/form-composition.js';
 import { validateSubmission } from '../domain/form-validation.js';
+import { normalizeIdentityValues } from '../domain/identity-validation.js';
 import type { SubmissionFileToken } from '@flacso/contracts';
 
 export interface SubmitPreinscriptionCommand {
@@ -92,12 +93,13 @@ export async function submitPreinscription(
   }
 
   // 5. Persist submission
+  const normalizedValues = normalizeIdentityValues(command.values);
   const saved = await repository.save({
     targetId: target.id,
     configRevision: target.configRevision,
     targetTitle: target.title,
     targetKind: target.kind,
-    values: command.values,
+    values: normalizedValues,
     files: command.files,
   });
 

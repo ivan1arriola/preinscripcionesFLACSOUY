@@ -8,6 +8,7 @@ import { errorHandler } from './error-handler.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import { createUploadRoutes } from './upload-routes.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
+import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -15,6 +16,7 @@ export interface AppDependencies {
   checkDatabase?: () => Promise<boolean>;
   temporaryFileStorage?: TemporaryFileStoragePort;
   googleDriveRepository?: GoogleDriveRepositoryPort;
+  formProfileRepository?: FormProfileRepository;
 }
 
 export function createApp(dependencies: AppDependencies): Express {

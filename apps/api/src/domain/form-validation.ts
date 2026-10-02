@@ -1,4 +1,5 @@
 import type { FormDefinition, ValidationResult } from '@flacso/contracts';
+import { isValidUruguayanCedula, normalizePhoneToE164 } from './identity-validation.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOCUMENT_TYPES = new Set(['cedula_uruguaya', 'pasaporte', 'documento_extranjero']);
@@ -66,6 +67,19 @@ export function validateSubmission(
   const paisEmisor = values.paisEmisorDocumento?.trim();
   if (tipoDocumento && tipoDocumento !== 'cedula_uruguaya' && !paisEmisor) {
     addError('paisEmisorDocumento', 'Indicá el país que emitió el documento.');
+  }
+
+  const documento = values.documento?.trim() ?? '';
+  if (tipoDocumento === 'cedula_uruguaya' && documento && !isValidUruguayanCedula(documento)) {
+    addError('documento', 'La cédula o su dígito verificador no son válidos.');
+  }
+  if (tipoDocumento && tipoDocumento !== 'cedula_uruguaya' && documento && !/^[\p{L}\p{N} ./-]{3,40}$/u.test(documento)) {
+    addError('documento', 'Usá entre 3 y 40 caracteres válidos para el documento.');
+  }
+
+  const celular = values.celular?.trim() ?? '';
+  if (celular && !normalizePhoneToE164(celular)) {
+    addError('celular', 'Ingresá un número de teléfono válido con su código de país.');
   }
 
   const genero = values.genero?.trim();

@@ -1,6 +1,7 @@
 import { createApp } from './presentation/http/app.js';
 import { FixtureAcademicCatalog } from './infrastructure/fixtures/fixture-academic-catalog.js';
 import { PostgresSubmissionRepository } from './infrastructure/database/postgres-submission-repository.js';
+import { PostgresFormProfileRepository } from './infrastructure/database/postgres-form-profile-repository.js';
 import { createKyselyDb } from './infrastructure/database/kysely.js';
 import { runMigrations } from './infrastructure/database/migrate.js';
 import { sql } from 'kysely';
@@ -14,6 +15,8 @@ import { GoogleDriveRepository } from './infrastructure/google/google-drive-repo
 
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
+
+const formProfileRepository = new PostgresFormProfileRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
   ? new WordPressAcademicCatalog(
@@ -57,6 +60,7 @@ const app = createApp({
   repository,
   temporaryFileStorage,
   googleDriveRepository,
+  formProfileRepository,
   checkDatabase: checkDb,
 });
 
