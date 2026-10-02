@@ -23,6 +23,7 @@ describe('HomePage Component', () => {
       kind: 'academic_offer',
       title: 'DAVIA Cohorte 11',
       registrationOpen: true,
+      offerType: 'diploma',
       configRevision: 'rev-1',
       status: 'operational',
       issues: [],
@@ -32,6 +33,7 @@ describe('HomePage Component', () => {
       kind: 'academic_offer',
       title: 'Maestría en Género Cohorte 8',
       registrationOpen: false,
+      offerType: 'maestria',
       configRevision: 'rev-2',
       status: 'closed',
       issues: [],
@@ -41,6 +43,7 @@ describe('HomePage Component', () => {
       kind: 'academic_offer',
       title: 'Oferta Incompatible',
       registrationOpen: true,
+      offerType: 'especializacion',
       configRevision: 'rev-3',
       status: 'incompatible',
       issues: ['Clave de input no soportada: campo_desconocido'],
@@ -78,7 +81,7 @@ describe('HomePage Component', () => {
     expect(screen.getByRole('heading', { name: 'Oferta académica' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Seminarios' })).toBeInTheDocument();
     expect(screen.getByText('3 propuestas')).toBeInTheDocument();
-    expect(screen.getByText('1 propuesta')).toBeInTheDocument();
+    expect(screen.getAllByText('1 propuesta')).toHaveLength(5);
 
     expect(screen.getAllByText('Abierta')).toHaveLength(2);
     expect(screen.getByText('Cerrada')).toBeInTheDocument();
@@ -88,5 +91,21 @@ describe('HomePage Component', () => {
     const openBtn = screen.getAllByRole('button', { name: /Completar preinscripción/i })[0]!;
     fireEvent.click(openBtn);
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'davia-c11' }));
+  });
+
+  it('groups academic offers by type and keeps each section collapsed until opened', async () => {
+    vi.mocked(apiClient.listTargets).mockResolvedValue(mockTargets);
+
+    render(<HomePage onSelectTarget={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByTestId('offer-group-diploma')).toBeInTheDocument());
+
+    expect(screen.getByTestId('offer-group-maestria')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('offer-group-especializacion')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('offer-group-diploma')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('offer-group-seminarios')).not.toHaveAttribute('open');
+
+    fireEvent.click(screen.getByText('Diplomas'));
+    expect(screen.getByTestId('offer-group-diploma')).toHaveAttribute('open');
   });
 });
