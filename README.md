@@ -20,6 +20,7 @@ La especificación funcional y arquitectónica se encuentra en:
 - [Integración con el plugin FLACSO / WordPress](docs/INTEGRACION_WORDPRESS.md)
 - [Documentación y Operación del MVP](docs/MVP.md)
 - [Manual de Operación y Observabilidad](docs/OPERACION.md)
+- [Plan de Rollout Reversible](docs/ROLLOUT.md)
 
 ## Ejecución Local y Docker
 
