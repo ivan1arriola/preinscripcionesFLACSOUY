@@ -1396,3 +1396,43 @@ WordPress · Google Sheets · Google Drive
 ```
 
 La arquitectura en capas debe mantenerse dentro del monolito; utilizar una sola aplicación desplegable no autoriza a que los componentes de presentación accedan directamente a Prisma, WordPress o Google APIs.
+
+
+---
+
+# 24. Integración requerida con el plugin FLACSO
+
+La nueva plataforma requiere actualizar el plugin de FLACSO para que WordPress pueda configurar y exponer el formulario asociado a cada destino académico.
+
+La configuración efectiva del formulario pertenece a:
+
+```text
+Oferta académica → Cohorte → Configuración de preinscripción
+Seminario        → Edición  → Configuración de preinscripción
+```
+
+Para la primera versión, Cohorte y Edición almacenan la configuración efectiva directamente. La herencia desde Oferta/Seminario queda como una posible evolución posterior.
+
+El plugin deberá:
+
+- mantener un catálogo administrativo de claves de input permitidas;
+- permitir seleccionar campos específicos;
+- permitir ordenarlos;
+- permitir definir obligatoriedad dentro de los overrides soportados;
+- impedir claves duplicadas o desconocidas;
+- exponer orientación y mención estructuradamente;
+- preservar la relación orientación → menciones cuando corresponda;
+- exponer un contrato REST estable para la aplicación;
+- incluir URLs públicas y de edición cuando sea posible.
+
+WordPress conoce las **claves** de los inputs para poder configurarlos, pero no su implementación técnica. La definición de tipo, validación, normalización y columna de Sheets sigue perteneciendo al código de Preinscripciones.
+
+El endpoint agregado recomendado es:
+
+```http
+GET /wp-json/flacso/v1/preinscripciones
+```
+
+La especificación detallada del cambio y del contrato REST está en:
+
+- [Integración con el plugin FLACSO](./INTEGRACION_WORDPRESS.md)
