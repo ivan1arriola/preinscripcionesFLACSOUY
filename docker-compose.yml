@@ -27,6 +27,7 @@ services:
       PORT: 3000
       NODE_ENV: production
       DATABASE_URL: postgres://flacso:flacso_password@postgres:5432/flacso_preinscripciones
+      WORDPRESS_URL: ${WORDPRESS_URL:-}
     ports:
       - "3000:3000"
     healthcheck:

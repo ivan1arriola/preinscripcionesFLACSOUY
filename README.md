@@ -44,3 +44,15 @@ pnpm build
 6. La aplicación define en código qué inputs existen, cómo se validan, renderizan y guardan.
 7. Google Sheets es la persistencia final de las preinscripciones.
 8. Los formularios no mantienen borradores ni sesiones de datos personales.
+
+## Catálogo real de WordPress
+
+La API puede leer el catálogo REST v1 del plugin FLACSO mediante:
+
+```bash
+WORDPRESS_URL=https://flacso.edu.uy docker compose up -d --build api web
+```
+
+La aplicación consulta `GET /wp-json/flacso/v1/preinscripciones`, valida la respuesta y conserva una caché técnica de 60 segundos en PostgreSQL. Antes de aceptar un envío vuelve a consultar WordPress para revalidar el destino y su `configRevision`.
+
+Si `WORDPRESS_URL` no está definida, el entorno local usa las fixtures incluidas para desarrollo. El endpoint del plugin debe estar publicado y devolver el contrato REST v1 antes de activar la variable.

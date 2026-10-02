@@ -105,6 +105,10 @@ describe('WordPress Client & Contract Adapter', () => {
     const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
     const response = await client.getPreinscriptions();
 
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://flacso.edu.uy/wp-json/flacso/v1/preinscripciones',
+      expect.objectContaining({ headers: { Accept: 'application/json' } })
+    );
     expect(response.version).toBe(1);
     expect(response.targets).toHaveLength(2);
     expect(response.targets[0]!.id).toBe('target_davia_c11');
