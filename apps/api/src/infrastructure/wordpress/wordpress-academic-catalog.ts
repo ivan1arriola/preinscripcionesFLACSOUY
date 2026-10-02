@@ -57,10 +57,15 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
   }
 
   private mapTarget(raw: WordPressTarget): AcademicTarget {
+    const hasGenericCohortTitle = raw.kind === 'academic_offer' && /^cohorte(?:\s|$)/iu.test(raw.title.trim());
+    const title = hasGenericCohortTitle && raw.offer?.name
+      ? `${raw.offer.name} — ${raw.title}`
+      : raw.title;
+
     return {
       id: raw.id,
       kind: raw.kind,
-      title: raw.title,
+      title,
       registrationOpen: raw.registrationOpen,
       registrationWindow: {
         from: raw.registrationWindow?.from ?? null,

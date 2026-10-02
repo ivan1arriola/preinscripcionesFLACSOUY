@@ -57,6 +57,11 @@ export const WordPressTargetSchema = z.object({
   }),
   configRevision: z.string(),
   form: FormStateSchema,
+  offer: z.object({
+    id: z.number(),
+    slug: z.string(),
+    name: z.string(),
+  }).optional(),
   orientations: z.array(OrientationSchema),
   mentions: z.array(OrientationMentionSchema).optional(),
   urls: TargetUrlsSchema,

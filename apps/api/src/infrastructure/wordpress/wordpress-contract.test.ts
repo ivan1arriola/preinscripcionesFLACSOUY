@@ -9,7 +9,7 @@ const frozenV1Response = {
     {
       id: 'target_davia_c11',
       kind: 'academic_offer',
-      title: 'Diploma Superior en Aprendizaje Visual e Inteligencia Artificial - Cohorte 11',
+      title: 'Cohorte XI',
       wordpress: {
         offerId: 12295,
         cohortId: 1234,
@@ -17,7 +17,7 @@ const frozenV1Response = {
       offer: {
         id: 12295,
         slug: 'davia',
-        name: 'DAVIA',
+        name: 'Diploma Superior en Aprendizaje Visual e Inteligencia Artificial',
       },
       cohort: {
         number: 11,
@@ -187,6 +187,7 @@ describe('WordPress Client & Contract Adapter', () => {
       { id: 'tec-edu', name: 'Tecnología Educativa' },
       { id: 'innovacion', name: 'Innovación Pública' },
     ]);
+    expect(targets1[0]!.title).toBe('Diploma Superior en Aprendizaje Visual e Inteligencia Artificial — Cohorte XI');
 
     // Second call: upstream fails, but cache provides targets
     const targets2 = await catalog.listTargets();
