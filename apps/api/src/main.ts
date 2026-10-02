@@ -8,6 +8,8 @@ import { sql } from 'kysely';
 import { WordPressClient } from './infrastructure/wordpress/wordpress-client.js';
 import { WordPressAcademicCatalog } from './infrastructure/wordpress/wordpress-academic-catalog.js';
 import { PostgresWordPressCache } from './infrastructure/wordpress/wordpress-cache.js';
+import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
+import { GoogleDriveRepository } from './infrastructure/google/google-drive-repository.js';
 
 
 const port = Number(process.env.PORT || 3000);
@@ -21,6 +23,18 @@ const catalog = process.env.WORDPRESS_URL
   : new FixtureAcademicCatalog();
 
 const repository = new PostgresSubmissionRepository(db);
+
+const temporaryFileStorage = new TemporaryFileStorage({
+  rootDir: process.env.UPLOAD_TMP_DIR || '/tmp/flacso-preinscripciones',
+  maxBytes: 10 * 1024 * 1024,
+  allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+});
+const googleDriveRepository = process.env.GOOGLE_DRIVE_FOLDER_ID && process.env.GOOGLE_ACCESS_TOKEN
+  ? new GoogleDriveRepository({
+      folderId: process.env.GOOGLE_DRIVE_FOLDER_ID,
+      accessTokenOrProvider: process.env.GOOGLE_ACCESS_TOKEN,
+    })
+  : undefined;
 
 const checkDb = async () => {
   try {
@@ -41,6 +55,8 @@ try {
 const app = createApp({
   catalog,
   repository,
+  temporaryFileStorage,
+  googleDriveRepository,
   checkDatabase: checkDb,
 });
 

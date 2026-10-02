@@ -89,6 +89,25 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
             .execute();
         }
       }
+
+      for (const file of record.files ?? []) {
+        await trx
+          .insertInto('submission_files')
+          .values({
+            token: file.token,
+            submission_id: submissionId,
+            field_key: file.fieldKey,
+            original_name: file.originalName,
+            mime_type: file.mimeType,
+            size: file.size,
+            status: 'pending',
+            drive_file_id: null,
+            error_message: null,
+            updated_at: new Date(),
+          })
+          .onConflict((oc) => oc.column('token').doNothing())
+          .execute();
+      }
     });
 
     return { id: submissionId };

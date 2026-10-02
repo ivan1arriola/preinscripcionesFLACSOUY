@@ -2,11 +2,13 @@ import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../ports/submission-repository.js';
 import { composeForm } from '../domain/form-composition.js';
 import { validateSubmission } from '../domain/form-validation.js';
+import type { SubmissionFileToken } from '@flacso/contracts';
 
 export interface SubmitPreinscriptionCommand {
   targetId: string;
   configRevision: string;
   values: Record<string, string>;
+  files?: SubmissionFileToken[];
 }
 
 export type SubmitPreinscriptionResult =
@@ -57,6 +59,18 @@ export async function submitPreinscription(
 
   const form = composition.value;
 
+  const providedFileFields = new Set((command.files ?? []).map((file) => file.fieldKey));
+  for (const document of form.documents ?? []) {
+    if (document.required && !providedFileFields.has(document.key) && !document.canDefer) {
+      return {
+        ok: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Faltan documentos obligatorios para completar la preinscripción.',
+        fieldErrors: { [document.key]: [`El documento ${document.label} es obligatorio.`] },
+      };
+    }
+  }
+
   // 4. Validate values & revision
   const validation = validateSubmission(form, command.values, command.configRevision);
   if (!validation.valid) {
@@ -84,6 +98,7 @@ export async function submitPreinscription(
     targetTitle: target.title,
     targetKind: target.kind,
     values: command.values,
+    files: command.files,
   });
 
   return {

@@ -14,12 +14,14 @@
   },
   "dependencies": {
     "@flacso/contracts": "workspace:*",
+    "busboy": "^1.6.0",
     "express": "^4.21.2",
     "kysely": "^0.27.5",
     "pg": "^8.13.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.4",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.4",
     "@types/pg": "^8.11.11",
