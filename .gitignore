@@ -6,6 +6,7 @@ coverage/
 *.log
 .env
 .env.local
+.secrets/
 .DS_Store
 *.tsbuildinfo
 test-results/
