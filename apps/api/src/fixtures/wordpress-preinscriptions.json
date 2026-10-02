@@ -129,6 +129,7 @@
       "kind": "seminar",
       "title": "Seminario de Investigación Cualitativa - Edición 2026-03",
       "registrationOpen": true,
+      "registrationAvailability": "open",
       "registrationWindow": {
         "from": "2026-08-01T00:00:00Z",
         "until": "2026-10-31T23:59:59Z"

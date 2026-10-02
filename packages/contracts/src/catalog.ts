@@ -57,12 +57,15 @@ export interface WordPressTargetSeminar {
   type: 'seminar';
 }
 
+export type RegistrationAvailability = 'open' | 'closed' | 'conflict';
+
 export interface AcademicTarget {
   id: string;
   kind: AcademicTargetKind;
   title: string;
   offerType?: string;
   registrationOpen: boolean;
+  registrationAvailability?: RegistrationAvailability;
   registrationWindow?: RegistrationWindow;
   configRevision: string;
   wordpress?: {
@@ -108,6 +111,7 @@ export interface DiagnosticTarget {
   title: string;
   offerType?: string;
   registrationOpen: boolean;
+  registrationAvailability?: RegistrationAvailability;
   configRevision: string;
   status: DiagnosticStatus;
   issues: string[];

@@ -61,4 +61,62 @@ describe('diagnoseTarget', () => {
     expect(diagnostic.status).toBe('incompatible');
     expect(diagnostic.issues).toContain('Falta especificar el tipo de oferta académica');
   });
+
+  describe('seminar availability diagnostics', () => {
+    const seminarTarget: AcademicTarget = {
+      id: 'sem-ed1',
+      kind: 'seminar',
+      title: 'Seminario Test',
+      registrationOpen: true,
+      configRevision: 'rev-1',
+      orientations: [],
+      mentions: [],
+      urls: {
+        legacyRegistration: 'https://flacso.edu.uy/seminario/test/',
+      },
+    };
+
+    it('diagnoses open seminar edition as operational', () => {
+      const resolutions = new Map([
+        ['/seminario/test/', { status: 'open' as const, targetId: 'sem-ed1' }],
+      ]);
+      const diag = diagnoseTarget(seminarTarget, undefined, resolutions);
+      expect(diag.status).toBe('operational');
+      expect(diag.registrationAvailability).toBe('open');
+      expect(diag.registrationOpen).toBe(true);
+      expect(diag.issues).toHaveLength(0);
+    });
+
+    it('diagnoses closed sibling seminar edition under open permalink as closed', () => {
+      const resolutions = new Map([
+        ['/seminario/test/', { status: 'open' as const, targetId: 'sem-ed2' }],
+      ]);
+      const diag = diagnoseTarget(seminarTarget, undefined, resolutions);
+      expect(diag.status).toBe('closed');
+      expect(diag.registrationAvailability).toBe('closed');
+      expect(diag.registrationOpen).toBe(false);
+    });
+
+    it('diagnoses multiple open seminar editions conflict as incompatible', () => {
+      const resolutions = new Map([
+        ['/seminario/test/', { status: 'conflict' as const, issue: 'multiple_open_seminar_editions' as const }],
+      ]);
+      const diag = diagnoseTarget(seminarTarget, undefined, resolutions);
+      expect(diag.status).toBe('incompatible');
+      expect(diag.registrationAvailability).toBe('conflict');
+      expect(diag.registrationOpen).toBe(false);
+      expect(diag.issues).toContain('multiple_open_seminar_editions');
+    });
+
+    it('diagnoses inconsistent permalink conflict as incompatible', () => {
+      const resolutions = new Map([
+        ['/seminario/test/', { status: 'conflict' as const, issue: 'inconsistent_seminar_permalink' as const }],
+      ]);
+      const diag = diagnoseTarget(seminarTarget, undefined, resolutions);
+      expect(diag.status).toBe('incompatible');
+      expect(diag.registrationAvailability).toBe('conflict');
+      expect(diag.registrationOpen).toBe(false);
+      expect(diag.issues).toContain('inconsistent_seminar_permalink');
+    });
+  });
 });

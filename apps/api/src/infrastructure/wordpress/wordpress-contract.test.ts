@@ -60,6 +60,7 @@ const simplifiedV1Response = {
         name: 'Edición 2026-03',
       },
       registrationOpen: false,
+      registrationAvailability: 'closed',
       registrationWindow: {
         from: null,
         until: null,
@@ -72,6 +73,40 @@ const simplifiedV1Response = {
         wordpress: 'https://flacso.edu.uy/ediciones/201',
         edit: 'https://flacso.edu.uy/wp-admin/post.php?post=201&action=edit',
         legacyRegistration: null,
+      },
+    },
+    {
+      id: 'target_metodologia_ed4',
+      kind: 'seminar',
+      title: 'Seminario de Investigación Cualitativa - Edición 2026-04',
+      wordpress: {
+        seminarId: 200,
+        editionId: 202,
+      },
+      seminar: {
+        id: 200,
+        slug: 'metodologia',
+        name: 'Investigación Cualitativa',
+        type: 'seminar',
+      },
+      edition: {
+        number: 4,
+        name: 'Edición 2026-04',
+      },
+      registrationOpen: true,
+      // Legacy target without registrationAvailability
+      registrationWindow: {
+        from: null,
+        until: null,
+      },
+      configRevision: 'sha256:d41d8cd98f00b204e9800998ecf8427f',
+      orientations: [],
+      mentions: [],
+      urls: {
+        public: 'https://flacso.edu.uy/seminarios/metodologia',
+        wordpress: 'https://flacso.edu.uy/ediciones/202',
+        edit: 'https://flacso.edu.uy/wp-admin/post.php?post=202&action=edit',
+        legacyRegistration: 'https://flacso.edu.uy/seminario/metodologia/',
       },
     },
   ],
@@ -98,13 +133,16 @@ describe('WordPress Client & Contract Adapter', () => {
       expect.objectContaining({ headers: { Accept: 'application/json' } })
     );
     expect(response.version).toBe(1);
-    expect(response.targets).toHaveLength(2);
+    expect(response.targets).toHaveLength(3);
     expect(response.targets[0]!.id).toBe('target_davia_c11');
     expect(response.targets[0]!.offer?.type).toBe('diploma');
     expect(response.targets[0]!.orientations).toEqual(['Educación', 'Políticas Públicas']);
     expect(response.targets[0]!.mentions).toEqual(['Tecnología Educativa', 'Innovación Pública']);
     expect(response.targets[1]!.registrationOpen).toBe(false);
+    expect(response.targets[1]!.registrationAvailability).toBe('closed');
     expect(response.targets[1]!.seminar?.type).toBe('seminar');
+    expect(response.targets[2]!.registrationOpen).toBe(true);
+    expect(response.targets[2]!.registrationAvailability).toBeUndefined();
   });
 
   it('rejects WordPress records that try to supply objects with IDs in orientations', async () => {
@@ -238,16 +276,18 @@ describe('WordPress Client & Contract Adapter', () => {
 
     // First call: populates cache
     const targets1 = await catalog.listTargets();
-    expect(targets1).toHaveLength(2);
+    expect(targets1).toHaveLength(3);
     expect(targets1[0]!.mentions).toEqual([
       'Tecnología Educativa',
       'Innovación Pública',
     ]);
     expect(targets1[0]!.title).toBe('Diploma Superior en Aprendizaje Visual e Inteligencia Artificial — Cohorte XI');
+    expect(targets1[1]!.registrationAvailability).toBe('closed');
+    expect(targets1[2]!.registrationAvailability).toBeUndefined();
 
     // Second call: upstream fails, but cache provides targets
     const targets2 = await catalog.listTargets();
-    expect(targets2).toHaveLength(2);
+    expect(targets2).toHaveLength(3);
     expect(targets2[0]!.id).toBe('target_davia_c11');
   });
 

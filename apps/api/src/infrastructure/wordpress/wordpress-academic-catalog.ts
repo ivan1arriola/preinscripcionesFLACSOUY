@@ -72,6 +72,7 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
       title,
       offerType,
       registrationOpen: raw.registrationOpen,
+      registrationAvailability: raw.registrationAvailability,
       registrationWindow: {
         from: raw.registrationWindow?.from ?? null,
         until: raw.registrationWindow?.until ?? null,
