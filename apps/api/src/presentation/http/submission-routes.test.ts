@@ -1,0 +1,145 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type { Server } from 'node:http';
+import { createApp } from './app.js';
+import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
+import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
+
+describe('Submission HTTP Routes', () => {
+  let server: Server;
+  let baseUrl: string;
+  let repository: InMemorySubmissionRepository;
+
+  const validPayload = {
+    configRevision: 'davia-c11-v1',
+    values: {
+      nombre: 'Lucía',
+      apellido: 'Méndez',
+      email: 'lucia@example.com',
+      telefono: '099112233',
+      documento: '4.123.456-7',
+      fechaNacimiento: '1992-03-20',
+      orientacion: 'educacion',
+      mencion: 'tec-edu',
+      titulo: 'Profesora de Historia',
+    },
+  };
+
+  beforeAll(async () => {
+    const catalog = new FixtureAcademicCatalog();
+    repository = new InMemorySubmissionRepository();
+    const app = createApp({ catalog, repository });
+
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, () => {
+        const addr = server.address();
+        if (addr && typeof addr === 'object') {
+          baseUrl = `http://localhost:${addr.port}`;
+        }
+        resolve();
+      });
+    });
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  it('POST /api/targets/:id/submissions returns 201 with submissionId for valid submission', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validPayload),
+    });
+
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.submissionId).toBeDefined();
+    expect(data.submissionId).toMatch(/^sub_/);
+  });
+
+  it('POST /api/targets/:id/submissions returns 409 when target is closed', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/mg-c8/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        configRevision: 'mg-c8-v1',
+        values: validPayload.values,
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error.code).toBe('CLOSED');
+  });
+
+  it('POST /api/targets/:id/submissions returns 409 for stale revision', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        configRevision: 'stale-rev-00',
+        values: validPayload.values,
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    const data = await res.json();
+    expect(data.error.code).toBe('STALE_REVISION');
+  });
+
+  it('POST /api/targets/:id/submissions returns 400 for field validation error', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        configRevision: 'davia-c11-v1',
+        values: {
+          ...validPayload.values,
+          email: 'correo-invalido',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error.code).toBe('VALIDATION_ERROR');
+    expect(data.error.fieldErrors.email).toBeDefined();
+  });
+
+  it('POST /api/targets/:id/submissions returns 404 for unknown target', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/target-no-existe/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validPayload),
+    });
+
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(data.error.code).toBe('NOT_FOUND');
+  });
+
+  it('POST /api/targets/:id/submissions returns 400 for malformed payload', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: 'not an object' }),
+    });
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error.code).toBe('INVALID_REQUEST');
+  });
+
+  it('ensures error responses never leak connection strings or secrets', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: 'invalid' }),
+    });
+
+    const text = await res.text();
+    expect(text).not.toContain('postgres://');
+    expect(text).not.toContain('password');
+    expect(text).not.toContain('secret');
+  });
+});
