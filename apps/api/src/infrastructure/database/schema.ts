@@ -54,6 +54,13 @@ export interface SubmissionValuesTable {
   value: string;
 }
 
+export interface TechnicalCacheTable {
+  key: string;
+  payload: string;
+  cached_at: Generated<Date>;
+  expires_at: Date;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -63,4 +70,6 @@ export interface DatabaseSchema {
   orientation_mentions: OrientationMentionsTable;
   submissions: SubmissionsTable;
   submission_values: SubmissionValuesTable;
+  technical_cache: TechnicalCacheTable;
 }
+

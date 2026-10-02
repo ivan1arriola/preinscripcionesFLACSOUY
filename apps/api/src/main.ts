@@ -5,10 +5,20 @@ import { createKyselyDb } from './infrastructure/database/kysely.js';
 import { runMigrations } from './infrastructure/database/migrate.js';
 import { sql } from 'kysely';
 
+import { WordPressClient } from './infrastructure/wordpress/wordpress-client.js';
+import { WordPressAcademicCatalog } from './infrastructure/wordpress/wordpress-academic-catalog.js';
+import { PostgresWordPressCache } from './infrastructure/wordpress/wordpress-cache.js';
+
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
 
-const catalog = new FixtureAcademicCatalog();
+const catalog = process.env.WORDPRESS_URL
+  ? new WordPressAcademicCatalog(
+      new WordPressClient({ baseUrl: process.env.WORDPRESS_URL }),
+      new PostgresWordPressCache(db)
+    )
+  : new FixtureAcademicCatalog();
+
 const repository = new PostgresSubmissionRepository(db);
 
 // Attempt migration on startup if database is accessible

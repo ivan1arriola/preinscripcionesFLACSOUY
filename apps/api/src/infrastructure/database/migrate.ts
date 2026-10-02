@@ -1,9 +1,11 @@
 import { createKyselyDb } from './kysely.js';
 import * as initialSchema from './migrations/001_initial_schema.js';
+import * as wordpressCacheSchema from './migrations/002_wordpress_cache.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
   await initialSchema.up(db);
+  await wordpressCacheSchema.up(db);
   console.log('Migrations complete.');
 }
 
