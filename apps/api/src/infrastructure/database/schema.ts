@@ -81,6 +81,22 @@ export interface SpreadsheetOperationsTable {
   updated_at: Generated<Date>;
 }
 
+export interface UploadSessionsTable {
+  id: string;
+  created_at: Generated<Date>;
+  last_activity_at: Generated<Date>;
+}
+
+export interface UploadSessionFilesTable {
+  id: string;
+  session_id: string;
+  original_name: string;
+  mime_type: string;
+  size_bytes: number;
+  storage_path: string;
+  uploaded_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -93,5 +109,8 @@ export interface DatabaseSchema {
   technical_cache: TechnicalCacheTable;
   target_spreadsheets: TargetSpreadsheetsTable;
   spreadsheet_operations: SpreadsheetOperationsTable;
+  upload_sessions: UploadSessionsTable;
+  upload_session_files: UploadSessionFilesTable;
 }
+
 
