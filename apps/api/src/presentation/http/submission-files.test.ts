@@ -103,6 +103,7 @@ async function setup(drive: GoogleDriveRepositoryPort) {
     getTarget: async () => target,
     listTargets: async () => [target],
     revalidateTarget: async () => target,
+    revalidateTargets: async () => [target],
   };
   const repository: SubmissionRepository = { save: async () => ({ id: 'sub_1' }) };
   const storage: TemporaryFileStoragePort = {

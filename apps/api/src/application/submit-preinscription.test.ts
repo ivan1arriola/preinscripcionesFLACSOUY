@@ -211,4 +211,125 @@ describe('submitPreinscription Use Case', () => {
     expect(result.code).toBe('NOT_FOUND');
     expect(repo.submissions).toHaveLength(0);
   });
+
+  describe('seminar submission availability checks', () => {
+    const seminarProfileRepo = new MemoryFormProfileRepository({
+      seminar: { ...getDefaultProfileDefinition('seminar'), documents: [] },
+    });
+
+    const createSeminarTarget = (id: string, editionId: number, open: boolean, availability?: 'open' | 'closed' | 'conflict'): AcademicTarget => ({
+      id,
+      kind: 'seminar',
+      title: `Seminario Test Edición ${editionId}`,
+      registrationOpen: open,
+      registrationAvailability: availability,
+      configRevision: 'rev-sem',
+      wordpress: { seminarId: 88, editionId },
+      seminar: { id: 88, slug: 'sem-test', name: 'Seminario Test', type: 'seminar' },
+      orientations: [],
+      mentions: [],
+      urls: { legacyRegistration: 'https://flacso.edu.uy/seminario/test/' },
+    });
+
+    it('rejects submission for closed seminar edition', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const mockCatalog: AcademicCatalog = {
+        listTargets: async () => [createSeminarTarget('sem-closed', 1, false, 'closed')],
+        getTarget: async () => createSeminarTarget('sem-closed', 1, false, 'closed'),
+        revalidateTarget: async () => createSeminarTarget('sem-closed', 1, false, 'closed'),
+        revalidateTargets: async () => [createSeminarTarget('sem-closed', 1, false, 'closed')],
+      };
+
+      const result = await submitPreinscription(mockCatalog, repo, seminarProfileRepo, {
+        targetId: 'sem-closed',
+        configRevision: 'rev-sem',
+        values: validValues,
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe('CLOSED');
+      }
+      expect(repo.submissions).toHaveLength(0);
+    });
+
+    it('rejects submission for seminar edition with conflict (multiple open)', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const targets = [
+        createSeminarTarget('sem-open-1', 1, true, 'open'),
+        createSeminarTarget('sem-open-2', 2, true, 'open'),
+      ];
+      const mockCatalog: AcademicCatalog = {
+        listTargets: async () => targets,
+        getTarget: async (id) => targets.find((t) => t.id === id) ?? null,
+        revalidateTarget: async (id) => targets.find((t) => t.id === id) ?? null,
+        revalidateTargets: async () => targets,
+      };
+
+      const result = await submitPreinscription(mockCatalog, repo, seminarProfileRepo, {
+        targetId: 'sem-open-1',
+        configRevision: 'rev-sem',
+        values: validValues,
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe('CLOSED');
+      }
+      expect(repo.submissions).toHaveLength(0);
+    });
+
+    it('rejects submission if edition closed between form load and submit', async () => {
+      const repo = new InMemorySubmissionRepository();
+      let isClosed = false;
+
+      const mockCatalog: AcademicCatalog = {
+        listTargets: async () => [createSeminarTarget('sem-dyn', 1, !isClosed, isClosed ? 'closed' : 'open')],
+        getTarget: async () => createSeminarTarget('sem-dyn', 1, true, 'open'),
+        revalidateTarget: async () => {
+          isClosed = true;
+          return createSeminarTarget('sem-dyn', 1, false, 'closed');
+        },
+        revalidateTargets: async () => [createSeminarTarget('sem-dyn', 1, false, 'closed')],
+      };
+
+      const result = await submitPreinscription(mockCatalog, repo, seminarProfileRepo, {
+        targetId: 'sem-dyn',
+        configRevision: 'rev-sem',
+        values: validValues,
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe('CLOSED');
+      }
+      expect(repo.submissions).toHaveLength(0);
+    });
+
+    it('persists submission for unique open seminar edition', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const targets = [
+        createSeminarTarget('sem-old', 1, false, 'closed'),
+        createSeminarTarget('sem-current', 2, true, 'open'),
+      ];
+      const mockCatalog: AcademicCatalog = {
+        listTargets: async () => targets,
+        getTarget: async (id) => targets.find((t) => t.id === id) ?? null,
+        revalidateTarget: async (id) => targets.find((t) => t.id === id) ?? null,
+        revalidateTargets: async () => targets,
+      };
+
+      const formRes = await getTargetForm(mockCatalog, seminarProfileRepo, 'sem-current');
+      if (!formRes.ok) throw new Error(formRes.message);
+
+      const result = await submitPreinscription(mockCatalog, repo, seminarProfileRepo, {
+        targetId: 'sem-current',
+        configRevision: formRes.form.effectiveRevision,
+        values: { ...validValues, orientacion: '', mencion: '' },
+      });
+
+      expect(result.ok).toBe(true);
+      expect(repo.submissions).toHaveLength(1);
+    });
+  });
 });

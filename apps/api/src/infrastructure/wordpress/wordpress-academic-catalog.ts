@@ -56,6 +56,13 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
     return target ? this.mapTarget(target) : null;
   }
 
+  async revalidateTargets(): Promise<AcademicTarget[]> {
+    // Bypass cache to get authoritative state from WordPress
+    const fresh = await this.client.getPreinscriptions();
+    await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
+    return fresh.targets.map((t) => this.mapTarget(t));
+  }
+
   private mapTarget(raw: WordPressTarget): AcademicTarget {
     const hasGenericCohortTitle = raw.kind === 'academic_offer' && /^cohorte(?:\s|$)/iu.test(raw.title.trim());
     const title = hasGenericCohortTitle && raw.offer?.name

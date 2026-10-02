@@ -31,4 +31,8 @@ export class FixtureAcademicCatalog implements AcademicCatalog {
   async revalidateTarget(id: string): Promise<AcademicTarget | null> {
     return this.getTarget(id);
   }
+
+  async revalidateTargets(): Promise<AcademicTarget[]> {
+    return structuredClone(this.targets);
+  }
 }

@@ -5,6 +5,7 @@ import { composeForm } from '../domain/form-composition.js';
 import { isSupportedOfferType } from '../domain/form-profiles.js';
 import { validateSubmission } from '../domain/form-validation.js';
 import { normalizeIdentityValues } from '../domain/identity-validation.js';
+import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
 import type { SubmissionFileToken } from '@flacso/contracts';
 
 export interface SubmitPreinscriptionCommand {
@@ -48,6 +49,30 @@ export async function submitPreinscription(
       code: 'CLOSED',
       message: 'La preinscripción para este destino académico se encuentra cerrada.',
     };
+  }
+
+  if (target.kind === 'seminar') {
+    const allTargets = await catalog.revalidateTargets();
+    const resolutions = resolveSeminarPermalinks(allTargets);
+    const rawUrl = target.urls?.legacyRegistration;
+    const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
+    const resolution = permalink ? resolutions.get(permalink) : undefined;
+
+    if (resolution) {
+      if (resolution.status === 'conflict' || resolution.status === 'closed' || resolution.targetId !== target.id) {
+        return {
+          ok: false,
+          code: 'CLOSED',
+          message: 'La preinscripción para este destino académico se encuentra cerrada.',
+        };
+      }
+    } else if (target.registrationAvailability === 'conflict' || target.registrationAvailability === 'closed') {
+      return {
+        ok: false,
+        code: 'CLOSED',
+        message: 'La preinscripción para este destino académico se encuentra cerrada.',
+      };
+    }
   }
 
   // 3. Compose form

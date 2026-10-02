@@ -3,6 +3,7 @@ import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import type { FormProfileRepository } from '../ports/form-profile-repository.js';
 import { composeForm } from '../domain/form-composition.js';
 import { isSupportedOfferType } from '../domain/form-profiles.js';
+import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
 
 export type GetTargetFormResult =
   | { ok: true; form: FormDefinition }
@@ -21,6 +22,45 @@ export async function getTargetForm(
       code: 'NOT_FOUND',
       message: `No se encontró el destino académico con ID "${targetId}".`,
     };
+  }
+
+  if (!target.registrationOpen) {
+    return {
+      ok: false,
+      code: 'CLOSED',
+      message: 'La preinscripción para este destino académico se encuentra cerrada.',
+    };
+  }
+
+  if (target.kind === 'seminar') {
+    const allTargets = await catalog.revalidateTargets();
+    const resolutions = resolveSeminarPermalinks(allTargets);
+    const rawUrl = target.urls?.legacyRegistration;
+    const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
+    const resolution = permalink ? resolutions.get(permalink) : undefined;
+
+    if (resolution) {
+      if (resolution.status === 'conflict') {
+        return {
+          ok: false,
+          code: 'CLOSED',
+          message: 'La preinscripción para este seminario presenta un conflicto en el catálogo.',
+        };
+      }
+      if (resolution.status === 'closed' || resolution.targetId !== target.id) {
+        return {
+          ok: false,
+          code: 'CLOSED',
+          message: 'La preinscripción para este destino académico se encuentra cerrada.',
+        };
+      }
+    } else if (target.registrationAvailability === 'conflict' || target.registrationAvailability === 'closed') {
+      return {
+        ok: false,
+        code: 'CLOSED',
+        message: 'La preinscripción para este destino académico se encuentra cerrada.',
+      };
+    }
   }
 
   const offerType = target.kind === 'seminar'
