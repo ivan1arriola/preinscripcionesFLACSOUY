@@ -70,7 +70,7 @@ A partir de la actualización arquitectónica, la estructura del formulario (pas
 
 El panel de administración (`/admin/perfiles`) está restringido exclusivamente a cuentas institucionales verificadas (`web@flacso.edu.uy`).
 
-Variables de entorno requeridas en producción (configurar en `.env` sin subir credenciales al repositorio):
+Configuración de acceso administrativo en producción (sin subir credenciales al repositorio):
 
 ```bash
 GOOGLE_OIDC_CLIENT_ID=tu_cliente_id.apps.googleusercontent.com
@@ -78,3 +78,5 @@ GOOGLE_OIDC_CLIENT_SECRET=tu_secreto_de_cliente
 GOOGLE_OIDC_REDIRECT_URI=https://preinscripciones.flacso.edu.uy/accounts/google/login/callback/
 ADMIN_ALLOWED_EMAILS=web@flacso.edu.uy
 ```
+
+`GOOGLE_OIDC_REDIRECT_URI` es opcional: la aplicación construye y envía el callback según el origen desde el que se abre el frontend. Si se define, se conserva como configuración disponible para el proveedor OAuth.
