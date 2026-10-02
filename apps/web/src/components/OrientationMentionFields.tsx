@@ -1,10 +1,13 @@
 import React from 'react';
 
-export type OrientationItem = string | { id: string; name: string };
+interface OrientationOption {
+  id: string;
+  name: string;
+}
 
 interface OrientationMentionFieldsProps {
-  orientations: OrientationItem[];
-  mentions?: OrientationItem[];
+  orientations: Array<string | OrientationOption | any>;
+  mentions?: Array<string | OrientationOption | any>;
   selectedOrientation: string;
   selectedMention: string;
   onOrientationChange: (orientationId: string) => void;
@@ -16,8 +19,18 @@ interface OrientationMentionFieldsProps {
   disabled?: boolean;
 }
 
+const normalizeOption = (item: string | OrientationOption | any): OrientationOption => {
+  if (typeof item === 'string') {
+    return { id: item, name: item };
+  }
+  return {
+    id: item?.id ?? item?.name ?? '',
+    name: item?.name ?? item?.id ?? '',
+  };
+};
+
 export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> = ({
-  orientations,
+  orientations = [],
   mentions = [],
   selectedOrientation,
   selectedMention,
@@ -29,21 +42,18 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
   mentionError,
   disabled = false,
 }) => {
-  const normOrientations = orientations.map((o) =>
-    typeof o === 'string' ? { id: o, name: o } : o
-  );
-  const normMentions = mentions.map((m) =>
-    typeof m === 'string' ? { id: m, name: m } : m
-  );
+  const normalizedOrientations = orientations.map(normalizeOption);
+  const normalizedMentions = mentions.map(normalizeOption);
+
   const handleOrientationSelect = (e: React.ChangeEvent<HTMLSelectElement>) => onOrientationChange(e.target.value);
 
-  if (normOrientations.length === 0 && normMentions.length === 0) {
+  if (normalizedOrientations.length === 0 && normalizedMentions.length === 0) {
     return null;
   }
 
   return (
     <div className="space-y-4">
-      {normOrientations.length > 0 && <div className="field-group">
+      {normalizedOrientations.length > 0 && <div className="field-group">
         <label htmlFor="input-orientacion" className="block text-sm font-medium text-gray-700">
           Orientación {orientationRequired && <span className="text-red-600">*</span>}
         </label>
@@ -56,7 +66,7 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
         >
           <option value="">-- Seleccione una orientación --</option>
-          {normOrientations.map((o) => (
+          {normalizedOrientations.map((o) => (
             <option key={o.id} value={o.id}>
               {o.name}
             </option>
@@ -65,7 +75,7 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
         {orientationError && <p className="mt-1 text-sm text-red-600">{orientationError}</p>}
       </div>}
 
-      {normMentions.length > 0 && (
+      {normalizedMentions.length > 0 && (
         <div className="field-group">
           <label htmlFor="input-mencion" className="block text-sm font-medium text-gray-700">
             Mención {mentionRequired && <span className="text-red-600">*</span>}
@@ -79,7 +89,7 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
           >
             <option value="">-- Seleccione una mención (opcional) --</option>
-            {normMentions.map((m) => (
+            {normalizedMentions.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>

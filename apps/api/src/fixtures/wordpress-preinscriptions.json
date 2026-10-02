@@ -65,6 +65,66 @@
       }
     },
     {
+      "id": "maestria-genero-c9",
+      "kind": "academic_offer",
+      "title": "Maestría en Género, Sociedad y Políticas - Cohorte 9",
+      "registrationOpen": true,
+      "registrationWindow": {
+        "from": "2026-09-01T00:00:00Z",
+        "until": "2026-11-30T23:59:59Z"
+      },
+      "configRevision": "mg-c9-v1",
+      "offer": {
+        "id": 12297,
+        "slug": "mg-c9",
+        "name": "Maestría en Género, Sociedad y Políticas",
+        "type": "maestria",
+        "orientations": [
+          "Género y Políticas Públicas",
+          "Género y Educación"
+        ],
+        "mentions": []
+      },
+      "orientations": [
+        "Género y Políticas Públicas",
+        "Género y Educación"
+      ],
+      "mentions": [],
+      "urls": {
+        "public": "https://flacso.edu.uy/ofertas/mg-c9"
+      }
+    },
+    {
+      "id": "diplomado-salud-c2",
+      "kind": "academic_offer",
+      "title": "Diplomado en Salud Colectiva - Cohorte 2",
+      "registrationOpen": true,
+      "registrationWindow": {
+        "from": "2026-09-01T00:00:00Z",
+        "until": "2026-11-30T23:59:59Z"
+      },
+      "configRevision": "salud-c2-v1",
+      "offer": {
+        "id": 12298,
+        "slug": "salud-c2",
+        "name": "Diplomado en Salud Colectiva",
+        "type": "diplomado",
+        "orientations": [],
+        "mentions": [
+          "Salud Comunitaria",
+          "Epidemiología Social"
+        ]
+      },
+      "orientations": [],
+      "mentions": [
+        "Salud Comunitaria",
+        "Epidemiología Social"
+      ],
+      "urls": {
+        "public": "https://flacso.edu.uy/ofertas/salud-c2"
+      }
+    },
+    {
       "id": "seminario-metodologia-ed3",
       "kind": "seminar",
       "title": "Seminario de Investigación Cualitativa - Edición 2026-03",

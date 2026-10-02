@@ -9,11 +9,12 @@ describe('DynamicForm Component', () => {
     title: 'DAVIA Cohorte 11',
     kind: 'academic_offer',
     offerType: 'diploma',
+    profileVersionId: 'diploma-v1',
+    effectiveRevision: 'rev-1',
     registrationOpen: true,
     configRevision: 'rev-1',
-    effectiveRevision: 'rev-1',
-    profileVersionId: 'ver_diploma_v1',
-    steps: [{ id: 'personal', title: 'Personal', order: 1 }],
+    steps: [],
+    documents: [],
     inputs: [
       { key: 'nombre', label: 'Nombre', type: 'text', required: true, position: 1 },
       { key: 'email', label: 'Correo electrónico', type: 'email', required: true, position: 2 },
@@ -35,7 +36,6 @@ describe('DynamicForm Component', () => {
         optionsSource: 'wordpress.menciones',
       },
     ],
-    documents: [],
     orientations: ['Educación', 'Políticas Públicas'],
     mentions: ['Tecnología Educativa', 'Innovación Pública'],
   };
@@ -65,7 +65,7 @@ describe('DynamicForm Component', () => {
 
     const orientacionSelect = screen.getByLabelText(/Orientación/i);
 
-    fireEvent.change(orientacionSelect, { target: { value: 'educacion' } });
+    fireEvent.change(orientacionSelect, { target: { value: 'Educación' } });
     expect(screen.getByText('Tecnología Educativa')).toBeInTheDocument();
     expect(screen.getByText('Innovación Pública')).toBeInTheDocument();
   });

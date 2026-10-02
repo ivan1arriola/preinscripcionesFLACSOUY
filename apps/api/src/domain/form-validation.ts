@@ -23,8 +23,9 @@ export function validateSubmission(
     fieldErrors[field].push(error);
   };
 
-  // 1. Revision check: includes the active profile version and its definition.
-  if (submittedRevision !== undefined && submittedRevision !== form.effectiveRevision) {
+  // 1. Revision check: must match form.effectiveRevision or form.configRevision
+  const expectedRevision = form.effectiveRevision || form.configRevision;
+  if (submittedRevision !== undefined && submittedRevision !== expectedRevision) {
     addError('_form', 'El formulario ha sido actualizado. Por favor recargue la página.');
   }
 
@@ -50,13 +51,25 @@ export function validateSubmission(
   const mencionVal = values.mencion?.trim();
 
   if (orientacionVal) {
-    if (!form.orientations.includes(orientacionVal)) {
+    const matches = form.orientations.some((orientation: any) =>
+      typeof orientation === 'string'
+        ? orientation === orientacionVal
+        : orientation.id === orientacionVal || orientation.name === orientacionVal
+    );
+    if (!matches) {
       addError('orientacion', 'La orientación seleccionada no es válida.');
     }
   }
 
-  if (mencionVal && !(form.mentions ?? []).includes(mencionVal)) {
-    addError('mencion', 'La mención seleccionada no es válida.');
+  if (mencionVal) {
+    const matches = (form.mentions ?? []).some((mention: any) =>
+      typeof mention === 'string'
+        ? mention === mencionVal
+        : mention.id === mencionVal || mention.name === mencionVal
+    );
+    if (!matches) {
+      addError('mencion', 'La mención seleccionada no es válida.');
+    }
   }
 
   const tipoDocumento = values.tipoDocumento?.trim();

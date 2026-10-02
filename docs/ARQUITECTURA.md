@@ -18,34 +18,36 @@ Cada sistema tendrá una responsabilidad explícita:
 
 | Sistema | Responsabilidad |
 |---|---|
-| WordPress | Catálogo académico y configuración académica |
-| Plataforma de Preinscripciones | Formularios, validación, envío, diagnóstico y administración técnica |
+| WordPress | Catálogo académico, tipo de oferta, fechas de apertura/cierre, orientaciones y menciones |
+| Plataforma de Preinscripciones | Perfiles de formulario versionados por tipo de oferta, validación, asistente en pasos, envío y administración técnica |
 | Google Sheets | Persistencia de preinscripciones y trabajo de las asistentes |
 | Google Drive | Documentación y estructura de archivos |
-| Servidor de Preinscripciones | Archivos temporales antes del envío |
+| Servidor de Preinscripciones | Archivos temporales antes del envío, sesiones OIDC y snapshots de perfiles |
 
-### 2.2. PostgreSQL como estado interno, no como fuente académica
+### 2.2. PostgreSQL como estado interno, perfiles versionados y auditoría
 
 La plataforma utilizará **PostgreSQL** para su estado técnico y operativo interno.
 
-PostgreSQL podrá almacenar, entre otros:
+PostgreSQL almacena:
 
-- configuración operativa;
+- perfiles de formulario versionados e inmutables por tipo de oferta (`maestria`, `especializacion`, `diplomado`, `diploma`, `seminar`);
+- usuarios administrativos autorizados con Google OIDC (`web@flacso.edu.uy`);
+- eventos de auditoría administrativa (creación y activación de versiones);
+- instantáneas (*snapshots*) canónicas de perfil asociadas a cada preinscripción enviada;
 - caché de respuestas de WordPress;
 - referencias técnicas a carpetas y Spreadsheets;
-- sesiones de carga temporal;
-- metadata de archivos temporales;
-- errores y eventos del sistema;
-- estado de trabajos internos.
+- sesiones de carga temporal y metadata de archivos temporales;
+- errores y eventos del sistema.
 
-PostgreSQL **no será la fuente de verdad del catálogo académico** ni sustituirá a Google Sheets como espacio institucional de trabajo sobre las preinscripciones.
+PostgreSQL **no es la fuente de verdad del catálogo académico** (que reside en WordPress) ni sustituye a Google Sheets como espacio institucional de trabajo sobre las preinscripciones.
 
 Las fuentes de verdad quedan separadas:
 
-- **WordPress**: qué ofertas, cohortes, seminarios, ediciones, orientaciones, menciones y formularios existen, y si están abiertos.
+- **WordPress**: qué ofertas, cohortes, seminarios y ediciones existen, sus tipos y opciones de orientación/mención, y su estado de apertura.
+- **Preinscripciones (PostgreSQL)**: estructura del formulario por tipo de oferta (pasos, campos, documentos, cartas), versionado inmutable y control administrativo Google.
 - **Google Sheets**: datos finales de las preinscripciones.
 - **Google Drive**: documentos definitivos.
-- **PostgreSQL**: estado técnico de la aplicación.
+- **PostgreSQL**: estado técnico y snapshots de auditoría.
 
 Puede existir una copia técnica mínima de identificadores o estados de procesamiento, pero no debe transformarse en una segunda configuración académica independiente.
 

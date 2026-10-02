@@ -1,26 +1,28 @@
 # Integración del plugin FLACSO con Preinscripciones
 
+> [!IMPORTANT]
+> **Actualización Arquitectónica (2026-10-02):**
+> La titularidad de los inputs, pasos y documentos ha sido desacoplada de WordPress hacia **Perfiles de Formulario Versionados e Inmutables** gestionados en PostgreSQL de Preinscripciones (`apps/api`).
+> WordPress es la fuente de verdad **académica** (`tipo de oferta`, `título`, `fechas/apertura`, `orientaciones`, `menciones` independientes).
+> Las secciones históricas de este documento que describían la configuración de inputs por cohorte en WordPress quedan superadas por los perfiles versionados (`maestria`, `especializacion`, `diplomado`, `diploma`, `seminar`).
+
 ## 1. Objetivo
 
 El plugin de FLACSO Uruguay debe exponer a la nueva plataforma de Preinscripciones toda la configuración académica necesaria para descubrir y construir formularios sin que Preinscripciones tenga que conocer de antemano qué ofertas académicas o seminarios existen.
 
 La regla principal es:
 
-> **WordPress decide qué formularios existen y qué información necesita cada uno. Preinscripciones decide cómo interpretar, mostrar, validar y almacenar cada tipo de información.**
+> **WordPress decide qué ofertas existen, sus atributos académicos y si están abiertas. Preinscripciones define el perfil de formulario según el tipo de oferta, administra sus versiones e interpreta, muestra, valida y almacena los envíos.**
 
 WordPress es la fuente de verdad para:
 
-- ofertas académicas;
+- ofertas académicas y su tipo (`maestria`, `especializacion`, `diplomado`, `diploma`);
 - cohortes;
 - seminarios;
 - ediciones;
 - apertura o cierre de preinscripciones;
-- orientaciones;
-- menciones;
-- relación entre orientaciones y menciones;
-- inputs específicos que usa cada formulario;
-- orden de esos inputs;
-- overrides permitidos por input.
+- orientaciones (opciones independientes de texto);
+- menciones (opciones independientes de texto).
 
 Preinscripciones no debe mantener una lista autoritativa paralela de ofertas ni formularios.
 

@@ -53,9 +53,9 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
       <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-blue-700">
         🔐
       </div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Panel Administrativo</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-2">Acceso Administrativo</h1>
       <p className="text-sm text-gray-600 mb-6">
-        Gestión de perfiles de formulario de preinscripción de FLACSO Uruguay.
+        Acceso exclusivo institucional (@flacso.edu.uy) para la gestión de perfiles de formulario.
       </p>
 
       {error && (

@@ -78,11 +78,13 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
     const stepInputs = form.inputs.filter((i) => {
       if (i.stepId) return i.stepId === currentStep.id;
       // Fallback grouping by step id
-      if (currentStep.id === 'personal') {
-        return ['nombre1', 'nombre2', 'apellido1', 'apellido2', 'fechaNacimiento', 'tipoDocumento', 'documento', 'paisEmisorDocumento', 'genero', 'generoOtra', 'etnia', 'paisNacimiento'].includes(i.key);
+      if (currentStep.id === 'personal' || steps.length <= 2) {
+        if (['nombre', 'nombre1', 'nombre2', 'apellido', 'apellido1', 'apellido2', 'fechaNacimiento', 'tipoDocumento', 'documento', 'paisEmisorDocumento', 'genero', 'generoOtra', 'etnia', 'paisNacimiento'].includes(i.key)) {
+          return true;
+        }
       }
       if (currentStep.id === 'contacto') {
-        return ['paisResidencia', 'domicilio', 'celular', 'email', 'ocupacion'].includes(i.key);
+        return ['paisResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
       }
       if (currentStep.id === 'academico') {
         return ['estudios', 'posgradoFlacso', 'posgradoCual', 'titulo', 'escolaridad', 'institucion', 'orientacion', 'mencion'].includes(i.key);
@@ -90,7 +92,8 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       if (currentStep.id === 'declaracion') {
         return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
       }
-      return false;
+      // If it's a 1-step profile (plus confirm), include any unassigned regular inputs in step 0
+      return currentStepIndex === 0;
     });
 
     for (const input of stepInputs) {
@@ -167,11 +170,13 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   // Inputs and documents for current step
   const currentStepInputs = form.inputs.filter((i) => {
     if (i.stepId) return i.stepId === currentStep.id;
-    if (currentStep.id === 'personal') {
-      return ['nombre1', 'nombre2', 'apellido1', 'apellido2', 'fechaNacimiento', 'tipoDocumento', 'documento', 'paisEmisorDocumento', 'genero', 'generoOtra', 'etnia', 'paisNacimiento'].includes(i.key);
+    if (currentStep.id === 'personal' || steps.length <= 2) {
+      if (['nombre', 'nombre1', 'nombre2', 'apellido', 'apellido1', 'apellido2', 'fechaNacimiento', 'tipoDocumento', 'documento', 'paisEmisorDocumento', 'genero', 'generoOtra', 'etnia', 'paisNacimiento'].includes(i.key)) {
+        return true;
+      }
     }
     if (currentStep.id === 'contacto') {
-      return ['paisResidencia', 'domicilio', 'celular', 'email', 'ocupacion'].includes(i.key);
+      return ['paisResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
     }
     if (currentStep.id === 'academico') {
       return ['estudios', 'posgradoFlacso', 'posgradoCual', 'titulo', 'escolaridad', 'institucion', 'orientacion', 'mencion'].includes(i.key);
@@ -179,7 +184,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
     if (currentStep.id === 'declaracion') {
       return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
     }
-    return false;
+    return currentStepIndex === 0;
   });
 
   const currentStepDocs = (form.documents ?? []).filter((d) => {
@@ -250,7 +255,8 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
             </button>
           ) : (
             <button
-              type="submit"
+              type="button"
+              onClick={handleFinalSubmit}
               disabled={isSubmitting || !form.registrationOpen}
               className="px-6 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 shadow-sm transition-colors"
             >

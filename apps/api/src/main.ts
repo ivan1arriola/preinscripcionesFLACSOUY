@@ -37,6 +37,14 @@ const googleDriveRepository = process.env.GOOGLE_DRIVE_FOLDER_ID && process.env.
       folderId: process.env.GOOGLE_DRIVE_FOLDER_ID,
       accessTokenOrProvider: process.env.GOOGLE_ACCESS_TOKEN,
     })
+  : process.env.NODE_ENV !== 'production'
+  ? {
+      storeSubmissionFiles: async (command: any) =>
+        command.files.map((f: any, i: number) => ({
+          token: f.token,
+          driveFileId: `dev-drive-${i}`,
+        })),
+    }
   : undefined;
 
 const checkDb = async () => {

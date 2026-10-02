@@ -25,7 +25,7 @@ export function App() {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [path, setPath] = useState(() => normalizePath(window.location.pathname));
   const [routeError, setRouteError] = useState<string | null>(null);
-  const [adminView, setAdminView] = useState<'login' | 'profiles'>('login');
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   useEffect(() => {
     const onPopState = () => setPath(normalizePath(window.location.pathname));
@@ -33,13 +33,10 @@ export function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  const isAdmin = path.startsWith('/admin');
-
   useEffect(() => {
-    if (isAdmin) {
-      apiClient.getAdminMe()
-        .then(() => setAdminView('profiles'))
-        .catch(() => setAdminView('login'));
+    if (path.startsWith('/admin')) {
+      setSelectedTargetId(null);
+      setRouteError(null);
       return;
     }
 
@@ -108,23 +105,23 @@ export function App() {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            {isAdmin ? (
+          <div>
+            {path.startsWith('/admin') ? (
               <button
                 type="button"
                 onClick={handleGoHome}
-                className="text-sm font-medium text-blue-600 hover:underline"
+                className="text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded px-2.5 py-1.5"
               >
-                Volver al sitio público
+                Volver al inicio
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => {
-                  window.history.pushState({}, '', '/admin/');
-                  setPath('/admin/');
+                  window.history.pushState({}, '', '/admin/perfiles');
+                  setPath('/admin/perfiles/');
                 }}
-                className="text-xs font-medium text-gray-500 hover:text-gray-700 hover:underline"
+                className="text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded px-2.5 py-1.5"
               >
                 Administración
               </button>
@@ -134,18 +131,18 @@ export function App() {
       </header>
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
-        {isAdmin ? (
-          adminView === 'profiles' ? (
+        {path.startsWith('/admin') ? (
+          isAdminLoggedIn ? (
             <AdminProfilesPage
-              onRequireLogin={() => setAdminView('login')}
+              onRequireLogin={() => setIsAdminLoggedIn(false)}
               onLogout={() => {
-                setAdminView('login');
+                setIsAdminLoggedIn(false);
                 handleGoHome();
               }}
             />
           ) : (
             <AdminLoginPage
-              onLoginSuccess={() => setAdminView('profiles')}
+              onLoginSuccess={() => setIsAdminLoggedIn(true)}
             />
           )
         ) : selectedTargetId ? (

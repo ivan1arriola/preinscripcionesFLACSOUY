@@ -26,7 +26,7 @@ describe('TargetPage Component', () => {
     configRevision: 'rev-davia',
     effectiveRevision: 'rev-davia',
     profileVersionId: 'ver_diploma_v1',
-    steps: [{ id: 'personal', title: 'Personal', order: 1 }],
+    steps: [],
     inputs: [
       { key: 'nombre', label: 'Nombre', type: 'text', required: true, position: 1 },
       { key: 'email', label: 'Correo electrónico', type: 'email', required: true, position: 2 },
