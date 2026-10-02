@@ -11,6 +11,18 @@ import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-reposit
 import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 
+import cookieParser from 'cookie-parser';
+import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
+import {
+  MemoryAdminSessionStore,
+  type AdminSessionStore,
+} from '../../application/admin-session.js';
+import {
+  createAdminAuthRoutes,
+  createAdminMeRoute,
+} from './admin-auth-routes.js';
+import { createAdminProfileRoutes } from './admin-profile-routes.js';
+
 export interface AppDependencies {
   catalog: AcademicCatalog;
   repository: SubmissionRepository;
@@ -18,12 +30,15 @@ export interface AppDependencies {
   temporaryFileStorage?: TemporaryFileStoragePort;
   googleDriveRepository?: GoogleDriveRepositoryPort;
   formProfileRepository?: FormProfileRepository;
+  googleIdentityVerifier?: GoogleIdentityVerifierPort;
+  adminSessionStore?: AdminSessionStore;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
 
   app.use(express.json());
+  app.use(cookieParser());
 
   if (dependencies.temporaryFileStorage) {
     app.use('/api/uploads', createUploadRoutes(dependencies.temporaryFileStorage));
@@ -59,6 +74,14 @@ export function createApp(dependencies: AppDependencies): Express {
 
   targetRoutes.use('/:id/submissions', submissionRoutes);
   app.use('/api/targets', targetRoutes);
+
+  // Admin session and routes
+  const sessionStore = dependencies.adminSessionStore ?? new MemoryAdminSessionStore();
+  if (dependencies.googleIdentityVerifier) {
+    app.use('/api/admin/auth', createAdminAuthRoutes(profileRepo, dependencies.googleIdentityVerifier, sessionStore));
+  }
+  app.use('/api/admin', createAdminMeRoute(sessionStore));
+  app.use('/api/admin/profiles', createAdminProfileRoutes(profileRepo, sessionStore));
 
   // Central error handler
   app.use(errorHandler);

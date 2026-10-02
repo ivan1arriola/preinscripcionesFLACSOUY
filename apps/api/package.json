@@ -15,7 +15,9 @@
   "dependencies": {
     "@flacso/contracts": "workspace:*",
     "busboy": "^1.6.0",
+    "cookie-parser": "^1.4.7",
     "express": "^4.21.2",
+    "google-auth-library": "^11.1.0",
     "kysely": "^0.27.5",
     "libphonenumber-js": "^1.13.14",
     "pg": "^8.13.3",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.4",
     "@types/pg": "^8.11.11",
