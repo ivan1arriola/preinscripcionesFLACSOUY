@@ -13,8 +13,6 @@ interface GoogleDriveRepositoryOptions {
   timeoutMs?: number;
 }
 
-import { buildDriveFolderNames, buildSemanticDriveFileName } from '../../domain/google-drive-naming.js';
-
 export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
   private readonly tokenProvider: () => Promise<string>;
   private readonly folderIdProvider: () => Promise<string>;
@@ -69,91 +67,16 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
     };
   }
 
-  private async resolveOrCreateFolder(token: string, parentId: string, folderName: string): Promise<string> {
-    const query = `'${parentId}' in parents and name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&supportsAllDrives=true`;
-    
-    const searchResponse = await this.fetchImpl(searchUrl, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-    if (!searchResponse.ok) {
-      throw new Error(`Error al buscar carpeta en Google Drive (HTTP ${searchResponse.status})`);
-    }
-    const searchPayload = await searchResponse.json() as { files?: { id: string }[] };
-    const firstFile = searchPayload.files?.[0];
-    if (firstFile && firstFile.id) {
-      return firstFile.id;
-    }
-
-    const createUrl = 'https://www.googleapis.com/drive/v3/files?supportsAllDrives=true';
-    const createResponse = await this.fetchImpl(createUrl, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-        parents: [parentId],
-      }),
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-    if (!createResponse.ok) {
-      throw new Error(`Error al crear carpeta en Google Drive (HTTP ${createResponse.status})`);
-    }
-    const createPayload = await createResponse.json() as { id?: string };
-    if (!createPayload.id) {
-      throw new Error('Google Drive no devolvió el identificador de la carpeta creada');
-    }
-    return createPayload.id;
-  }
-
   async storeSubmissionFiles(command: StoreSubmissionFilesCommand): Promise<StoredDriveFile[]> {
     const token = await this.tokenProvider();
-    const rootFolderId = await this.folderIdProvider();
-    
-    let currentFolderId = rootFolderId;
-    const hierarchy = buildDriveFolderNames(command.target);
-    
-    for (const folderName of hierarchy) {
-      currentFolderId = await this.resolveOrCreateFolder(token, currentFolderId, folderName);
-    }
-    
-    // Create or resolve sibling 'Preinscripciones' just to guarantee institutional structure, but we don't upload there.
-    await this.resolveOrCreateFolder(token, currentFolderId, 'Preinscripciones');
-    
-    // Resolve 'Documentación' as the final destination
-    const docsFolderId = await this.resolveOrCreateFolder(token, currentFolderId, 'Documentación');
-
+    const folderId = await this.folderIdProvider();
     const result: StoredDriveFile[] = [];
-    
-    // Track ordinals to allow multiple files for the same fieldKey
-    const ordinalCounters: Record<string, number> = {};
-
     for (const file of command.files) {
-      const ordinal = ordinalCounters[file.fieldKey] ?? 0;
-      ordinalCounters[file.fieldKey] = ordinal + 1;
-
-      const semanticName = buildSemanticDriveFileName({
-        submissionId: command.submissionId,
-        fieldKey: file.fieldKey,
-        originalName: file.originalName,
-        mimeType: file.mimeType,
-        values: command.values,
-        ordinal,
-      });
-
       const boundary = `flacso-${command.submissionId}-${file.token}`;
       const metadata = JSON.stringify({
-        name: semanticName,
-        parents: [docsFolderId],
-        appProperties: { 
-          flacsoSubmissionId: command.submissionId, 
-          flacsoFileToken: file.token,
-          flacsoTargetId: command.target.targetId,
-          flacsoTargetKind: command.target.kind,
-          flacsoDocumentKey: file.fieldKey,
-          flacsoOriginalName: file.originalName,
-        },
+        name: file.originalName,
+        parents: [folderId],
+        appProperties: { flacsoSubmissionId: command.submissionId, flacsoFileToken: file.token },
       });
       const body = Buffer.concat([
         Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),

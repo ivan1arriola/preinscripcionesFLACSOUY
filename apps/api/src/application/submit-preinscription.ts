@@ -7,8 +7,6 @@ import { validateSubmission } from '../domain/form-validation.js';
 import { normalizeIdentityValues } from '../domain/identity-validation.js';
 import type { SubmissionFileToken } from '@flacso/contracts';
 
-import type { DriveTargetDescriptor } from '../domain/google-drive-naming.js';
-
 export interface SubmitPreinscriptionCommand {
   targetId: string;
   configRevision: string;
@@ -17,7 +15,7 @@ export interface SubmitPreinscriptionCommand {
 }
 
 export type SubmitPreinscriptionResult =
-  | { ok: true; submissionId: string; driveTarget: DriveTargetDescriptor }
+  | { ok: true; submissionId: string }
   | {
       ok: false;
       code: 'NOT_FOUND' | 'CLOSED' | 'INCOMPATIBLE_FORM' | 'STALE_REVISION' | 'VALIDATION_ERROR';
@@ -25,28 +23,6 @@ export type SubmitPreinscriptionResult =
       fieldErrors?: Record<string, string[]>;
       issues?: string[];
     };
-
-export function buildDriveTargetDescriptor(target: any): DriveTargetDescriptor {
-  const isSeminar = target.kind === 'seminar';
-  
-  if (isSeminar) {
-    return {
-      targetId: target.id,
-      kind: 'seminar',
-      seminarName: target.seminar?.name || target.title,
-      editionName: target.wordpress?.editionId ? `Edición ${target.wordpress.editionId}` : undefined,
-      editionNumber: target.wordpress?.editionId,
-    };
-  }
-
-  return {
-    targetId: target.id,
-    kind: 'academic_offer',
-    offerName: target.offer?.name || target.title.split(' — ')[0],
-    cohortName: target.wordpress?.cohortId ? `Cohorte ${target.wordpress.cohortId}` : undefined,
-    cohortNumber: target.wordpress?.cohortId,
-  };
-}
 
 export async function submitPreinscription(
   catalog: AcademicCatalog,
@@ -141,6 +117,5 @@ export async function submitPreinscription(
   return {
     ok: true,
     submissionId: saved.id,
-    driveTarget: buildDriveTargetDescriptor(target),
   };
 }

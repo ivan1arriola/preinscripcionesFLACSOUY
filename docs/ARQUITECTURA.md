@@ -439,11 +439,8 @@ Preinscripciones FLACSO/
     └── ...
 ```
 
-La aplicación utilizará el identificador de la carpeta raíz configurado desde la interfaz de administración (guardado en PostgreSQL) y creará la jerarquía mostrada arriba bajo demanda. Si los niveles ya existen, los reutilizará.
+La estructura exacta puede evolucionar durante la implementación, pero la aplicación debe poder construirla desde la carpeta raíz.
 
-Dentro de `Documentación`, los archivos se almacenarán utilizando un nombre semántico (ej: `apellidos-perez__nombres-ana__cv__8f312...pdf`) para permitir una identificación clara sin abrir el archivo, manteniendo el archivo original y los metadatos de trazabilidad en los `appProperties` de Google Drive.
-
-*Nota:* Los archivos históricos almacenados directamente en la raíz antes de esta actualización no se migrarán ni renombrarán automáticamente.
 ## 8.3. Identificadores
 
 Los nombres visibles de carpetas no deben ser identificadores técnicos.

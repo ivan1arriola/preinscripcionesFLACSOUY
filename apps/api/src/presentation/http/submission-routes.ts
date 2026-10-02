@@ -117,14 +117,9 @@ export function createSubmissionRoutes(
           const driveFiles = [];
           for (const file of files) {
             const temporary = await fileDependencies.storage.open(file.token, sessionId);
-            driveFiles.push({ token: file.token, fieldKey: file.fieldKey, originalName: temporary.originalName, mimeType: temporary.mimeType, data: temporary.data });
+            driveFiles.push({ token: file.token, originalName: temporary.originalName, mimeType: temporary.mimeType, data: temporary.data });
           }
-          const stored = await fileDependencies.drive.storeSubmissionFiles({ 
-            submissionId: result.submissionId, 
-            target: result.driveTarget,
-            values: parsed.data.values,
-            files: driveFiles 
-          });
+          const stored = await fileDependencies.drive.storeSubmissionFiles({ submissionId: result.submissionId, files: driveFiles });
           for (const file of stored) {
             await fileDependencies.storage.remove(file.token, sessionId);
           }
