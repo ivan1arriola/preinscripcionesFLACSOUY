@@ -121,11 +121,26 @@ Las relaciones muchos-a-muchos tendrán tablas propias. No se almacenará como c
 
 La aplicación definirá el puerto `AcademicCatalog`, que representa el catálogo académico sin conocer su origen.
 
-La implementación del MVP será `FixtureAcademicCatalog`, que leerá respuestas JSON locales con un contrato equivalente al endpoint agregado de WordPress:
+La implementación del MVP será `FixtureAcademicCatalog`, que leerá respuestas JSON locales con el contrato REST público v1 del plugin de WordPress:
 
 ```http
 GET /wp-json/flacso/v1/preinscripciones
 ```
+
+La respuesta tendrá la forma `{ version: 1, targets: [...] }` y cada destino incluirá, como mínimo:
+
+- `id` estable y opaco;
+- `kind` discriminado como `academic_offer` o `seminar`;
+- IDs nativos dentro de `wordpress`;
+- datos visibles de oferta/cohorte o seminario/edición;
+- `registrationOpen`;
+- `registrationWindow.from` y `until` como ISO 8601 o `null`;
+- `configRevision` como huella de la configuración efectiva;
+- `form.valid`, `form.inputs` y `form.issues`;
+- orientaciones y menciones estructuradas;
+- URLs operativas, incluyendo `legacyRegistration` cuando exista.
+
+El plugin no generará la URL de la nueva aplicación. La nueva aplicación construirá sus propias URLs.
 
 Las fixtures deberán incluir al menos:
 
@@ -137,6 +152,10 @@ Las fixtures deberán incluir al menos:
 - un caso incompatible con una clave de input desconocida.
 
 La futura implementación `WordPressAcademicCatalog` reemplazará al adaptador de fixtures sin modificar el dominio, los casos de uso ni el frontend.
+
+Los destinos con `form.valid: false` serán visibles para diagnóstico, pero no podrán mostrar un formulario enviable. La aplicación no ocultará silenciosamente los problemas del contrato.
+
+Antes de aceptar un envío, el caso de uso volverá a consultar el catálogo y comparará la `configRevision` enviada por el navegador con la revisión actual. Si cambió, rechazará el envío como formulario obsoleto.
 
 ## API del MVP
 
@@ -153,7 +172,7 @@ GET /api/health
 
 `GET /api/targets/:id` devolverá la definición completa del formulario, incluyendo inputs, obligatoriedad, orientaciones y menciones.
 
-`POST /api/targets/:id/submissions` volverá a consultar el catálogo, comprobará que el destino siga abierto, validará el payload y almacenará un envío simulado en PostgreSQL.
+`POST /api/targets/:id/submissions` aceptará `{ configRevision: string, values: Record<string, string> }`, volverá a consultar el catálogo, comprobará que el destino siga abierto y válido, comparará la revisión, validará el payload y almacenará un envío simulado en PostgreSQL.
 
 El frontend no confiará únicamente en la validación cliente.
 
@@ -203,8 +222,10 @@ Un destino cerrado o incompatible no podrá aceptar envíos.
 Los errores de contrato se tratarán de forma explícita:
 
 - clave de input desconocida: destino incompatible y respuesta de error segura;
+- contrato REST inválido: destino visible para diagnóstico, pero no enviable;
 - destino inexistente: HTTP 404;
 - destino cerrado: respuesta de conflicto o validación de negocio;
+- `configRevision` desactualizada: rechazo por formulario obsoleto;
 - payload inválido: HTTP 400 con errores por campo;
 - falla de persistencia: error técnico sin exponer detalles internos.
 
@@ -221,12 +242,13 @@ El MVP se considerará implementado cuando:
 5. Orientaciones y menciones respeten su relación.
 6. Las claves desconocidas produzcan un diagnóstico de incompatibilidad.
 7. El backend valide nuevamente el catálogo durante el envío.
-8. Un envío válido quede registrado en PostgreSQL.
-9. El modelo de PostgreSQL cumpla 3FN y tenga restricciones de integridad.
-10. La lógica de dominio tenga pruebas unitarias como funciones puras.
-11. La API tenga pruebas de contrato y casos de error.
-12. El frontend tenga pruebas del listado, formulario, validación y confirmación.
-13. La aplicación no dependa de una conexión real a WordPress, Sheets o Drive.
+8. El backend rechace una `configRevision` desactualizada.
+9. Un envío válido quede registrado en PostgreSQL.
+10. El modelo de PostgreSQL cumpla 3FN y tenga restricciones de integridad.
+11. La lógica de dominio tenga pruebas unitarias como funciones puras.
+12. La API tenga pruebas de contrato y casos de error.
+13. El frontend tenga pruebas del listado, formulario, validación y confirmación.
+14. La aplicación no dependa de una conexión real a WordPress, Sheets o Drive.
 
 ## Evolución posterior
 
@@ -238,3 +260,13 @@ Después de validar este MVP se podrá sustituir, de forma incremental:
 - el diagnóstico básico por el panel administrativo completo.
 
 Estas sustituciones no deben exigir trasladar reglas de negocio al frontend ni duplicar el catálogo académico en PostgreSQL.
+
+## Integración posterior con el plugin WordPress
+
+La primera integración real se implementará en un módulo independiente `modules/preinscripciones/` del plugin, cargado por su loader principal. El módulo tendrá responsabilidades separadas para catálogo de claves, configuración, serialización y REST.
+
+WordPress conservará `link_preinscripcion` y el flujo legacy. La API se desplegará de forma reversible, sin reescritura automática de enlaces ni activación global de la nueva app.
+
+La configuración efectiva se guardará en el destino concreto: meta `preinscripcion_formulario` en Cohortes y Ediciones. Las operaciones administrativas usarán nonce y capacidades de edición. Orientaciones y menciones específicas se guardarán estructuradamente por Cohorte cuando corresponda.
+
+El endpoint será público, de solo lectura, con `permission_callback` abierto para GET y caché HTTP breve de 60 segundos. No devolverá datos personales, metadatos internos arbitrarios ni trazas. Las pruebas del plugin cubrirán sanitización, deduplicación, orden, obligatoriedad, relaciones orientación-mención, IDs estables, `configRevision`, apertura/cierre, serialización, contrato v1, datos legacy y preservación del flujo actual.

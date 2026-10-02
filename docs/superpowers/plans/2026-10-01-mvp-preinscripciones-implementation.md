@@ -19,6 +19,9 @@
 - PostgreSQL será la persistencia del MVP y su modelo deberá cumplir tercera forma normal.
 - React consumirá únicamente la API propia.
 - La API volverá a consultar y validar el catálogo durante cada envío.
+- El contrato simulado seguirá exactamente REST v1: `{ version: 1, targets: [...] }`.
+- Cada envío incluirá y revalidará `configRevision`.
+- Los destinos con `form.valid: false` serán visibles para diagnóstico, pero no serán enviables.
 - No se implementarán todavía WordPress real, Google Sheets, Google Drive, archivos reales ni panel administrativo.
 - No se expondrán secretos ni datos sensibles en errores o fixtures.
 
@@ -27,6 +30,7 @@
 - Un destino cerrado o incompatible debe aparecer, pero nunca aceptar envíos: prueba en Task 3 y Task 5.
 - Una mención perteneciente a otra orientación debe rechazarse: prueba en Task 2.
 - Una clave de input desconocida debe producir diagnóstico de incompatibilidad, no un control genérico: prueba en Task 2 y Task 3.
+- Una `configRevision` modificada entre carga y envío debe rechazar el envío obsoleto: prueba en Task 2, Task 4 y Task 5.
 - Un envío válido debe persistirse sin perder campos ni depender del orden del formulario: prueba en Task 4 y Task 5.
 - Un contenedor iniciado sin PostgreSQL disponible debe devolver un estado de salud no listo sin filtrar credenciales: prueba en Task 1 y Task 7.
 
@@ -100,8 +104,8 @@
 - Create: `apps/api/src/domain/diagnostics.test.ts`
 
 **Interfaces:**
-- `InputDefinition = { key: string; label: string; required: boolean }`.
-- `FormDefinition = { targetId: string; inputs: InputDefinition[]; orientations: Orientation[] }`.
+- `InputDefinition = { key: string; position: number; label: string; required: boolean }`.
+- `FormDefinition = { valid: boolean; issues: string[]; targetId: string; configRevision: string; inputs: InputDefinition[]; orientations: Orientation[] }`.
 - `Orientation = { id: string; name: string; mentions: Mention[] }`.
 - `composeForm(universalInputs, configuredInputs): Result<FormDefinition, DomainError>`.
 - `validateSubmission(form, values): ValidationResult`.
@@ -114,7 +118,7 @@
 
 - [ ] **Step 2: Write tests for pure validation**
 
-  Assert required values are enforced, optional empty values pass, and a mention not contained in the selected orientation is rejected.
+  Assert required values are enforced, optional empty values pass, a mention not contained in the selected orientation is rejected, and a submitted revision different from the current revision is rejected as stale.
 
 - [ ] **Step 3: Write tests for pure diagnostics**
 
@@ -152,6 +156,7 @@
 - Create: `apps/api/src/application/catalog.test.ts`
 
 **Interfaces:**
+- `AcademicCatalog.version(): 1`.
 - `AcademicCatalog.listTargets(): Promise<AcademicTarget[]>`.
 - `AcademicCatalog.getTarget(id: string): Promise<AcademicTarget | null>`.
 - `AcademicCatalog.revalidateTarget(id: string): Promise<AcademicTarget | null>`.
@@ -160,7 +165,7 @@
 
 - [ ] **Step 1: Write catalog tests against fixture data**
 
-  Assert the fixture catalog returns an open academic offer, a closed offer, an open seminar, related orientation/mention data, and an incompatible target with an unknown input.
+  Assert the fixture catalog parses `{ version: 1, targets: [...] }` and returns an open academic offer, a closed offer, an open seminar, related orientation/mention data, stable opaque IDs, `registrationWindow`, `configRevision` and an incompatible target with `form.valid: false` and `issues: ["unknown_input"]`.
 
 - [ ] **Step 2: Run the catalog tests and verify they fail**
 
@@ -202,7 +207,7 @@
 **Interfaces:**
 - `SubmissionRepository.save(submission: ValidatedSubmission): Promise<{ id: string }>`.
 - `submitPreinscription(catalog, repository, command): Promise<SubmissionResult>`.
-- `ValidatedSubmission = { targetId: string; values: Record<string, string> }`.
+- `ValidatedSubmission = { targetId: string; configRevision: string; values: Record<string, string> }`.
 
 - [ ] **Step 1: Write the repository integration test**
 
@@ -210,7 +215,7 @@
 
 - [ ] **Step 2: Write the application test with an in-memory repository**
 
-  Assert the use case revalidates the target, rejects a closed target and persists a valid submission without depending on field order.
+  Assert the use case revalidates the target, rejects a closed target, rejects an invalid target, rejects a stale `configRevision` and persists a valid submission without depending on field order.
 
 - [ ] **Step 3: Run tests and verify they fail**
 
@@ -254,11 +259,12 @@
 - `GET /api/targets` returns `{ targets: DiagnosticTarget[] }`.
 - `GET /api/targets/:id` returns `FormDefinition` or 404/409 for missing or incompatible targets.
 - `POST /api/targets/:id/submissions` accepts `{ values: Record<string, string> }` and returns `{ submissionId: string }` on success.
+- `POST /api/targets/:id/submissions` accepts `{ configRevision: string, values: Record<string, string> }` and returns `{ submissionId: string }` on success.
 - `createApp(dependencies: AppDependencies): Express` wires ports and use cases without constructing infrastructure inside route handlers.
 
 - [ ] **Step 1: Write route tests**
 
-  Assert list, detail, open submission, closed submission, unknown target, incompatible target and field validation responses. Assert error responses contain no connection string or secret.
+  Assert list, detail, open submission, closed submission, stale revision, unknown target, incompatible target and field validation responses. Assert error responses contain no connection string or secret.
 
 - [ ] **Step 2: Run route tests and verify they fail**
 
@@ -299,12 +305,12 @@
 **Interfaces:**
 - `apiClient.listTargets(): Promise<DiagnosticTarget[]>`.
 - `apiClient.getTarget(id: string): Promise<FormDefinition>`.
-- `apiClient.submit(id: string, values: Record<string, string>): Promise<{ submissionId: string }>`.
+- `apiClient.submit(id: string, configRevision: string, values: Record<string, string>): Promise<{ submissionId: string }>`.
 - `DynamicForm` receives a `FormDefinition` and emits values only; it does not import backend modules or fixtures.
 
 - [ ] **Step 1: Write component tests**
 
-  Assert open and closed target rendering, dynamic required fields, dependent mention options, client-side required validation, incompatible-target messaging and successful confirmation after a mocked API response.
+  Assert open and closed target rendering, dynamic required fields, dependent mention options, client-side required validation, incompatible-target messaging, stale-revision error and successful confirmation after a mocked API response.
 
 - [ ] **Step 2: Run frontend tests and verify they fail**
 
