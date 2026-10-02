@@ -3,6 +3,8 @@ import type { DiagnosticTarget } from '@flacso/contracts';
 import { apiClient } from '../api/client.js';
 import { TargetList } from '../components/TargetList.js';
 
+import { legacyPathForTarget } from '../domain/legacy-permalink-resolution.js';
+
 interface HomePageProps {
   onSelectTarget: (target: DiagnosticTarget) => void;
 }
@@ -15,6 +17,61 @@ const ACADEMIC_GROUPS = [
 ] as const;
 
 const offerTypeOf = (target: DiagnosticTarget) => target.offerType ?? 'otros';
+
+const groupSeminarsByPermalink = (seminarTargets: DiagnosticTarget[]): DiagnosticTarget[] => {
+  const groups = new Map<string, DiagnosticTarget[]>();
+  for (const sem of seminarTargets) {
+    const permalink = legacyPathForTarget(sem) ?? sem.id;
+    const list = groups.get(permalink) ?? [];
+    list.push(sem);
+    groups.set(permalink, list);
+  }
+
+  const representativeSeminars: DiagnosticTarget[] = [];
+  for (const editions of groups.values()) {
+    if (editions.length === 1 && editions[0]) {
+      representativeSeminars.push(editions[0]);
+      continue;
+    }
+
+    const hasConflict = editions.some(
+      (e) =>
+        e.registrationAvailability === 'conflict' ||
+        e.issues.includes('multiple_open_seminar_editions') ||
+        e.issues.includes('inconsistent_seminar_permalink')
+    );
+
+    const openEditions = editions.filter((e) => {
+      if (e.registrationAvailability !== undefined) {
+        return e.registrationAvailability === 'open';
+      }
+      return Boolean(e.registrationOpen && e.status === 'operational');
+    });
+
+    if (hasConflict || openEditions.length > 1) {
+      const base = editions[0]!;
+      representativeSeminars.push({
+        ...base,
+        registrationOpen: false,
+        registrationAvailability: 'conflict',
+        status: 'incompatible',
+        issues: ['multiple_open_seminar_editions'],
+      });
+    } else if (openEditions.length === 1 && openEditions[0]) {
+      representativeSeminars.push(openEditions[0]);
+    } else {
+      const base = editions[0]!;
+      representativeSeminars.push({
+        ...base,
+        registrationOpen: false,
+        registrationAvailability: 'closed',
+        status: 'closed',
+      });
+    }
+  }
+
+  return representativeSeminars;
+};
 
 export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
   const [targets, setTargets] = useState<DiagnosticTarget[]>([]);
@@ -61,7 +118,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
   }
 
   const academicOffers = targets.filter((target) => target.kind === 'academic_offer');
-  const seminars = targets.filter((target) => target.kind === 'seminar');
+  const rawSeminars = targets.filter((target) => target.kind === 'seminar');
+  const seminars = groupSeminarsByPermalink(rawSeminars);
 
   const renderGroup = (key: string, title: string, groupTargets: DiagnosticTarget[]) => {
     if (groupTargets.length === 0) return null;

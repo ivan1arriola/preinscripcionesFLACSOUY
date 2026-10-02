@@ -5,28 +5,22 @@ import { HomePage } from './pages/HomePage';
 import { TargetPage } from './pages/TargetPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
 import { AdminProfilesPage } from './pages/AdminProfilesPage';
+import { ClosedRegistrationNotice } from './components/ClosedRegistrationNotice';
+import {
+  HOME_PATH,
+  normalizePath,
+  legacyPathForTarget,
+  resolveLegacyPermalink,
+} from './domain/legacy-permalink-resolution';
 
-const HOME_PATH = '/';
 const ADMIN_CALLBACK_PATH = '/accounts/google/login/callback/';
-
-const normalizePath = (path: string): string => {
-  if (path === HOME_PATH) return HOME_PATH;
-  return path.endsWith('/') ? path : `${path}/`;
-};
 
 const isAdminPath = (path: string): boolean =>
   path.startsWith('/admin') || path === ADMIN_CALLBACK_PATH;
 
-const legacyPathForTarget = (target: DiagnosticTarget): string | null => {
-  const legacyRegistration = target.urls?.legacyRegistration;
-  if (!legacyRegistration) return null;
-
-  const path = normalizePath(new URL(legacyRegistration).pathname);
-  return /^\/(oferta|seminario)\/[^/]+\/$/.test(path) ? path : null;
-};
-
 export function App() {
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [closedNotice, setClosedNotice] = useState<{ isConflict: boolean; title?: string } | null>(null);
   const [path, setPath] = useState(() => normalizePath(window.location.pathname));
   const [routeError, setRouteError] = useState<string | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -40,26 +34,33 @@ export function App() {
   useEffect(() => {
     if (isAdminPath(path)) {
       setSelectedTargetId(null);
+      setClosedNotice(null);
       setRouteError(null);
       return;
     }
 
     if (path === HOME_PATH) {
       setSelectedTargetId(null);
+      setClosedNotice(null);
       setRouteError(null);
       return;
     }
 
     let active = true;
     setSelectedTargetId(null);
+    setClosedNotice(null);
     setRouteError(null);
 
     apiClient.listTargets()
       .then((targets) => {
         if (!active) return;
-        const target = targets.find((candidate) => legacyPathForTarget(candidate) === path);
-        if (target) {
-          setSelectedTargetId(target.id);
+        const resolution = resolveLegacyPermalink(targets, path);
+        if (resolution.kind === 'target') {
+          setSelectedTargetId(resolution.target.id);
+        } else if (resolution.kind === 'closed') {
+          setClosedNotice({ isConflict: false, title: resolution.title });
+        } else if (resolution.kind === 'conflict') {
+          setClosedNotice({ isConflict: true, title: resolution.title });
         } else {
           setRouteError('No encontramos una preinscripción para este enlace.');
         }
@@ -79,6 +80,8 @@ export function App() {
     window.history.pushState({}, '', HOME_PATH);
     setPath(HOME_PATH);
     setSelectedTargetId(null);
+    setClosedNotice(null);
+    setRouteError(null);
   };
 
   const handleSelectTarget = (target: DiagnosticTarget) => {
@@ -159,6 +162,12 @@ export function App() {
           )
         ) : selectedTargetId ? (
           <TargetPage targetId={selectedTargetId} onBack={handleGoHome} />
+        ) : closedNotice ? (
+          <ClosedRegistrationNotice
+            title={closedNotice.title}
+            isConflict={closedNotice.isConflict}
+            onBack={handleGoHome}
+          />
         ) : routeError ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-900" role="alert">
             <p className="font-medium">{routeError}</p>

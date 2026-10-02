@@ -108,4 +108,47 @@ describe('HomePage Component', () => {
     fireEvent.click(screen.getByText('Diplomas'));
     expect(screen.getByTestId('offer-group-diploma')).toHaveAttribute('open');
   });
+
+  it('does not duplicate seminar cards for historical editions under the same permalink', async () => {
+    const targetsWithEditions: DiagnosticTarget[] = [
+      {
+        id: 'sem-ed1',
+        kind: 'seminar',
+        title: 'Seminario Cualitativo Edición 1',
+        registrationOpen: false,
+        registrationAvailability: 'closed',
+        configRevision: 'rev-1',
+        status: 'closed',
+        issues: [],
+        urls: {
+          legacyRegistration: 'https://flacso.edu.uy/seminario/investigacion-cualitativa/',
+        },
+      },
+      {
+        id: 'sem-ed2',
+        kind: 'seminar',
+        title: 'Seminario Cualitativo Edición 2',
+        registrationOpen: true,
+        registrationAvailability: 'open',
+        configRevision: 'rev-2',
+        status: 'operational',
+        issues: [],
+        urls: {
+          legacyRegistration: 'https://flacso.edu.uy/seminario/investigacion-cualitativa/',
+        },
+      },
+    ];
+
+    vi.mocked(apiClient.listTargets).mockResolvedValue(targetsWithEditions);
+
+    render(<HomePage onSelectTarget={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Seminarios' })).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText('1 propuesta')).toHaveLength(2);
+    expect(screen.getByText('Seminario Cualitativo Edición 2')).toBeInTheDocument();
+    expect(screen.queryByText('Seminario Cualitativo Edición 1')).not.toBeInTheDocument();
+  });
 });
