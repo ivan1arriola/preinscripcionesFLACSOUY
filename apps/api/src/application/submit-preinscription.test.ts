@@ -7,12 +7,28 @@ describe('submitPreinscription Use Case', () => {
   const catalog = new FixtureAcademicCatalog();
 
   const validValues = {
-    nombre: 'Valeria',
-    apellido: 'González',
+    nombre1: 'Valeria',
+    nombre2: '',
+    apellido1: 'González',
+    apellido2: '',
     email: 'valeria@example.com',
-    telefono: '098765432',
-    documento: '4.567.890-1',
     fechaNacimiento: '1990-05-15',
+    tipoDocumento: 'cedula_uruguaya',
+    documento: '4.567.890-1',
+    paisEmisorDocumento: 'Uruguay',
+    genero: 'Mujer',
+    etnia: 'No declara',
+    celular: '098765432',
+    domicilio: 'Montevideo',
+    ocupacion: 'Docente',
+    paisNacimiento: 'Uruguay',
+    paisResidencia: 'Uruguay',
+    tieneConvenio: 'No',
+    fuente: 'Web',
+    aceptaDifusion: 'No',
+    estudios: 'Licenciatura',
+    posgradoFlacso: 'No',
+    posgradoCual: '',
     orientacion: 'educacion',
     mencion: 'tec-edu',
     titulo: 'Licenciada en Ciencias de la Educación',
@@ -22,17 +38,9 @@ describe('submitPreinscription Use Case', () => {
     const repo = new InMemorySubmissionRepository();
 
     // Pass values in arbitrary/reversed order
-    const reorderedValues: Record<string, string> = {
-      titulo: validValues.titulo,
-      email: validValues.email,
-      nombre: validValues.nombre,
-      mencion: validValues.mencion,
-      documento: validValues.documento,
-      apellido: validValues.apellido,
-      orientacion: validValues.orientacion,
-      fechaNacimiento: validValues.fechaNacimiento,
-      telefono: validValues.telefono,
-    };
+    const reorderedValues: Record<string, string> = Object.fromEntries(
+      Object.entries(validValues).reverse()
+    );
 
     const result = await submitPreinscription(catalog, repo, {
       targetId: 'davia-c11',
@@ -47,7 +55,7 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions).toHaveLength(1);
     expect(repo.submissions[0]?.targetId).toBe('davia-c11');
     expect(repo.submissions[0]?.configRevision).toBe('davia-c11-v1');
-    expect(repo.submissions[0]?.values.nombre).toBe('Valeria');
+    expect(repo.submissions[0]?.values.nombre1).toBe('Valeria');
   });
 
   it('rejects a closed target and does not persist', async () => {
@@ -57,10 +65,26 @@ describe('submitPreinscription Use Case', () => {
       targetId: 'mg-c8', // closed in fixture
       configRevision: 'mg-c8-v1',
       values: {
-        nombre: 'Valeria',
-        apellido: 'González',
+        nombre1: 'Valeria',
+        apellido1: 'González',
         email: 'valeria@example.com',
+        fechaNacimiento: '1990-05-15',
+        tipoDocumento: 'cedula_uruguaya',
         documento: '4.567.890-1',
+        paisEmisorDocumento: 'Uruguay',
+        genero: 'Mujer',
+        etnia: 'No declara',
+        celular: '098765432',
+        domicilio: 'Montevideo',
+        ocupacion: 'Docente',
+        paisNacimiento: 'Uruguay',
+        paisResidencia: 'Uruguay',
+        tieneConvenio: 'No',
+        fuente: 'Web',
+        aceptaDifusion: 'No',
+        estudios: 'Licenciatura',
+        posgradoFlacso: 'No',
+        posgradoCual: '',
         titulo: 'Licenciada',
         escolaridad: 'Escolaridad adjunta',
       },

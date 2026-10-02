@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { composeForm } from './form-composition.js';
 import type { AcademicTarget } from '@flacso/contracts';
+import { UNIVERSAL_INPUTS } from './form-definition.js';
 
 describe('composeForm', () => {
   const baseTarget: AcademicTarget = {
@@ -18,13 +19,8 @@ describe('composeForm', () => {
       ],
       issues: [],
     },
-    orientations: [
-      {
-        id: 'educacion',
-        name: 'Educación',
-        mentions: [{ id: 'tec-edu', name: 'Tecnología Educativa' }],
-      },
-    ],
+    orientations: [{ id: 'educacion', name: 'Educación', mentions: [] }],
+    mentions: [{ id: 'tec-edu', name: 'Tecnología Educativa' }],
   };
 
   it('composes universal inputs with configured inputs sorted by position', () => {
@@ -33,11 +29,13 @@ describe('composeForm', () => {
     if (!result.ok) return;
 
     const keys = result.value.inputs.map((i) => i.key);
-    // Universal inputs: nombre, apellido, email, telefono
-    expect(keys).toContain('nombre');
-    expect(keys).toContain('apellido');
+    expect(keys).toEqual(expect.arrayContaining(UNIVERSAL_INPUTS.map((input) => input.key)));
+    expect(keys).toContain('nombre1');
+    expect(keys).toContain('nombre2');
+    expect(keys).toContain('apellido1');
+    expect(keys).toContain('apellido2');
     expect(keys).toContain('email');
-    expect(keys).toContain('telefono');
+    expect(keys).toContain('celular');
     expect(keys).toContain('documento');
     expect(keys).toContain('orientacion');
     expect(keys).toContain('mencion');
@@ -106,5 +104,48 @@ describe('composeForm', () => {
 
     const institucion = result.value.inputs.find((i) => i.key === 'institucion');
     expect(institucion?.required).toBe(true);
+  });
+
+  it('keeps orientation and mention independent', () => {
+    const result = composeForm({
+      ...baseTarget,
+      form: {
+        valid: true,
+        inputs: [
+          { key: 'orientacion', position: 10, required: false },
+          { key: 'mencion', position: 20, required: true },
+        ],
+        issues: [],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.inputs.find((input) => input.key === 'orientacion')?.required).toBe(false);
+    expect(result.value.inputs.find((input) => input.key === 'mencion')?.required).toBe(true);
+    expect(result.value.mentions).toEqual([{ id: 'tec-edu', name: 'Tecnología Educativa' }]);
+  });
+
+  it('does not expose orientation or mention for seminars', () => {
+    const result = composeForm({
+      ...baseTarget,
+      kind: 'seminar',
+      form: {
+        valid: true,
+        inputs: [
+          { key: 'orientacion', position: 10, required: true },
+          { key: 'mencion', position: 20, required: true },
+        ],
+        issues: [],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.inputs.map((input) => input.key)).not.toEqual(
+      expect.arrayContaining(['orientacion', 'mencion'])
+    );
+    expect(result.value.orientations).toEqual([]);
+    expect(result.value.mentions).toEqual([]);
   });
 });

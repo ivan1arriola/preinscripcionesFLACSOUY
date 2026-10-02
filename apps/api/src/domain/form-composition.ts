@@ -6,6 +6,7 @@ import type {
 import {
   UNIVERSAL_INPUTS,
   SUPPORTED_SPECIFIC_INPUTS,
+  DOCUMENT_DEFINITIONS,
   ALL_SUPPORTED_INPUT_KEYS,
 } from './form-definition.js';
 
@@ -21,7 +22,9 @@ export function composeForm(target: AcademicTarget): CompositionResult {
   }
 
   const seenKeys = new Set<string>();
-  const configuredInputs = target.form.inputs ?? [];
+  const configuredInputs = (target.form.inputs ?? []).filter(
+    (configured) => target.kind !== 'seminar' || !['orientacion', 'mencion'].includes(configured.key)
+  );
 
   // Check for duplicates and unknown keys in configured inputs
   for (const configured of configuredInputs) {
@@ -83,6 +86,34 @@ export function composeForm(target: AcademicTarget): CompositionResult {
   // Sort inputs by position ascending
   finalInputs.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
+  const documents = (target.form.documents ?? []).flatMap((configured) => {
+    const base = DOCUMENT_DEFINITIONS[configured.key];
+    if (!base) {
+      issues.push(`Clave de documento no soportada: ${configured.key}`);
+      return [];
+    }
+    return [{
+      ...base,
+      position: configured.position ?? 99,
+      required: configured.required ?? base.required,
+      maxFiles: configured.maxFiles ?? base.maxFiles,
+      maxBytes: configured.maxBytes ?? base.maxBytes,
+      acceptedMimeTypes: configured.acceptedMimeTypes ?? base.acceptedMimeTypes,
+      canDefer: configured.canDefer ?? base.canDefer,
+    }];
+  });
+
+  if (issues.length > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'INCOMPATIBLE_FORM',
+        message: 'El formulario contiene definiciones incompatibles o no soportadas.',
+        issues,
+      },
+    };
+  }
+
   return {
     ok: true,
     value: {
@@ -92,7 +123,11 @@ export function composeForm(target: AcademicTarget): CompositionResult {
       registrationOpen: target.registrationOpen,
       configRevision: target.configRevision,
       inputs: finalInputs,
-      orientations: target.orientations ?? [],
+      orientations: target.kind === 'seminar' ? [] : target.orientations ?? [],
+      mentions: target.kind === 'seminar'
+        ? []
+        : target.mentions ?? target.orientations.flatMap((orientation) => orientation.mentions ?? []),
+      documents,
     },
   };
 }

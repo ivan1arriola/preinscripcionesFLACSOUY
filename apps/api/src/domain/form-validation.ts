@@ -38,25 +38,18 @@ export function validateSubmission(
     }
   }
 
-  // 3. Validate orientation and mention consistency
+  // 3. Validate orientation and mention independently
   const orientacionVal = values.orientacion?.trim();
   const mencionVal = values.mencion?.trim();
 
   if (orientacionVal) {
-    const selectedOrientation = form.orientations.find((o) => o.id === orientacionVal);
-    if (!selectedOrientation) {
+    if (!form.orientations.some((orientation) => orientation.id === orientacionVal)) {
       addError('orientacion', 'La orientación seleccionada no es válida.');
-    } else if (mencionVal) {
-      const validMention = selectedOrientation.mentions.some((m) => m.id === mencionVal);
-      if (!validMention) {
-        addError(
-          'mencion',
-          'La mención seleccionada no corresponde a la orientación elegida.'
-        );
-      }
     }
-  } else if (mencionVal) {
-    addError('orientacion', 'Debe seleccionar una orientación antes de elegir una mención.');
+  }
+
+  if (mencionVal && !(form.mentions ?? []).some((mention) => mention.id === mencionVal)) {
+    addError('mencion', 'La mención seleccionada no es válida.');
   }
 
   const valid = Object.keys(fieldErrors).length === 0;

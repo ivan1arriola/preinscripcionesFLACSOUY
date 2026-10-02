@@ -1,102 +1,90 @@
-import type { InputDefinition } from '@flacso/contracts';
+import type { DocumentDefinition, InputDefinition } from '@flacso/contracts';
 
 export const UNIVERSAL_INPUTS: InputDefinition[] = [
-  {
-    key: 'nombre',
-    label: 'Nombre',
-    type: 'text',
-    required: true,
-    position: 1,
-    spreadsheetColumn: 'Nombre',
-  },
-  {
-    key: 'apellido',
-    label: 'Apellido',
-    type: 'text',
-    required: true,
-    position: 2,
-    spreadsheetColumn: 'Apellido',
-  },
-  {
-    key: 'email',
-    label: 'Correo electrónico',
-    type: 'email',
-    required: true,
-    position: 3,
-    spreadsheetColumn: 'Correo electrónico',
-  },
-  {
-    key: 'telefono',
-    label: 'Teléfono',
-    type: 'tel',
-    required: false,
-    position: 4,
-    spreadsheetColumn: 'Teléfono',
-  },
-];
+  ['nombre1', 'Primer nombre', 'text', true, 'Primer nombre'],
+  ['nombre2', 'Segundo nombre', 'text', false, 'Segundo nombre'],
+  ['apellido1', 'Primer apellido', 'text', true, 'Primer apellido'],
+  ['apellido2', 'Segundo apellido', 'text', false, 'Segundo apellido'],
+  ['email', 'Correo electrónico', 'email', true, 'Correo electrónico'],
+  ['fechaNacimiento', 'Fecha de nacimiento', 'date', true, 'Fecha de nacimiento'],
+  ['tipoDocumento', 'Tipo de documento', 'select', true, 'Tipo de documento'],
+  ['documento', 'Número de documento', 'text', true, 'Número de documento'],
+  ['paisEmisorDocumento', 'País emisor del documento', 'text', true, 'País emisor del documento'],
+  ['genero', 'Identidad de género', 'select', true, 'Identidad de género'],
+  ['etnia', 'Raza / etnia', 'text', true, 'Raza / etnia'],
+  ['celular', 'Celular', 'tel', true, 'Celular'],
+  ['domicilio', 'Domicilio (incluyendo país)', 'text', true, 'Domicilio'],
+  ['ocupacion', 'Ocupación actual', 'text', true, 'Ocupación actual'],
+  ['paisNacimiento', 'País de nacimiento', 'text', true, 'País de nacimiento'],
+  ['paisResidencia', 'País de residencia', 'text', true, 'País de residencia'],
+  ['tieneConvenio', '¿Te corresponde algún convenio?', 'select', true, '¿Te corresponde algún convenio?'],
+  ['fuente', '¿Cómo conociste esta propuesta?', 'select', true, 'Cómo conociste la propuesta'],
+  ['aceptaDifusion', '¿Autorizás la difusión de tu nombre y foto para esta propuesta?', 'select', true, 'Autoriza difusión'],
+  ['estudios', 'Estudios cursados', 'textarea', true, 'Estudios cursados'],
+  ['posgradoFlacso', '¿Cursaste algún posgrado en FLACSO?', 'select', true, '¿Cursó posgrado en FLACSO?'],
+  ['posgradoCual', '¿Cuál posgrado?', 'text', false, 'Cuál posgrado'],
+].map(([key, label, type, required, spreadsheetColumn], index) => ({
+  key: key as string,
+  label: label as string,
+  type: type as InputDefinition['type'],
+  required: required as boolean,
+  position: index + 1,
+  spreadsheetColumn: spreadsheetColumn as string,
+}));
 
 export const SUPPORTED_SPECIFIC_INPUTS: Record<string, Omit<InputDefinition, 'position'>> = {
-  documento: {
-    key: 'documento',
-    label: 'Documento',
-    type: 'text',
-    required: true,
-    spreadsheetColumn: 'Documento',
-  },
-  fechaNacimiento: {
-    key: 'fechaNacimiento',
-    label: 'Fecha de nacimiento',
-    type: 'date',
-    required: true,
-    spreadsheetColumn: 'Fecha de nacimiento',
-  },
   titulo: {
-    key: 'titulo',
-    label: 'Título',
-    type: 'text',
-    required: true,
+    key: 'titulo', label: 'Título', type: 'text', required: true,
     spreadsheetColumn: 'Título',
   },
   escolaridad: {
-    key: 'escolaridad',
-    label: 'Escolaridad',
-    type: 'text',
-    required: true,
+    key: 'escolaridad', label: 'Escolaridad', type: 'text', required: true,
     spreadsheetColumn: 'Escolaridad',
   },
   orientacion: {
-    key: 'orientacion',
-    label: 'Orientación',
-    type: 'select',
-    required: true,
-    spreadsheetColumn: 'Orientación',
-    optionsSource: 'wordpress.orientaciones',
+    key: 'orientacion', label: 'Orientación', type: 'select', required: true,
+    spreadsheetColumn: 'Orientación', optionsSource: 'wordpress.orientaciones',
   },
   mencion: {
-    key: 'mencion',
-    label: 'Mención',
-    type: 'select',
-    required: false,
-    spreadsheetColumn: 'Mención',
-    optionsSource: 'wordpress.menciones',
+    key: 'mencion', label: 'Mención', type: 'select', required: false,
+    spreadsheetColumn: 'Mención', optionsSource: 'wordpress.menciones',
   },
   institucion: {
-    key: 'institucion',
-    label: 'Institución',
-    type: 'text',
-    required: false,
+    key: 'institucion', label: 'Institución', type: 'text', required: false,
     spreadsheetColumn: 'Institución',
   },
-  ocupacion: {
-    key: 'ocupacion',
-    label: 'Ocupación',
-    type: 'text',
-    required: false,
-    spreadsheetColumn: 'Ocupación',
+};
+
+export const DOCUMENT_DEFINITIONS: Record<string, DocumentDefinition> = {
+  identidad: {
+    key: 'identidad', label: 'Documento de identidad', required: true,
+    maxFiles: 2, maxBytes: 10 * 1024 * 1024,
+    acceptedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+  },
+  cv: {
+    key: 'cv', label: 'Curriculum Vitae', required: true,
+    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'],
+  },
+  titulo: {
+    key: 'titulo', label: 'Título', required: true,
+    maxFiles: 1, maxBytes: 10 * 1024 * 1024,
+    acceptedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+  },
+  cartaMotivacion: {
+    key: 'cartaMotivacion', label: 'Carta de motivación', required: true,
+    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'], canDefer: true,
+  },
+  cartaRecomendacion1: {
+    key: 'cartaRecomendacion1', label: 'Primera carta de recomendación', required: false,
+    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'], canDefer: true,
+  },
+  cartaRecomendacion2: {
+    key: 'cartaRecomendacion2', label: 'Segunda carta de recomendación', required: false,
+    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'], canDefer: true,
   },
 };
 
 export const ALL_SUPPORTED_INPUT_KEYS = new Set<string>([
-  ...UNIVERSAL_INPUTS.map((u) => u.key),
+  ...UNIVERSAL_INPUTS.map((input) => input.key),
   ...Object.keys(SUPPORTED_SPECIFIC_INPUTS),
 ]);

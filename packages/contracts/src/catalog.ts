@@ -8,7 +8,28 @@ export interface Mention {
 export interface Orientation {
   id: string;
   name: string;
-  mentions: Mention[];
+  mentions?: Mention[];
+}
+
+export interface DocumentDefinition {
+  key: string;
+  label: string;
+  required: boolean;
+  position?: number;
+  maxFiles?: number;
+  maxBytes?: number;
+  acceptedMimeTypes?: string[];
+  canDefer?: boolean;
+}
+
+export interface TargetDocumentConfig {
+  key: string;
+  required?: boolean;
+  position?: number;
+  maxFiles?: number;
+  maxBytes?: number;
+  acceptedMimeTypes?: string[];
+  canDefer?: boolean;
 }
 
 export interface RegistrationWindow {
@@ -46,9 +67,11 @@ export interface AcademicTarget {
   form: {
     valid: boolean;
     inputs: TargetInputConfig[];
+    documents?: TargetDocumentConfig[];
     issues: string[];
   };
   orientations: Orientation[];
+  mentions?: Mention[];
   urls?: {
     public?: string;
     wordpress?: string;
@@ -65,6 +88,8 @@ export interface FormDefinition {
   configRevision: string;
   inputs: InputDefinition[];
   orientations: Orientation[];
+  mentions?: Mention[];
+  documents?: DocumentDefinition[];
 }
 
 export type DiagnosticStatus = 'operational' | 'closed' | 'incompatible';
