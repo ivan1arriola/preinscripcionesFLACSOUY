@@ -1,6 +1,8 @@
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../ports/submission-repository.js';
+import type { FormProfileRepository } from '../ports/form-profile-repository.js';
 import { composeForm } from '../domain/form-composition.js';
+import { isSupportedOfferType } from '../domain/form-profiles.js';
 import { validateSubmission } from '../domain/form-validation.js';
 import { normalizeIdentityValues } from '../domain/identity-validation.js';
 import type { SubmissionFileToken } from '@flacso/contracts';
@@ -25,6 +27,7 @@ export type SubmitPreinscriptionResult =
 export async function submitPreinscription(
   catalog: AcademicCatalog,
   repository: SubmissionRepository,
+  profileRepository: FormProfileRepository,
   command: SubmitPreinscriptionCommand
 ): Promise<SubmitPreinscriptionResult> {
   // 1. Re-query and revalidate the academic catalog during submission
@@ -48,7 +51,13 @@ export async function submitPreinscription(
   }
 
   // 3. Compose form
-  const composition = composeForm(target);
+  const offerType = target.kind === 'seminar'
+    ? 'seminar'
+    : target.offer?.type || target.offerType || '';
+  const activeProfile = isSupportedOfferType(offerType)
+    ? await profileRepository.getActive(offerType)
+    : null;
+  const composition = composeForm(target, activeProfile);
   if (!composition.ok) {
     return {
       ok: false,
@@ -96,11 +105,13 @@ export async function submitPreinscription(
   const normalizedValues = normalizeIdentityValues(command.values);
   const saved = await repository.save({
     targetId: target.id,
-    configRevision: target.configRevision,
+    configRevision: form.effectiveRevision,
     targetTitle: target.title,
     targetKind: target.kind,
     values: normalizedValues,
     files: command.files,
+    profileVersionId: form.profileVersionId ?? null,
+    profileSnapshot: activeProfile?.definition ?? null,
   });
 
   return {

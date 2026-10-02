@@ -1,10 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import { FixtureAcademicCatalog } from '../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../infrastructure/database/in-memory-submission-repository.js';
+import { MemoryFormProfileRepository } from '../infrastructure/fixtures/memory-form-profile-repository.js';
+import { getDefaultProfileDefinition } from '../domain/form-profiles.js';
+import { getTargetForm } from './get-target-form.js';
 import { submitPreinscription } from './submit-preinscription.js';
 
 describe('submitPreinscription Use Case', () => {
   const catalog = new FixtureAcademicCatalog();
+  const profileRepo = new MemoryFormProfileRepository({
+    diploma: { ...getDefaultProfileDefinition('diploma'), documents: [] },
+  });
+
+  async function currentRevision(targetId = 'davia-c11') {
+    const result = await getTargetForm(catalog, profileRepo, targetId);
+    if (!result.ok) throw new Error(result.message);
+    return result.form.effectiveRevision;
+  }
 
   const validValues = {
     nombre1: 'Valeria',
@@ -29,9 +41,11 @@ describe('submitPreinscription Use Case', () => {
     estudios: 'Licenciatura',
     posgradoFlacso: 'No',
     posgradoCual: '',
-    orientacion: 'educacion',
-    mencion: 'tec-edu',
+    orientacion: 'Educación',
+    mencion: 'Tecnología Educativa',
     titulo: 'Licenciada en Ciencias de la Educación',
+    escolaridad: 'Escolaridad completa',
+    institucion: 'Universidad de la República',
   };
 
   it('successfully persists a valid submission for an open target without depending on field order', async () => {
@@ -42,28 +56,71 @@ describe('submitPreinscription Use Case', () => {
       Object.entries(validValues).reverse()
     );
 
-    const result = await submitPreinscription(catalog, repo, {
+    const result = await submitPreinscription(catalog, repo, profileRepo, {
       targetId: 'davia-c11',
-      configRevision: 'davia-c11-v1',
+      configRevision: await currentRevision(),
       values: reorderedValues,
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    const rev = await currentRevision();
     expect(result.submissionId).toMatch(/^sub_/);
     expect(repo.submissions).toHaveLength(1);
     expect(repo.submissions[0]?.targetId).toBe('davia-c11');
-    expect(repo.submissions[0]?.configRevision).toBe('davia-c11-v1');
+    expect(repo.submissions[0]?.configRevision).toBe(rev);
+    expect(repo.submissions[0]?.profileVersionId).toBe('ver_diploma_v1');
+    expect(repo.submissions[0]?.profileSnapshot).toBeDefined();
     expect(repo.submissions[0]?.values.nombre1).toBe('Valeria');
     expect(repo.submissions[0]?.values.documento).toBe('3.456.789-4');
     expect(repo.submissions[0]?.values.celular).toBe('+59899123456');
+    expect(repo.submissions[0]?.values.orientacion).toBe('Educación');
+    expect(repo.submissions[0]?.values.mencion).toBe('Tecnología Educativa');
+  });
+
+  it('rejects a submission when the active profile changes (stale form revision) but keeps prior submissions unchanged', async () => {
+    const repo = new InMemorySubmissionRepository();
+    const oldRevision = await currentRevision();
+
+    // First submission on v1
+    const firstResult = await submitPreinscription(catalog, repo, profileRepo, {
+      targetId: 'davia-c11',
+      configRevision: oldRevision,
+      values: validValues,
+    });
+    expect(firstResult.ok).toBe(true);
+    expect(repo.submissions[0]?.profileVersionId).toBe('ver_diploma_v1');
+
+    // Admin adds and activates a new profile version v2
+    const v2 = await profileRepo.createVersion(
+      {
+        type: 'diploma',
+        definition: { ...getDefaultProfileDefinition('diploma'), documents: [] },
+      },
+      'admin@flacso.edu.uy'
+    );
+    await profileRepo.activateVersion(v2.profileId, v2.id);
+
+    // Second submission using old revision must be rejected
+    const secondResult = await submitPreinscription(catalog, repo, profileRepo, {
+      targetId: 'davia-c11',
+      configRevision: oldRevision,
+      values: validValues,
+    });
+    expect(secondResult.ok).toBe(false);
+    if (secondResult.ok) return;
+    expect(secondResult.code).toBe('STALE_REVISION');
+
+    // Prior submission remains intact with its original v1 snapshot
+    expect(repo.submissions).toHaveLength(1);
+    expect(repo.submissions[0]?.profileVersionId).toBe('ver_diploma_v1');
   });
 
   it('rejects a closed target and does not persist', async () => {
     const repo = new InMemorySubmissionRepository();
 
-    const result = await submitPreinscription(catalog, repo, {
+    const result = await submitPreinscription(catalog, repo, profileRepo, {
       targetId: 'mg-c8', // closed in fixture
       configRevision: 'mg-c8-v1',
       values: {
@@ -102,7 +159,7 @@ describe('submitPreinscription Use Case', () => {
   it('rejects a submission with an outdated configRevision (stale form)', async () => {
     const repo = new InMemorySubmissionRepository();
 
-    const result = await submitPreinscription(catalog, repo, {
+    const result = await submitPreinscription(catalog, repo, profileRepo, {
       targetId: 'davia-c11',
       configRevision: 'outdated-revision-99',
       values: validValues,
@@ -124,9 +181,9 @@ describe('submitPreinscription Use Case', () => {
       mencion: 'mencion-inexistente',
     };
 
-    const result = await submitPreinscription(catalog, repo, {
+    const result = await submitPreinscription(catalog, repo, profileRepo, {
       targetId: 'davia-c11',
-      configRevision: 'davia-c11-v1',
+      configRevision: await currentRevision(),
       values: invalidValues,
     });
 
@@ -142,7 +199,7 @@ describe('submitPreinscription Use Case', () => {
   it('returns NOT_FOUND for unknown targetId', async () => {
     const repo = new InMemorySubmissionRepository();
 
-    const result = await submitPreinscription(catalog, repo, {
+    const result = await submitPreinscription(catalog, repo, profileRepo, {
       targetId: 'target-fantasma',
       configRevision: 'v1',
       values: validValues,

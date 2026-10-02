@@ -9,6 +9,7 @@ import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import { createUploadRoutes } from './upload-routes.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
+import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -45,10 +46,12 @@ export function createApp(dependencies: AppDependencies): Express {
   });
 
   // Target routes and nested submission routes
-  const targetRoutes = createTargetRoutes(dependencies.catalog);
+  const profileRepo = dependencies.formProfileRepository ?? new MemoryFormProfileRepository();
+  const targetRoutes = createTargetRoutes(dependencies.catalog, profileRepo);
   const submissionRoutes = createSubmissionRoutes(
     dependencies.catalog,
     dependencies.repository,
+    profileRepo,
     dependencies.temporaryFileStorage && dependencies.googleDriveRepository
       ? { storage: dependencies.temporaryFileStorage, drive: dependencies.googleDriveRepository }
       : undefined

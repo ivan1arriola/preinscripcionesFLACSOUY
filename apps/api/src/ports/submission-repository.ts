@@ -7,6 +7,8 @@ export interface ValidatedSubmissionRecord {
   targetKind: string;
   values: Record<string, string>;
   files?: SubmissionFileToken[];
+  profileVersionId?: string | null;
+  profileSnapshot?: unknown | null;
 }
 
 export interface SavedSubmissionResult {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../../ports/submission-repository.js';
+import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
 import { submitPreinscription } from '../../application/submit-preinscription.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
@@ -24,6 +25,7 @@ interface SubmissionFileDependencies {
 export function createSubmissionRoutes(
   catalog: AcademicCatalog,
   repository: SubmissionRepository,
+  profileRepository: FormProfileRepository,
   fileDependencies?: SubmissionFileDependencies
 ): Router {
   const router = Router({ mergeParams: true });
@@ -45,7 +47,7 @@ export function createSubmissionRoutes(
         return;
       }
 
-      const result = await submitPreinscription(catalog, repository, {
+      const result = await submitPreinscription(catalog, repository, profileRepository, {
         targetId,
         configRevision: parsed.data.configRevision,
         values: parsed.data.values,

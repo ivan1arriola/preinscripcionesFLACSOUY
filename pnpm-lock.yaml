@@ -29,6 +29,9 @@ importers:
       kysely:
         specifier: ^0.27.5
         version: 0.27.6
+      libphonenumber-js:
+        specifier: ^1.13.14
+        version: 1.13.14
       pg:
         specifier: ^8.13.3
         version: 8.23.1
@@ -63,6 +66,9 @@ importers:
       '@flacso/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      libphonenumber-js:
+        specifier: ^1.13.14
+        version: 1.13.14
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -1170,6 +1176,9 @@ packages:
   kysely@0.27.6:
     resolution: {integrity: sha512-FIyV/64EkKhJmjgC0g2hygpBv5RNWVPyNCqSAD7eTCv6eFWNIi4PN1UvdSJGicN/o35bnevgis4Y0UDC0qi8jQ==}
     engines: {node: '>=14.0.0'}
+
+  libphonenumber-js@1.13.14:
+    resolution: {integrity: sha512-llihgCcx0BFLksecLP+x1J+6JDE1GsXS1RN/LoPF6qcwpeQcnjj0lcvZxY8AzbEpYwyZWPZW/nDuqkqzm3amiw==}
 
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
@@ -2646,6 +2655,8 @@ snapshots:
   json5@2.2.3: {}
 
   kysely@0.27.6: {}
+
+  libphonenumber-js@1.13.14: {}
 
   loose-envify@1.4.0:
     dependencies:

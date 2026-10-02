@@ -3,6 +3,9 @@ import type { Server } from 'node:http';
 import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
+import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
+import { getDefaultProfileDefinition } from '../../domain/form-profiles.js';
+import { getTargetForm } from '../../application/get-target-form.js';
 
 describe('Submission HTTP Routes', () => {
   let server: Server;
@@ -34,16 +37,24 @@ describe('Submission HTTP Routes', () => {
       estudios: 'Profesorado',
       posgradoFlacso: 'No',
       posgradoCual: '',
-      orientacion: 'educacion',
-      mencion: 'tec-edu',
+      orientacion: 'Educación',
+      mencion: 'Tecnología Educativa',
       titulo: 'Profesora de Historia',
+      escolaridad: 'Escolaridad completa',
+      institucion: 'Universidad de la República',
     },
   };
 
   beforeAll(async () => {
     const catalog = new FixtureAcademicCatalog();
     repository = new InMemorySubmissionRepository();
-    const app = createApp({ catalog, repository });
+    const profileRepo = new MemoryFormProfileRepository({
+      diploma: { ...getDefaultProfileDefinition('diploma'), documents: [] },
+    });
+    const formResult = await getTargetForm(catalog, profileRepo, 'davia-c11');
+    if (!formResult.ok) throw new Error(formResult.message);
+    validPayload.configRevision = formResult.form.effectiveRevision;
+    const app = createApp({ catalog, repository, formProfileRepository: profileRepo });
 
     await new Promise<void>((resolve) => {
       server = app.listen(0, () => {
@@ -108,7 +119,7 @@ describe('Submission HTTP Routes', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        configRevision: 'davia-c11-v1',
+        configRevision: validPayload.configRevision,
         values: {
           ...validPayload.values,
           email: 'correo-invalido',

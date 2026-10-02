@@ -50,7 +50,7 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
     setServerErrors({});
 
     try {
-      const res = await apiClient.submit(targetId, form.configRevision, values, files);
+      const res = await apiClient.submit(targetId, form.effectiveRevision, values, files);
       setSubmissionId(res.submissionId);
     } catch (err) {
       if (err instanceof ApiError) {

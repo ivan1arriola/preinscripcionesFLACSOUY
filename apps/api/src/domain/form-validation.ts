@@ -23,8 +23,8 @@ export function validateSubmission(
     fieldErrors[field].push(error);
   };
 
-  // 1. Revision check: must match form.configRevision
-  if (submittedRevision !== undefined && submittedRevision !== form.configRevision) {
+  // 1. Revision check: includes the active profile version and its definition.
+  if (submittedRevision !== undefined && submittedRevision !== form.effectiveRevision) {
     addError('_form', 'El formulario ha sido actualizado. Por favor recargue la página.');
   }
 

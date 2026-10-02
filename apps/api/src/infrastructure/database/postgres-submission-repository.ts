@@ -63,6 +63,8 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
           id: submissionId,
           target_id: record.targetId,
           config_revision: record.configRevision,
+          profile_version_id: record.profileVersionId ?? null,
+          profile_snapshot: record.profileSnapshot ? JSON.stringify(record.profileSnapshot) : null,
         })
         .execute();
 

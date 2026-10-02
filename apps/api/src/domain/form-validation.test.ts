@@ -90,14 +90,14 @@ describe('validateSubmission', () => {
   };
 
   it('passes when all required values are present and orientation/mention are independent', () => {
-    const result = validateSubmission(form, validValues, 'rev-xyz');
+    const result = validateSubmission(form, validValues, form.effectiveRevision);
     expect(result.valid).toBe(true);
     expect(Object.keys(result.fieldErrors)).toHaveLength(0);
   });
 
   it('fails when a required value is missing or empty', () => {
     const missingValues = { ...validValues, nombre1: '   ', email: '' };
-    const result = validateSubmission(form, missingValues, 'rev-xyz');
+    const result = validateSubmission(form, missingValues, form.effectiveRevision);
     expect(result.valid).toBe(false);
     expect(result.fieldErrors.nombre1).toBeDefined();
     expect(result.fieldErrors.email).toBeDefined();
@@ -105,20 +105,20 @@ describe('validateSubmission', () => {
 
   it('allows optional values to be empty', () => {
     const withoutOptional = { ...validValues, nombre2: '', apellido2: '', posgradoCual: '', mencion: '' };
-    const result = validateSubmission(form, withoutOptional, 'rev-xyz');
+    const result = validateSubmission(form, withoutOptional, form.effectiveRevision);
     expect(result.valid).toBe(true);
   });
 
   it('fails when email format is invalid', () => {
     const invalidEmail = { ...validValues, email: 'not-an-email' };
-    const result = validateSubmission(form, invalidEmail, 'rev-xyz');
+    const result = validateSubmission(form, invalidEmail, form.effectiveRevision);
     expect(result.valid).toBe(false);
     expect(result.fieldErrors.email).toBeDefined();
   });
 
   it('rejects an orientation that does not exist', () => {
     const invalidOrientation = { ...validValues, orientacion: 'inexistente' };
-    const result = validateSubmission(form, invalidOrientation, 'rev-xyz');
+    const result = validateSubmission(form, invalidOrientation, form.effectiveRevision);
     expect(result.valid).toBe(false);
     expect(result.fieldErrors.orientacion).toBeDefined();
   });
@@ -129,7 +129,7 @@ describe('validateSubmission', () => {
       orientacion: 'educacion',
       mencion: 'gestion-pub',
     };
-    const result = validateSubmission(form, mismatchedMention, 'rev-xyz');
+    const result = validateSubmission(form, mismatchedMention, form.effectiveRevision);
     expect(result.valid).toBe(true);
     expect(result.fieldErrors.mencion).toBeUndefined();
   });
@@ -151,7 +151,7 @@ describe('validateSubmission', () => {
       convenioWordpressId: '',
       posgradoFlacso: 'Si',
       posgradoCual: '',
-    }, 'rev-xyz');
+    }, form.effectiveRevision);
 
     expect(result.valid).toBe(false);
     expect(result.fieldErrors.paisEmisorDocumento).toBeDefined();
@@ -167,7 +167,7 @@ describe('validateSubmission', () => {
       genero: 'identidad-inventada',
       aceptaDifusion: 'Tal vez',
       posgradoFlacso: 'Quizás',
-    }, 'rev-xyz');
+    }, form.effectiveRevision);
 
     expect(result.valid).toBe(false);
     expect(result.fieldErrors.tipoDocumento).toBeDefined();
@@ -181,7 +181,7 @@ describe('validateSubmission', () => {
       ...validValues,
       documento: '34567890',
       celular: '123',
-    }, 'rev-xyz');
+    }, form.effectiveRevision);
 
     expect(result.valid).toBe(false);
     expect(result.fieldErrors.documento).toContain('La cédula o su dígito verificador no son válidos.');
