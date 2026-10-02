@@ -2,6 +2,14 @@ import crypto from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
 import type { AdminUser } from '../domain/form-profiles.js';
 
+export const getAllowedAdminEmails = (): string[] => {
+  const envVal = process.env.ADMIN_ALLOWED_EMAILS;
+  if (envVal) {
+    return envVal.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  }
+  return ['web@flacso.edu.uy'];
+};
+
 export const ALLOWED_ADMIN_EMAIL = 'web@flacso.edu.uy';
 export const ADMIN_SESSION_COOKIE = 'flacso_admin_session';
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
