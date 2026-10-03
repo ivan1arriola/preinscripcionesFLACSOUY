@@ -4,6 +4,7 @@ import type {
   FormDefinition,
   InputDefinition,
   DocumentDefinition,
+  AgreementOption,
 } from '@flacso/contracts';
 import {
   UNIVERSAL_INPUTS,
@@ -19,6 +20,7 @@ export type CompositionResult =
 export function composeForm(
   target: AcademicTarget,
   effectiveProfile: EffectiveProfile | null,
+  agreements: AgreementOption[] = [],
 ): CompositionResult {
   const offerType = target.kind === 'seminar'
     ? 'seminar'
@@ -142,6 +144,7 @@ export function composeForm(
       documents: finalDocuments,
       orientations: targetOrientations,
       mentions: targetMentions,
+      agreements,
       recommendationLettersCount,
     },
   };

@@ -85,6 +85,11 @@ export interface WordPressClientOptions {
   timeoutMs?: number;
 }
 
+const WordPressAgreementSchema = z.object({
+  id: z.number().int().positive(),
+  title: z.object({ rendered: z.string() }),
+});
+
 export class WordPressClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -130,5 +135,39 @@ export class WordPressClient {
     }
 
     return parseResult.data;
+  }
+
+  async getAgreements(): Promise<Array<{ id: string; label: string }>> {
+    const url = `${this.baseUrl}/wp-json/wp/v2/convenio?per_page=100&_fields=id,title`;
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (err: any) {
+      throw new WordPressClientError(`No se pudo conectar con WordPress: ${err.message}`);
+    }
+
+    if (!response.ok) {
+      throw new WordPressClientError(`Error HTTP ${response.status} al consultar los convenios de WordPress`, response.status);
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new WordPressClientError('La respuesta de convenios de WordPress no es un JSON válido');
+    }
+
+    const parsed = z.array(WordPressAgreementSchema).safeParse(payload);
+    if (!parsed.success) {
+      throw new WordPressClientError('La respuesta de convenios de WordPress no cumple el formato esperado');
+    }
+
+    return parsed.data
+      .map((agreement) => ({ id: String(agreement.id), label: agreement.title.rendered.trim() }))
+      .filter((agreement) => agreement.label.length > 0);
   }
 }

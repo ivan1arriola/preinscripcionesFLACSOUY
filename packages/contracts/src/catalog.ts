@@ -57,6 +57,11 @@ export interface WordPressTargetSeminar {
   type: 'seminar';
 }
 
+export interface AgreementOption {
+  id: string;
+  label: string;
+}
+
 export type RegistrationAvailability = 'open' | 'closed' | 'conflict';
 
 export interface AcademicTarget {
@@ -108,6 +113,7 @@ export interface FormDefinition {
   documents: DocumentDefinition[];
   orientations: string[];
   mentions: string[];
+  agreements?: AgreementOption[];
   recommendationLettersCount?: number;
 }
 

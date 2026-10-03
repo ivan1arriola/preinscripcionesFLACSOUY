@@ -91,7 +91,11 @@ export async function submitPreinscription(
   const activeProfile = isSupportedOfferType(offerType)
     ? await profileRepository.getActive(offerType)
     : null;
-  const composition = composeForm(target, activeProfile);
+  const hasAgreementField = activeProfile?.definition.fields.some((field) => field.key === 'convenioWordpressId') ?? false;
+  const agreements = hasAgreementField && catalog.listAgreements
+    ? await catalog.listAgreements()
+    : [];
+  const composition = composeForm(target, activeProfile, agreements);
   if (!composition.ok) {
     return {
       ok: false,

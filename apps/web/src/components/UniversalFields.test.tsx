@@ -8,6 +8,8 @@ const inputs: InputDefinition[] = [
   { key: 'documento', label: 'Número de documento', type: 'text', required: true, position: 2 },
   { key: 'paisEmisorDocumento', label: 'País emisor del documento', type: 'text', required: true, position: 3 },
   { key: 'celular', label: 'Celular', type: 'tel', required: true, position: 4 },
+  { key: 'tieneConvenio', label: '¿Te corresponde algún convenio?', type: 'select', required: true, position: 5 },
+  { key: 'aceptaDifusion', label: '¿Autorizás la difusión de tu nombre y foto?', type: 'select', required: true, position: 6 },
 ];
 
 describe('UniversalFields identity and contact controls', () => {
@@ -32,5 +34,19 @@ describe('UniversalFields identity and contact controls', () => {
 
     expect(onChange).toHaveBeenLastCalledWith('celular', '+59899123456');
     expect(screen.getByText('Se guardará como +59899123456.')).toBeInTheDocument();
+  });
+
+  it('presents yes-or-no answers as radio buttons', () => {
+    render(<UniversalFields inputs={inputs} values={{}} errors={{}} disabled={false} onChange={vi.fn()} />);
+
+    expect(screen.getAllByRole('radio', { name: 'Sí' })).toHaveLength(2);
+    expect(screen.getAllByRole('radio', { name: 'No' })).toHaveLength(2);
+    expect(screen.queryByRole('combobox', { name: /¿Te corresponde algún convenio/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the country flag and calling code next to the phone number', () => {
+    render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={vi.fn()} />);
+
+    expect(screen.getByText('🇺🇾 +598')).toBeInTheDocument();
   });
 });

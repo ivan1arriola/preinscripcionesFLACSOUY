@@ -1,5 +1,5 @@
 import React from 'react';
-import type { FormStepDefinition, InputDefinition, DocumentDefinition, SubmissionFileToken } from '@flacso/contracts';
+import type { AgreementOption, FormStepDefinition, InputDefinition, DocumentDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { UniversalFields } from './UniversalFields.js';
 import { OrientationMentionFields } from './OrientationMentionFields.js';
 import { DocumentUploadFields } from './DocumentUploadFields.js';
@@ -20,6 +20,7 @@ export interface FormStepProps {
   onRemoveToken: (file: SubmissionFileToken) => void;
   orientations?: string[];
   mentions?: string[];
+  agreements?: AgreementOption[];
 }
 
 export const FormStep: React.FC<FormStepProps> = ({
@@ -38,6 +39,7 @@ export const FormStep: React.FC<FormStepProps> = ({
   onRemoveToken,
   orientations = [],
   mentions = [],
+  agreements = [],
 }) => {
   // If this is the confirmation step, render a summary of entered data
   if (step.id === 'confirmacion') {
@@ -126,6 +128,7 @@ export const FormStep: React.FC<FormStepProps> = ({
           errors={errors}
           disabled={disabled}
           onChange={onChange}
+          agreements={agreements}
         />
       )}
 

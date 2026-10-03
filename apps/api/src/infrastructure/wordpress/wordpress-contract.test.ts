@@ -145,6 +145,29 @@ describe('WordPress Client & Contract Adapter', () => {
     expect(response.targets[2]!.registrationAvailability).toBeUndefined();
   });
 
+  it('reads published agreements from the native WordPress REST endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { id: 42, title: { rendered: 'Convenio Universidad de la República' } },
+        { id: 67, title: { rendered: 'Convenio ANEP' } },
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+
+    await expect(client.getAgreements()).resolves.toEqual([
+      { id: '42', label: 'Convenio Universidad de la República' },
+      { id: '67', label: 'Convenio ANEP' },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://flacso.edu.uy/wp-json/wp/v2/convenio?per_page=100&_fields=id,title',
+      expect.objectContaining({ headers: { Accept: 'application/json' } })
+    );
+  });
+
   it('rejects WordPress records that try to supply objects with IDs in orientations', async () => {
     const legacyOrientationResponse = {
       version: 1,

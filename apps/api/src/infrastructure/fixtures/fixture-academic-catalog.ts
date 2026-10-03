@@ -1,4 +1,4 @@
-import type { AcademicTarget } from '@flacso/contracts';
+import type { AcademicTarget, AgreementOption } from '@flacso/contracts';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import fixtureData from '../../fixtures/wordpress-preinscriptions.json' with { type: 'json' };
 
@@ -34,5 +34,9 @@ export class FixtureAcademicCatalog implements AcademicCatalog {
 
   async revalidateTargets(): Promise<AcademicTarget[]> {
     return structuredClone(this.targets);
+  }
+
+  async listAgreements(): Promise<AgreementOption[]> {
+    return [];
   }
 }

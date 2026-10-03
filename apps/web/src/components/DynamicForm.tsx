@@ -74,7 +74,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({ form, onSubmit, isSubm
   return <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
     {!form.registrationOpen && <div className="p-4 mb-4 text-sm text-amber-800 rounded-lg bg-amber-50 border border-amber-200" role="alert"><strong>Preinscripción cerrada:</strong> Este destino académico no se encuentra aceptando preinscripciones actualmente.</div>}
     {serverErrors._form && <div className="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50 border border-red-200" role="alert">{serverErrors._form.join(', ')}</div>}
-    <UniversalFields inputs={regularInputs} values={values} errors={errors} disabled={!form.registrationOpen || isSubmitting} onChange={handleInputChange} />
+    <UniversalFields inputs={regularInputs} values={values} errors={errors} disabled={!form.registrationOpen || isSubmitting} onChange={handleInputChange} agreements={form.agreements ?? []} />
     {(hasOrientationInput || hasMentionInput) && (form.orientations.length > 0 || (form.mentions?.length ?? 0) > 0) && <OrientationMentionFields
       orientations={form.orientations}
       mentions={form.mentions ?? []}

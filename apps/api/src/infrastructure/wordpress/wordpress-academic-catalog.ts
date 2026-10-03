@@ -1,4 +1,4 @@
-import type { AcademicTarget } from '@flacso/contracts';
+import type { AcademicTarget, AgreementOption } from '@flacso/contracts';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { WordPressClient, WordPressTarget } from './wordpress-client.js';
 import type { WordPressCache } from './wordpress-cache.js';
@@ -61,6 +61,10 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
     const fresh = await this.client.getPreinscriptions();
     await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
     return fresh.targets.map((t) => this.mapTarget(t));
+  }
+
+  async listAgreements(): Promise<AgreementOption[]> {
+    return this.client.getAgreements();
   }
 
   private mapTarget(raw: WordPressTarget): AcademicTarget {

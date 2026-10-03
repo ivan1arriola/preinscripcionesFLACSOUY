@@ -21,19 +21,19 @@ export const WizardProgress: React.FC<WizardProgressProps> = ({
 }) => {
   return (
     <nav aria-label="Progreso de la preinscripción" className="mb-8">
-      <ol className="flex flex-wrap md:flex-nowrap items-center w-full gap-2">
+      <ol className="wizard-progress-list flex flex-wrap md:flex-nowrap items-center w-full gap-2">
         {steps.map((step, idx) => {
           const isCurrent = idx === currentStepIndex;
           const isPassed = idx < currentStepIndex;
           const isClickable = idx <= highestStepReached && idx !== currentStepIndex;
 
           return (
-            <li key={step.id} className="flex-1 min-w-[140px]">
+            <li key={step.id} className="wizard-progress-item flex-1">
               <button
                 type="button"
                 disabled={!isClickable}
                 onClick={() => isClickable && onStepClick(idx)}
-                className={`w-full text-left p-3 rounded-lg border text-sm font-medium transition-colors ${
+                className={`wizard-progress-button w-full text-left p-3 rounded-lg border text-sm font-medium transition-colors ${
                   isCurrent
                     ? 'border-blue-600 bg-blue-50 text-blue-900 font-semibold'
                     : isPassed

@@ -128,7 +128,7 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center">
         <button
           type="button"
           onClick={onBack}
@@ -136,9 +136,6 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
         >
           &larr; Volver al listado
         </button>
-        <span className="text-xs bg-gray-100 text-gray-700 py-1 px-2.5 rounded font-mono">
-          Rev: {form.configRevision}
-        </span>
       </div>
 
       <div>

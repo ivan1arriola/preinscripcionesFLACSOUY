@@ -104,11 +104,15 @@ export function validateSubmission(
   }
 
   const tieneConvenio = values.tieneConvenio?.trim();
+  const convenioWordpressId = values.convenioWordpressId?.trim() ?? '';
   if (tieneConvenio && !YES_NO_VALUES.has(tieneConvenio)) {
     addError('tieneConvenio', 'La respuesta sobre convenio no es válida.');
   }
-  if (tieneConvenio === 'Si' && !values.convenioWordpressId?.trim()) {
+  if (tieneConvenio === 'Si' && !convenioWordpressId) {
     addError('convenioWordpressId', 'Seleccioná el convenio que te corresponde.');
+  }
+  if (tieneConvenio === 'Si' && convenioWordpressId && !form.agreements?.some((agreement) => agreement.id === convenioWordpressId)) {
+    addError('convenioWordpressId', 'El convenio seleccionado ya no está disponible.');
   }
 
   const aceptaDifusion = values.aceptaDifusion?.trim();

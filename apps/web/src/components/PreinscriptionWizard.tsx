@@ -195,7 +195,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   const isFinalStep = currentStepIndex === steps.length - 1;
 
   return (
-    <div className="max-w-3xl mx-auto py-4">
+    <div className="preinscription-wizard mx-auto py-4">
       <WizardProgress
         steps={steps}
         currentStepIndex={currentStepIndex}
@@ -204,7 +204,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       />
 
       <form onSubmit={isFinalStep ? handleFinalSubmit : (e) => { e.preventDefault(); handleNext(); }}>
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="form-step-card bg-white shadow rounded-lg p-6 mb-6">
           <FormStep
             step={currentStep}
             inputs={currentStepInputs}
@@ -221,6 +221,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
             onRemoveToken={handleRemoveToken}
             orientations={form.orientations ?? []}
             mentions={form.mentions ?? []}
+            agreements={form.agreements ?? []}
           />
         </div>
 
