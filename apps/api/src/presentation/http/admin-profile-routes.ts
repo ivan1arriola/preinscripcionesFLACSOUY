@@ -83,105 +83,26 @@ export function createAdminProfileRoutes(
     }
   });
 
-  // Create a new version for a profile
-  router.post('/:type/versions', async (req: RequestWithAdminSession, res) => {
-    const typeParam = String(req.params.type ?? '');
-    if (!isSupportedOfferType(typeParam)) {
-      res.status(404).json({
-        error: {
-          code: 'NOT_FOUND',
-          message: `Tipo de oferta no compatible: ${typeParam}`,
-        },
-      });
-      return;
-    }
-
-    const rawDefinition = req.body?.definition;
-    if (!rawDefinition) {
-      res.status(422).json({
-        error: {
-          code: 'INVALID_DEFINITION',
-          message: 'Falta la definición del perfil en el cuerpo de la solicitud.',
-        },
-      });
-      return;
-    }
-
-    let validatedDefinition;
-    try {
-      validatedDefinition = validateProfileDefinition(typeParam, rawDefinition);
-    } catch (validationError) {
-      res.status(422).json({
-        error: {
-          code: 'INVALID_DEFINITION',
-          message: validationError instanceof Error ? validationError.message : 'Definición de perfil inválida.',
-        },
-      });
-      return;
-    }
-
-    try {
-      const version = await profileRepository.createVersion(
-        {
-          type: typeParam,
-          definition: validatedDefinition,
-        },
-        req.adminUser?.email ?? 'web@flacso.edu.uy'
-      );
-
-      res.status(201).json({ version });
-    } catch (error) {
-      res.status(500).json({
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Error al crear versión de perfil',
-        },
-      });
-    }
+  // Create a new version for a profile (disabled in canonical forms)
+  router.post('/:type/versions', async (_req: RequestWithAdminSession, res) => {
+    res.status(410).json({
+      error: {
+        code: 'PROFILES_DISABLED',
+        message: 'La edición de perfiles de formulario ya no está disponible. Los formularios se gestionan de forma canónica en código (canonical-v1).',
+      },
+    });
   });
 
-  // Activate a version
-  router.post('/:type/activate/:versionId', async (req: RequestWithAdminSession, res) => {
-    const typeParam = String(req.params.type ?? '');
-    const versionId = String(req.params.versionId ?? '');
-
-    if (!isSupportedOfferType(typeParam)) {
-      res.status(404).json({
-        error: {
-          code: 'NOT_FOUND',
-          message: `Tipo de oferta no compatible: ${typeParam}`,
-        },
-      });
-      return;
-    }
-
-    try {
-      const profile = await profileRepository.getByType(typeParam);
-      if (!profile) {
-        res.status(404).json({
-          error: {
-            code: 'NOT_FOUND',
-            message: `Perfil no encontrado para tipo: ${typeParam}`,
-          },
-        });
-        return;
-      }
-
-      await profileRepository.activateVersion(
-        profile.id,
-        versionId,
-        req.adminUser?.email ?? 'web@flacso.edu.uy'
-      );
-      res.json({ ok: true, profileId: profile.id, activeVersionId: versionId });
-    } catch (error) {
-      res.status(400).json({
-        error: {
-          code: 'ACTIVATION_FAILED',
-          message: error instanceof Error ? error.message : 'Error al activar versión de perfil',
-        },
-      });
-    }
+  // Activate a version (disabled in canonical forms)
+  router.post('/:type/activate/:versionId', async (_req: RequestWithAdminSession, res) => {
+    res.status(410).json({
+      error: {
+        code: 'PROFILES_DISABLED',
+        message: 'La edición de perfiles de formulario ya no está disponible. Los formularios se gestionan de forma canónica en código (canonical-v1).',
+      },
+    });
   });
 
   return router;
 }
+

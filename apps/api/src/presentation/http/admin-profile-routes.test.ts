@@ -113,7 +113,7 @@ describe('Admin Profile HTTP Routes', () => {
     expect(data.versions).toHaveLength(1);
   });
 
-  it('POST /api/admin/profiles/:type/versions rejects invalid definition with 422', async () => {
+  it('POST /api/admin/profiles/:type/versions returns 410 with PROFILES_DISABLED', async () => {
     const res = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
       method: 'POST',
       headers: {
@@ -122,46 +122,18 @@ describe('Admin Profile HTTP Routes', () => {
         'x-csrf-token': csrfToken,
       },
       body: JSON.stringify({
-        definition: {
-          steps: [], // empty steps is invalid
-          fields: [],
-          documents: [],
-        },
+        definition: getDefaultProfileDefinition('diploma'),
       }),
     });
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(410);
     const data = await res.json();
-    expect(data.error.code).toBe('INVALID_DEFINITION');
+    expect(data.error.code).toBe('PROFILES_DISABLED');
+    expect(data.error.message).toContain('ya no está disponible');
   });
 
-  it('POST /api/admin/profiles/:type/versions creates version and activate activates it', async () => {
-    const def = getDefaultProfileDefinition('diploma');
-    const customDef = {
-      ...def,
-      steps: [
-        ...def.steps,
-        { id: 'extra', title: 'Paso Extra', order: 99 },
-      ],
-    };
-
-    // 1. Create version v2
-    const createRes = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Cookie: sessionCookie,
-        'x-csrf-token': csrfToken,
-      },
-      body: JSON.stringify({ definition: customDef }),
-    });
-    expect(createRes.status).toBe(201);
-    const createData = await createRes.json();
-    expect(createData.version.versionNumber).toBe(2);
-    const newVersionId = createData.version.id;
-
-    // 2. Activate version v2
-    const activateRes = await fetch(
-      `${baseUrl}/api/admin/profiles/diploma/activate/${newVersionId}`,
+  it('POST /api/admin/profiles/:type/activate/:versionId returns 410 with PROFILES_DISABLED', async () => {
+    const res = await fetch(
+      `${baseUrl}/api/admin/profiles/diploma/activate/ver_diploma_v1`,
       {
         method: 'POST',
         headers: {
@@ -170,15 +142,10 @@ describe('Admin Profile HTTP Routes', () => {
         },
       }
     );
-    expect(activateRes.status).toBe(200);
-
-    // 3. Verify active version is now v2
-    const getRes = await fetch(`${baseUrl}/api/admin/profiles/diploma`, {
-      headers: { Cookie: sessionCookie },
-    });
-    const getData = await getRes.json();
-    expect(getData.profile.activeVersionId).toBe(newVersionId);
-    expect(getData.activeVersion.versionNumber).toBe(2);
-    expect(getData.versions).toHaveLength(2);
+    expect(res.status).toBe(410);
+    const data = await res.json();
+    expect(data.error.code).toBe('PROFILES_DISABLED');
+    expect(data.error.message).toContain('ya no está disponible');
   });
 });
+

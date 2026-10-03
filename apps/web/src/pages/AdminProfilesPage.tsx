@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { apiClient, ApiError } from '../api/client.js';
-import { ProfileVersionEditor } from '../components/ProfileVersionEditor.js';
 import { AdminDriveSettingsCard } from '../components/AdminDriveSettingsCard.js';
 import { AdminSpreadsheetSettingsCard } from '../components/AdminSpreadsheetSettingsCard.js';
 
@@ -9,14 +8,6 @@ interface AdminProfilesPageProps {
   onLogout: () => void;
 }
 
-const PROFILE_TYPE_LABELS: Record<string, string> = {
-  diploma: 'Diplomas',
-  maestria: 'Maestrías',
-  especializacion: 'Especializaciones',
-  diplomado: 'Diplomados',
-  seminar: 'Seminarios',
-};
-
 export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
   onRequireLogin,
   onLogout,
@@ -24,17 +15,9 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
   const [activeSection, setActiveSection] = useState<'profiles' | 'drive' | 'spreadsheets'>('profiles');
   const [adminUser, setAdminUser] = useState<any>(null);
   const [csrfToken, setCsrfToken] = useState<string>('');
-  const [profiles, setProfiles] = useState<any[]>([]);
-  const [selectedType, setSelectedType] = useState<string>('diploma');
-  const [selectedProfileDetail, setSelectedProfileDetail] = useState<{
-    profile: any;
-    activeVersion: any;
-    versions: any[];
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. Check session
+  // Check admin session
   useEffect(() => {
     let mounted = true;
     apiClient
@@ -60,54 +43,6 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
     };
   }, [onRequireLogin]);
 
-  // 2. Load profiles list
-  const loadProfiles = useCallback(async () => {
-    try {
-      const list = await apiClient.listAdminProfiles();
-      setProfiles(list);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        onRequireLogin();
-      } else {
-        setError('Error al cargar la lista de perfiles.');
-      }
-    }
-  }, [onRequireLogin]);
-
-  useEffect(() => {
-    if (adminUser) {
-      loadProfiles();
-    }
-  }, [adminUser, loadProfiles]);
-
-  // 3. Load selected profile detail
-  const loadProfileDetail = useCallback(async (type: string, isReload = false) => {
-    if (!isReload) {
-      setLoading(true);
-    }
-    setError(null);
-    try {
-      const detail = await apiClient.getAdminProfile(type);
-      setSelectedProfileDetail(detail);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        onRequireLogin();
-      } else {
-        setError(`Error al cargar el perfil de ${type}.`);
-      }
-    } finally {
-      if (!isReload) {
-        setLoading(false);
-      }
-    }
-  }, [onRequireLogin]);
-
-  useEffect(() => {
-    if (adminUser && selectedType) {
-      loadProfileDetail(selectedType);
-    }
-  }, [adminUser, selectedType, loadProfileDetail]);
-
   const handleLogout = async () => {
     await apiClient.adminLogout(csrfToken);
     onLogout();
@@ -126,9 +61,9 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
       {/* Top Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-gray-200 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Perfiles de Formulario</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Administración de Preinscripciones</h1>
           <p className="text-sm text-gray-600">
-            Administración de esquemas inmutables por tipo de oferta académica.
+            Configuración del sistema, almacenamiento Google Drive y planillas por oferta.
           </p>
         </div>
 
@@ -166,7 +101,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          📋 Perfiles de Formulario
+          📋 Formularios Canónicos
         </button>
         <button
           type="button"
@@ -201,51 +136,36 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
       ) : activeSection === 'spreadsheets' ? (
         <AdminSpreadsheetSettingsCard csrfToken={csrfToken} />
       ) : (
-        <>
-          {/* Tabs for Offer Types */}
-          <div className="flex border-b border-gray-200 mb-8 overflow-x-auto" role="tablist" aria-label="Tipos de oferta">
-            {['diploma', 'maestria', 'especializacion', 'diplomado', 'seminar'].map((type) => {
-              const profileItem = profiles.find((p) => p.type === type);
-              const isSelected = selectedType === type;
-              const label = profileItem?.name ?? PROFILE_TYPE_LABELS[type] ?? type;
-
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  role="tab"
-                  aria-selected={isSelected}
-                  onClick={() => setSelectedType(type)}
-                  className={`py-3 px-6 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                    isSelected
-                      ? 'border-blue-600 text-blue-600 font-semibold'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Profile Detail and Editor */}
-          {loading ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">Cargando perfil...</p>
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-blue-900 mb-2">
+              Formularios Canónicos Activos (canonical-v1)
+            </h2>
+            <p className="text-sm text-blue-800 mb-4 leading-relaxed">
+              La plataforma utiliza una definición canónica unificada y declarativa en código TypeScript. Los perfiles dinámicos y editables han sido reemplazados para garantizar estabilidad, consistencia y trazabilidad. Los cambios de formulario se realizan mediante revisiones de código y despliegues controlados.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-blue-900 mt-4 pt-4 border-t border-blue-200">
+              <div>
+                <h3 className="font-semibold mb-1">Estructura unificada (5 pasos)</h3>
+                <ol className="list-decimal list-inside space-y-1 text-blue-800">
+                  <li>Datos personales y demográficos</li>
+                  <li>Residencia y contacto (incluye ciudad de residencia)</li>
+                  <li>Trayectoria académica</li>
+                  <li>Documentación requerida</li>
+                  <li>Convenios y declaraciones</li>
+                </ol>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-1">Documentación</h3>
+                <ul className="list-disc list-inside space-y-1 text-blue-800">
+                  <li>Base obligatoria: Cédula/documento, CV, Título y Carta de motivación.</li>
+                  <li>Maestrías: solicitan dos cartas de recomendación adicionales (obligatorias).</li>
+                  <li>Orientaciones, menciones y convenios se obtienen automáticamente desde WordPress.</li>
+                </ul>
+              </div>
             </div>
-          ) : selectedProfileDetail ? (
-            <ProfileVersionEditor
-              profile={selectedProfileDetail.profile}
-              activeVersion={selectedProfileDetail.activeVersion}
-              versions={selectedProfileDetail.versions}
-              csrfToken={csrfToken}
-              onRefresh={() => {
-                loadProfiles();
-                loadProfileDetail(selectedType, true);
-              }}
-            />
-          ) : null}
-        </>
+          </div>
+        </div>
       )}
     </div>
   );
