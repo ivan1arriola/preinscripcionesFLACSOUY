@@ -40,27 +40,27 @@
 - Produce `FLACSO_Edicion::registration_availability(int $edition_id, ?int $timestamp = null): array` con `status`, `from` y `until`.
 - Mantiene `FLACSO_Edicion::accepts_registration()` como fachada booleana que devuelve `status === 'open'`.
 
-- [ ] **Step 1: Escribir las pruebas de límite temporal y datos incompletos**
+- [x] **Step 1: Escribir las pruebas de límite temporal y datos incompletos**
 
   Cubrir una edición con `fecha_inicio` válida en los siguientes casos: antes del cierre, durante el décimo día, exactamente al inicio del día posterior y después del cierre. Cubrir también fecha ausente, estado cancelado y cierre administrativo explícito.
 
-- [ ] **Step 2: Ejecutar el test del plugin y verificar que falla**
+- [x] **Step 2: Ejecutar el test del plugin y verificar que falla**
 
   Run: `php tests/seminar-registration-availability-contract-test.php`
 
   Expected: FAIL porque todavía no existe el estado calculado ni el límite temporal verificable.
 
-- [ ] **Step 3: Implementar la función de disponibilidad**
+- [x] **Step 3: Implementar la función de disponibilidad**
 
   Usar `wp_timezone()` y `DateTimeImmutable` para calcular `until` de forma determinista. La fecha `from` será `null` mientras el modelo no tenga una fecha explícita de apertura; la ausencia de `fecha_inicio` será `closed` con `until: null`. La apertura administrativa no puede extender el cierre de diez días.
 
-- [ ] **Step 4: Ejecutar las pruebas del plugin**
+- [x] **Step 4: Ejecutar las pruebas del plugin**
 
   Run: `php tests/seminar-registration-availability-contract-test.php`
 
   Expected: PASS, incluyendo la frontera exacta del cierre.
 
-- [ ] **Step 5: Commit del cambio aislado**
+- [x] **Step 5: Commit del cambio aislado**
 
   En el checkout del plugin: `git add modules/seminarios/includes/class-edicion.php tests/seminar-registration-availability-contract-test.php && git commit -m "feat(seminars): formalize registration availability window"`
 
@@ -74,29 +74,29 @@
 - Consume `FLACSO_Edicion::registration_availability()` de Task 1.
 - Produce en cada destino de seminario `registrationAvailability`, `registrationWindow.from` y `registrationWindow.until`.
 
-- [ ] **Step 1: Escribir pruebas del serializer**
+- [x] **Step 1: Escribir pruebas del serializer**
 
   Preparar dos ediciones publicadas del mismo seminario con el mismo permalink. Verificar que una edición abierta queda como `open`, que una edición vencida queda como `closed`, que dos abiertas quedan como `conflict` y que ninguna respuesta depende del ID u orden de publicación. Verificar también que no se usa `fecha_limite_preinscripcion` para prolongar una edición más allá de los diez días.
 
-- [ ] **Step 2: Ejecutar el test y verificar que falla**
+- [x] **Step 2: Ejecutar el test y verificar que falla**
 
   Run: `php tests/seminar-permalink-serializer-test.php`
 
   Expected: FAIL porque el serializer actual solo expone `registrationOpen` y calcula `until` desde un meta legado.
 
-- [ ] **Step 3: Implementar el segundo pase del serializer**
+- [x] **Step 3: Implementar el segundo pase del serializer**
 
   Serializar primero todas las ediciones y agruparlas por `seminario_id` y permalink normalizado. Si hay exactamente una edición elegible, publicar `open` solo en ella; si no hay ninguna, publicar `closed`; si hay más de una, publicar `conflict` en todas las candidatas. Mantener cada destino y su ID para diagnóstico histórico.
 
   Antes de resolver la edición abierta, comparar todos los permalinks no vacíos del mismo `seminario_id`; si no coinciden después de normalizarlos, publicar `conflict` en todo el grupo.
 
-- [ ] **Step 4: Ejecutar pruebas contractuales y de REST**
+- [x] **Step 4: Ejecutar pruebas contractuales y de REST**
 
   Run: `php tests/seminar-permalink-serializer-test.php && php tests/preinscriptions-rest-contract-test.php`
 
   Expected: PASS, con el nuevo campo presente y sin regresiones para cohortes ni para el contrato v1 existente.
 
-- [ ] **Step 5: Commit y publicación del plugin**
+- [x] **Step 5: Commit y publicación del plugin**
 
   En el checkout del plugin, revisar exclusivamente el diff de esta tarea, crear un commit descriptivo y publicar `main` solo si el checkout no contiene cambios de otra tarea. Reportar el SHA del plugin separado del SHA de la app.
 
@@ -251,7 +251,7 @@
 
   Confirmar que no se incluyeron `.env`, secretos, credenciales, datos personales ni cambios de despliegue no solicitados. Confirmar que el plugin y la app tienen commits separados y que ambos usan el mismo nombre y semántica de `registrationAvailability`.
 
-- [ ] **Step 4: Publicar cada repositorio con su SHA**
+- [x] **Step 4: Publicar cada repositorio con su SHA**
 
   Publicar primero el plugin, verificar el endpoint REST actualizado, luego publicar la app. Informar por separado commit local, push, CI, deploy y verificación pública; un push exitoso no se considera despliegue verificado.
 
