@@ -6,6 +6,7 @@ import { isSupportedOfferType } from '../domain/form-profiles.js';
 import { validateSubmission } from '../domain/form-validation.js';
 import { normalizeIdentityValues } from '../domain/identity-validation.js';
 import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
+import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import type { SubmissionFileToken } from '@flacso/contracts';
 
 export interface SubmitPreinscriptionCommand {
@@ -16,7 +17,15 @@ export interface SubmitPreinscriptionCommand {
 }
 
 export type SubmitPreinscriptionResult =
-  | { ok: true; submissionId: string }
+  | {
+      ok: true;
+      submissionId: string;
+      spreadsheet: {
+        valuesByColumnName: Record<string, string>;
+        requiredColumns: string[];
+      };
+      driveTarget: ReturnType<typeof driveTargetDescriptor>;
+    }
   | {
       ok: false;
       code: 'NOT_FOUND' | 'CLOSED' | 'INCOMPATIBLE_FORM' | 'STALE_REVISION' | 'VALIDATION_ERROR';
@@ -142,5 +151,17 @@ export async function submitPreinscription(
   return {
     ok: true,
     submissionId: saved.id,
+    spreadsheet: {
+      valuesByColumnName: Object.fromEntries(
+        form.inputs.map((input) => [
+          input.spreadsheetColumn ?? input.label,
+          normalizedValues[input.key] ?? '',
+        ]),
+      ),
+      requiredColumns: form.inputs
+        .filter((input) => input.required)
+        .map((input) => input.spreadsheetColumn ?? input.label),
+    },
+    driveTarget: driveTargetDescriptor(target),
   };
 }

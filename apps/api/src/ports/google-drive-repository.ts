@@ -1,5 +1,8 @@
+import type { DriveTargetDescriptor } from '../domain/google-drive-naming.js';
+
 export interface DriveUploadFile {
   token: string;
+  fieldKey?: string;
   originalName: string;
   mimeType: string;
   data: Buffer;
@@ -8,6 +11,8 @@ export interface DriveUploadFile {
 export interface StoreSubmissionFilesCommand {
   submissionId: string;
   files: DriveUploadFile[];
+  target?: DriveTargetDescriptor;
+  values?: Record<string, string>;
 }
 
 export interface StoredDriveFile {

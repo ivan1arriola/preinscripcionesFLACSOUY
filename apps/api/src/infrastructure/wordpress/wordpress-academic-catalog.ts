@@ -88,6 +88,8 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
       wordpress: raw.wordpress,
       offer: raw.offer,
       seminar: raw.seminar,
+      cohort: raw.cohort,
+      edition: raw.edition,
       orientations: raw.orientations ?? [],
       mentions: raw.mentions ?? [],
       urls: {

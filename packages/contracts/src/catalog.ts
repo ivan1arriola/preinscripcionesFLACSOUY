@@ -76,6 +76,14 @@ export interface AcademicTarget {
   };
   offer?: WordPressTargetOffer;
   seminar?: WordPressTargetSeminar;
+  cohort?: {
+    number?: number | string;
+    name?: string;
+  };
+  edition?: {
+    number?: number | string;
+    name?: string;
+  };
   orientations: string[];
   mentions: string[];
   urls?: {

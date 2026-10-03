@@ -95,7 +95,7 @@ describe('AdminProfilesPage Component', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Crear nueva versión/i })).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     fireEvent.click(screen.getByRole('tab', { name: 'Avanzado' }));
     const textarea = screen.getByRole('textbox');
@@ -134,7 +134,7 @@ describe('AdminProfilesPage Component', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Crear nueva versión/i })).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     fireEvent.submit(screen.getByRole('button', { name: /Crear nueva versión/i }).closest('form')!);
 

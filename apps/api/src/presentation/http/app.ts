@@ -8,6 +8,7 @@ import { errorHandler } from './error-handler.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import { createUploadRoutes } from './upload-routes.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
+import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
 import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 
@@ -32,6 +33,9 @@ export interface AppDependencies {
   checkDatabase?: () => Promise<boolean>;
   temporaryFileStorage?: TemporaryFileStoragePort;
   googleDriveRepository?: GoogleDriveRepositoryPort;
+  spreadsheetRepository?: SpreadsheetRepository;
+  spreadsheetId?: string;
+  spreadsheetSheetName?: string;
   formProfileRepository?: FormProfileRepository;
   googleIdentityVerifier?: GoogleIdentityVerifierPort;
   adminSessionStore?: AdminSessionStore;
@@ -74,7 +78,14 @@ export function createApp(dependencies: AppDependencies): Express {
     profileRepo,
     dependencies.temporaryFileStorage && dependencies.googleDriveRepository
       ? { storage: dependencies.temporaryFileStorage, drive: dependencies.googleDriveRepository }
-      : undefined
+      : undefined,
+    dependencies.spreadsheetRepository && dependencies.spreadsheetId
+      ? {
+          repository: dependencies.spreadsheetRepository,
+          spreadsheetId: dependencies.spreadsheetId,
+          sheetName: dependencies.spreadsheetSheetName,
+        }
+      : undefined,
   );
 
   targetRoutes.use('/:id/submissions', submissionRoutes);

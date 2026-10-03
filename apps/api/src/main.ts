@@ -12,6 +12,8 @@ import { WordPressAcademicCatalog } from './infrastructure/wordpress/wordpress-a
 import { PostgresWordPressCache } from './infrastructure/wordpress/wordpress-cache.js';
 import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
 import { GoogleDriveRepository } from './infrastructure/google/google-drive-repository.js';
+import { GoogleSheetsRepository } from './infrastructure/google/google-sheets-repository.js';
+import { HttpGoogleSheetsClient } from './infrastructure/google/sheets-client.js';
 import { loadAllGoogleCredentials } from './infrastructure/google/google-credentials.js';
 import { GoogleIdentityVerifier } from './infrastructure/auth/google-oidc.js';
 
@@ -37,6 +39,10 @@ const temporaryFileStorage = new TemporaryFileStorage({
   allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
 });
 const googleCreds = loadAllGoogleCredentials();
+const googleSheetsId = process.env.GOOGLE_SHEETS_ID?.trim();
+if (process.env.NODE_ENV === 'production' && (!googleCreds.tokenProvider || !googleSheetsId)) {
+  throw new Error('Google Sheets no está configurado: se requiere la cuenta de servicio y GOOGLE_SHEETS_ID en producción.');
+}
 if (googleCreds.serviceAccountPath) {
   console.log(`[Google] Cuenta de servicio detectada: ${googleCreds.serviceAccountPath} (${googleCreds.clientEmail || 'sin email'})`);
 } else if (process.env.GOOGLE_ACCESS_TOKEN) {
@@ -67,6 +73,10 @@ const googleDriveRepository = !isMockDrive && googleCreds.tokenProvider
           driveFileId: `dev-drive-${i}`,
         })),
     }
+  : undefined;
+
+const googleSheetsRepository = googleCreds.tokenProvider && googleSheetsId
+  ? new GoogleSheetsRepository(new HttpGoogleSheetsClient({ accessTokenOrProvider: googleCreds.tokenProvider }))
   : undefined;
 
 const googleIdentityVerifier = googleCreds.oauthConfig.clientId
@@ -103,6 +113,9 @@ const app = createApp({
   repository,
   temporaryFileStorage,
   googleDriveRepository,
+  spreadsheetRepository: googleSheetsRepository,
+  spreadsheetId: googleSheetsId,
+  spreadsheetSheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1',
   formProfileRepository,
   googleIdentityVerifier,
   systemSettingsRepository,

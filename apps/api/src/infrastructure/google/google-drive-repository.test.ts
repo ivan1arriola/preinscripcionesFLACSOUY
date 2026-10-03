@@ -51,4 +51,42 @@ describe('GoogleDriveRepository', () => {
     expect(request?.url).toContain('drive/v3/files/folder-1');
     expect(request?.url).toContain('capabilities(canAddChildren)');
   });
+
+  it('creates the academic hierarchy and uses a semantic document name', async () => {
+    const requests: Request[] = [];
+    let folderNumber = 0;
+    const repository = new GoogleDriveRepository({
+      folderId: 'root-1',
+      accessTokenOrProvider: 'token',
+      fetchImpl: async (input, init) => {
+        const request = new Request(input, init);
+        requests.push(request);
+        if (request.url.includes('/files?q=')) {
+          return new Response(JSON.stringify({ files: [] }), { status: 200 });
+        }
+        if (request.method === 'POST' && request.url.includes('/drive/v3/files?fields=')) {
+          folderNumber += 1;
+          return new Response(JSON.stringify({ id: `folder-${folderNumber}` }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ id: 'drive-file-1', name: 'semantic.pdf' }), { status: 200 });
+      },
+    });
+
+    await repository.storeSubmissionFiles({
+      submissionId: 'sub-1',
+      target: {
+        targetId: 'offer-1', kind: 'academic_offer', offerName: 'Maestría en Educación', cohortName: 'Cohorte VII',
+      },
+      values: { apellido1: 'Pérez', nombre1: 'Ana' },
+      files: [{ token: 'tmp-token', fieldKey: 'cv', originalName: 'cv.pdf', mimeType: 'application/pdf', data: Buffer.from('pdf') }],
+    });
+
+    expect(requests.filter((request) => request.url.includes('/files?q=')).length).toBe(5);
+    const uploadRequest = requests.find((request) => request.url.includes('/upload/drive/v3/files'));
+    expect(uploadRequest).toBeDefined();
+    const uploadBody = await uploadRequest?.text();
+    expect(uploadBody).toContain('apellidos-perez__nombres-ana__cv__sub-1.pdf');
+    expect(uploadBody).toContain('flacsoTargetId');
+    expect(uploadBody).toContain('flacsoFieldKey');
+  });
 });

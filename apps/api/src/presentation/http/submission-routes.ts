@@ -6,6 +6,7 @@ import type { FormProfileRepository } from '../../ports/form-profile-repository.
 import { submitPreinscription } from '../../application/submit-preinscription.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
+import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
 
 const submissionSchema = z.object({
   configRevision: z.string({ required_error: 'La revisión de configuración es obligatoria.' }),
@@ -22,11 +23,18 @@ interface SubmissionFileDependencies {
   drive: GoogleDriveRepositoryPort;
 }
 
+interface SubmissionSpreadsheetDependencies {
+  repository: SpreadsheetRepository;
+  spreadsheetId: string;
+  sheetName?: string;
+}
+
 export function createSubmissionRoutes(
   catalog: AcademicCatalog,
   repository: SubmissionRepository,
   profileRepository: FormProfileRepository,
-  fileDependencies?: SubmissionFileDependencies
+  fileDependencies?: SubmissionFileDependencies,
+  spreadsheetDependencies?: SubmissionSpreadsheetDependencies,
 ): Router {
   const router = Router({ mergeParams: true });
 
@@ -103,6 +111,7 @@ export function createSubmissionRoutes(
       }
 
       const files = parsed.data.files ?? [];
+      let storedDriveFiles: Array<{ token: string }> = [];
       if (files.length > 0) {
         if (!fileDependencies) {
           res.status(503).json({ error: { code: 'FILE_PROCESSING_UNAVAILABLE', message: 'La carga de documentación no está disponible en este momento.' } });
@@ -117,15 +126,46 @@ export function createSubmissionRoutes(
           const driveFiles = [];
           for (const file of files) {
             const temporary = await fileDependencies.storage.open(file.token, sessionId);
-            driveFiles.push({ token: file.token, originalName: temporary.originalName, mimeType: temporary.mimeType, data: temporary.data });
+            driveFiles.push({ token: file.token, fieldKey: file.fieldKey, originalName: temporary.originalName, mimeType: temporary.mimeType, data: temporary.data });
           }
-          const stored = await fileDependencies.drive.storeSubmissionFiles({ submissionId: result.submissionId, files: driveFiles });
-          for (const file of stored) {
-            await fileDependencies.storage.remove(file.token, sessionId);
-          }
+          const stored = await fileDependencies.drive.storeSubmissionFiles({
+            submissionId: result.submissionId,
+            files: driveFiles,
+            target: result.driveTarget,
+            values: parsed.data.values,
+          });
+          storedDriveFiles = stored;
         } catch (error) {
           res.status(502).json({ error: { code: 'FILE_PROCESSING_ERROR', message: error instanceof Error ? error.message : 'No se pudo guardar la documentación.' } });
           return;
+        }
+      }
+
+      if (spreadsheetDependencies) {
+        try {
+          await spreadsheetDependencies.repository.appendByHeaders(
+            spreadsheetDependencies.spreadsheetId,
+            result.spreadsheet.valuesByColumnName,
+            result.spreadsheet.requiredColumns,
+            spreadsheetDependencies.sheetName,
+          );
+        } catch (error) {
+          res.status(502).json({ error: { code: 'SPREADSHEET_PROCESSING_ERROR', message: error instanceof Error ? error.message : 'No se pudo guardar la preinscripción.' } });
+          return;
+        }
+      }
+
+      if (files.length > 0) {
+        const sessionId = req.header('x-preinscription-session')?.trim();
+        if (sessionId && fileDependencies) {
+          try {
+            for (const file of storedDriveFiles) {
+              await fileDependencies.storage.remove(file.token, sessionId);
+            }
+          } catch (error) {
+            res.status(502).json({ error: { code: 'FILE_PROCESSING_ERROR', message: error instanceof Error ? error.message : 'No se pudo limpiar la documentación temporal.' } });
+            return;
+          }
         }
       }
 

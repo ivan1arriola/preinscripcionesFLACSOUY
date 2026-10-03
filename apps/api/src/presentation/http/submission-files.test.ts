@@ -5,6 +5,7 @@ import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../../ports/submission-repository.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
+import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 
 import { composeForm } from '../../domain/form-composition.js';
@@ -54,7 +55,7 @@ const values = {
   posgradoCual: '',
 };
 
-async function setup(drive: GoogleDriveRepositoryPort) {
+async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: SpreadsheetRepository) {
   const profileRepo = new MemoryFormProfileRepository({
     seminar: {
       steps: [{ id: 'general', title: 'General', order: 1 }],
@@ -114,7 +115,13 @@ async function setup(drive: GoogleDriveRepositoryPort) {
   };
   const app = express();
   app.use(express.json());
-  app.use('/submissions', createSubmissionRoutes(catalog, repository, profileRepo, { storage, drive }));
+  app.use('/submissions', createSubmissionRoutes(
+    catalog,
+    repository,
+    profileRepo,
+    { storage, drive },
+    spreadsheet ? { repository: spreadsheet, spreadsheetId: 'sheet-1', sheetName: 'Inscripciones' } : undefined,
+  ));
   return { app, storage, effectiveRevision };
 }
 
@@ -141,6 +148,72 @@ describe('Submission file orchestration', () => {
     let removed = false;
     const drive: GoogleDriveRepositoryPort = { storeSubmissionFiles: async () => { throw new Error('Drive caído'); } };
     const { app, storage, effectiveRevision } = await setup(drive);
+    storage.remove = async () => { removed = true; };
+    const server = app.listen(0);
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('server address missing');
+    try {
+      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
+        body: JSON.stringify({ configRevision: effectiveRevision, values, files: [{ token: 'tmp-1', fieldKey: 'cv', originalName: 'cv.pdf', size: 3, mimeType: 'application/pdf' }] }),
+      });
+      expect(response.status).toBe(502);
+      expect(removed).toBe(false);
+    } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
+  });
+
+  it('writes the submission to Sheets before removing temporary files', async () => {
+    const events: string[] = [];
+    let appendCommand: { spreadsheetId: string; valuesByColumnName: Record<string, string>; requiredColumns: string[]; sheetName?: string } | undefined;
+    const drive: GoogleDriveRepositoryPort = {
+      storeSubmissionFiles: async () => {
+        events.push('drive');
+        return [{ token: 'tmp-1', driveFileId: 'drive-1' }];
+      },
+    };
+    const spreadsheet: SpreadsheetRepository = {
+      readHeaders: async () => [],
+      appendByHeaders: async (...args) => {
+        events.push('sheets');
+        appendCommand = {
+          spreadsheetId: args[0],
+          valuesByColumnName: args[1],
+          requiredColumns: args[2],
+          sheetName: args[3],
+        };
+        return { spreadsheetId: args[0], updatedRange: 'Inscripciones!A2:Z2', updatedRows: 1 };
+      },
+      diagnose: async () => ({ spreadsheetId: 'sheet-1', accessible: true, sheetFound: true, headerDiagnostic: { valid: true, foundColumns: [], missingColumns: [], extraColumns: [] } }),
+    };
+    const { app, storage, effectiveRevision } = await setup(drive, spreadsheet);
+    storage.remove = async () => { events.push('remove'); };
+    const server = app.listen(0);
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('server address missing');
+    try {
+      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
+        body: JSON.stringify({ configRevision: effectiveRevision, values, files: [{ token: 'tmp-1', fieldKey: 'cv', originalName: 'cv.pdf', size: 3, mimeType: 'application/pdf' }] }),
+      });
+      expect(response.status).toBe(201);
+      expect(events).toEqual(['drive', 'sheets', 'remove']);
+      expect(appendCommand?.spreadsheetId).toBe('sheet-1');
+      expect(appendCommand?.sheetName).toBe('Inscripciones');
+      expect(appendCommand?.valuesByColumnName['Primer nombre']).toBe('Ana');
+      expect(appendCommand?.valuesByColumnName['Primer apellido']).toBe('Pérez');
+      expect(appendCommand?.requiredColumns).toContain('Primer nombre');
+    } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
+  });
+
+  it('keeps temporary files when Sheets fails after Drive succeeds', async () => {
+    let removed = false;
+    const drive: GoogleDriveRepositoryPort = { storeSubmissionFiles: async () => [{ token: 'tmp-1', driveFileId: 'drive-1' }] };
+    const spreadsheet: SpreadsheetRepository = {
+      readHeaders: async () => [],
+      appendByHeaders: async () => { throw new Error('Sheets caído'); },
+      diagnose: async () => ({ spreadsheetId: 'sheet-1', accessible: false, sheetFound: false, headerDiagnostic: { valid: false, foundColumns: [], missingColumns: [], extraColumns: [] } }),
+    };
+    const { app, storage, effectiveRevision } = await setup(drive, spreadsheet);
     storage.remove = async () => { removed = true; };
     const server = app.listen(0);
     const address = server.address();
