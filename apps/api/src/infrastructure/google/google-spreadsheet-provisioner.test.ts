@@ -46,4 +46,28 @@ describe('GoogleSpreadsheetProvisioner', () => {
       [['Correo electrónico', 'Primer nombre']],
     );
   });
+
+  it('explains when a service account cannot create files in My Drive', async () => {
+    const provisioner = new GoogleSpreadsheetProvisioner({
+      accessTokenOrProvider: 'token',
+      sheetsClient: {
+        getValues: async () => [],
+        appendValues: async () => ({ updatedRange: 'unused', updatedRows: 0 }),
+        updateValues: async () => undefined,
+      },
+      fetchImpl: async () => new Response(JSON.stringify({
+        error: {
+          message: "The user's Drive storage quota has been exceeded.",
+          errors: [{ reason: 'storageQuotaExceeded' }],
+        },
+      }), { status: 403 }),
+    });
+
+    await expect(provisioner.create({
+      folderId: 'folder-1',
+      title: 'Inscripciones',
+      sheetName: 'Datos',
+      headers: ['Nombre'],
+    })).rejects.toThrow('Unidad compartida');
+  });
 });

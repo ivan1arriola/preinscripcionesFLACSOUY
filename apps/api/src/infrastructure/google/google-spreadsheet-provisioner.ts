@@ -47,7 +47,11 @@ export class GoogleSpreadsheetProvisioner implements SpreadsheetProvisioner {
     );
 
     if (!response.ok) {
-      throw new Error(`Google Drive no permitió crear la planilla (HTTP ${response.status}).`);
+      const details = await readGoogleError(response);
+      if (details.reason === 'storageQuotaExceeded') {
+        throw new Error('Google Drive no puede crear la planilla porque las cuentas de servicio no tienen cuota de almacenamiento en Mi unidad. Configurá una carpeta dentro de una Unidad compartida o usá OAuth de una cuenta institucional.');
+      }
+      throw new Error(`Google Drive no permitió crear la planilla (HTTP ${response.status}${details.message ? `: ${details.message}` : ''}).`);
     }
     const payload = await response.json() as { id?: string };
     if (!payload.id) throw new Error('Google Drive no devolvió el identificador de la planilla.');
@@ -63,5 +67,17 @@ export class GoogleSpreadsheetProvisioner implements SpreadsheetProvisioner {
       sheetName: command.sheetName,
       url: `https://docs.google.com/spreadsheets/d/${payload.id}/edit`,
     };
+  }
+}
+
+async function readGoogleError(response: Response): Promise<{ reason?: string; message?: string }> {
+  try {
+    const payload = await response.json() as {
+      error?: { message?: string; errors?: Array<{ reason?: string; message?: string }> };
+    };
+    const detail = payload.error?.errors?.[0];
+    return { reason: detail?.reason, message: detail?.message ?? payload.error?.message };
+  } catch {
+    return {};
   }
 }
