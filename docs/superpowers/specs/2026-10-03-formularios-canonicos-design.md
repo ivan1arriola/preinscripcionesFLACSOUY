@@ -18,7 +18,7 @@ de propuesta: las maestrías solicitan dos cartas de recomendación.
 - Todos los tipos usan los mismos pasos, campos personales, de contacto,
   trayectoria, documentación y declaraciones.
 - La maestría agrega dos campos de documentación: primera y segunda carta de
-  recomendación. Ambos pueden enviarse después.
+  recomendación. Ambos son obligatorios al enviar.
 - Las orientaciones y menciones no son configuración de formulario. Se muestran
   únicamente cuando WordPress las entrega para la propuesta; la ausencia de
   opciones omite la pregunta.
@@ -47,10 +47,10 @@ posgrado FLACSO, título, escolaridad, institución, orientación, mención,
 convenio, fuente y autorización de difusión.
 
 Los documentos base serán documento de identidad, CV, título y carta de
-motivación. Identidad, CV y título son obligatorios; la carta de motivación
-puede declararse para envío posterior. Las maestrías suman dos cartas de
-recomendación, ambas diferibles. No habrá diferencias de documentos entre los
-otros tipos.
+motivación. Todos son obligatorios al enviar la preinscripción. Las maestrías
+suman dos cartas de recomendación, también obligatorias al enviar. No existe
+la opción de declarar un documento para envío posterior ni habrá diferencias de
+documentos entre los otros tipos.
 
 Las respuestas Sí/No se presentan como radios. Las reglas condicionales se
 validan tanto en navegador como en API: convenio exige una selección cuando la
