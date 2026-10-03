@@ -113,7 +113,7 @@ if [[ -L "\$CURRENT" || -d "\$CURRENT" ]]; then
     DB_USER="\$(grep '^POSTGRES_USER=' "\$ENV_FILE" | cut -d= -f2-)"
     DB_NAME="\$(grep '^POSTGRES_DB=' "\$ENV_FILE" | cut -d= -f2-)"
     test -n "\$DB_USER" && test -n "\$DB_NAME" || { echo "Faltan POSTGRES_USER o POSTGRES_DB en \$ENV_FILE" >&2; exit 1; }
-    docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T postgres pg_dump --username "\$DB_USER" --dbname "\$DB_NAME" --clean --if-exists --no-owner --no-privileges > "\$BACKUP_DIR/database.sql"
+    docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T postgres pg_dump --username "\$DB_USER" --dbname "\$DB_NAME" --clean --if-exists --no-owner --no-privileges < /dev/null > "\$BACKUP_DIR/database.sql"
   fi
 fi
 
@@ -125,7 +125,7 @@ docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" up -d --rem
 docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" ps
 
 for attempt in \$(seq 1 30); do
-  if docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T api wget -qO- http://localhost:3000/api/health | grep -q '"status":"ok"'; then
+  if docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T api wget -qO- http://localhost:3000/api/health < /dev/null | grep -q '"status":"ok"'; then
     break
   fi
   if [[ "\$attempt" == 30 ]]; then
