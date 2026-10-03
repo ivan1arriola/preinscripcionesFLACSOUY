@@ -5,7 +5,8 @@ import type { SheetsClient } from './sheets-client.js';
 describe('GoogleSpreadsheetProvisioner', () => {
   it('creates the spreadsheet inside the configured Drive folder and writes headers', async () => {
     const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'created-sheet-1' }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'created-sheet-1' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sheets: [{ properties: { title: 'Hoja 1' } }] }), { status: 200 }));
     const sheetsClient: SheetsClient = {
       getValues: vi.fn(),
       appendValues: vi.fn(),
@@ -26,7 +27,7 @@ describe('GoogleSpreadsheetProvisioner', () => {
 
     expect(result).toEqual({
       spreadsheetId: 'created-sheet-1',
-      sheetName: 'Sheet1',
+      sheetName: 'Hoja 1',
       url: 'https://docs.google.com/spreadsheets/d/created-sheet-1/edit',
     });
     expect(fetchImpl).toHaveBeenCalledWith(
@@ -42,7 +43,7 @@ describe('GoogleSpreadsheetProvisioner', () => {
     );
     expect(sheetsClient.updateValues).toHaveBeenCalledWith(
       'created-sheet-1',
-      'Sheet1!A1',
+      "'Hoja 1'!A1",
       [['Correo electrónico', 'Primer nombre']],
     );
   });

@@ -56,18 +56,41 @@ export class GoogleSpreadsheetProvisioner implements SpreadsheetProvisioner {
     const payload = await response.json() as { id?: string };
     if (!payload.id) throw new Error('Google Drive no devolvió el identificador de la planilla.');
 
+    const sheetName = await this.readInitialSheetName(payload.id);
     await this.options.sheetsClient.updateValues(
       payload.id,
-      `${command.sheetName}!A1`,
+      `${toSheetRange(sheetName)}!A1`,
       [command.headers],
     );
 
     return {
       spreadsheetId: payload.id,
-      sheetName: command.sheetName,
+      sheetName,
       url: `https://docs.google.com/spreadsheets/d/${payload.id}/edit`,
     };
   }
+
+  private async readInitialSheetName(spreadsheetId: string): Promise<string> {
+    const token = await this.tokenProvider();
+    const response = await this.fetchImpl(
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties.title`,
+      {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`Google Sheets no permitió consultar la hoja inicial (HTTP ${response.status}).`);
+    }
+    const payload = await response.json() as { sheets?: Array<{ properties?: { title?: string } }> };
+    const title = payload.sheets?.[0]?.properties?.title;
+    if (!title) throw new Error('Google Sheets no devolvió el nombre de la hoja inicial.');
+    return title;
+  }
+}
+
+function toSheetRange(sheetName: string): string {
+  return `'${sheetName.replace(/'/g, "''")}'`;
 }
 
 async function readGoogleError(response: Response): Promise<{ reason?: string; message?: string }> {
