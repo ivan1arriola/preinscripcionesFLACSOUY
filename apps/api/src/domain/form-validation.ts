@@ -24,8 +24,8 @@ export function validateSubmission(
   };
 
   // 1. Revision check: must match form.effectiveRevision or form.configRevision
-  const expectedRevision = form.effectiveRevision || form.configRevision;
-  if (submittedRevision !== undefined && submittedRevision !== expectedRevision) {
+  const expectedRevisions = new Set([form.effectiveRevision, form.configRevision].filter(Boolean));
+  if (submittedRevision !== undefined && !expectedRevisions.has(submittedRevision)) {
     addError('_form', 'El formulario ha sido actualizado. Por favor recargue la página.');
   }
 

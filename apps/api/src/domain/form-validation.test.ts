@@ -187,4 +187,30 @@ describe('validateSubmission', () => {
     expect(result.fieldErrors.documento).toContain('La cédula o su dígito verificador no son válidos.');
     expect(result.fieldErrors.celular).toContain('Ingresá un número de teléfono válido con su código de país.');
   });
+
+  it('validates required ciudadResidencia', () => {
+    const formWithCiudad: FormDefinition = {
+      ...form,
+      inputs: [
+        ...form.inputs,
+        { key: 'ciudadResidencia', label: 'Ciudad de residencia', type: 'text', required: true, position: 24 },
+      ],
+    };
+    const invalidValues = { ...validValues, ciudadResidencia: '' };
+    const result = validateSubmission(formWithCiudad, invalidValues);
+    expect(result.valid).toBe(false);
+    expect(result.fieldErrors.ciudadResidencia).toBeDefined();
+    expect(result.fieldErrors.ciudadResidencia![0]).toMatch(/obligatorio/i);
+  });
+
+  it('accepts both effectiveRevision and raw configRevision', () => {
+    const resultEffective = validateSubmission(form, validValues, form.effectiveRevision);
+    expect(resultEffective.fieldErrors._form).toBeUndefined();
+
+    const resultRaw = validateSubmission(form, validValues, form.configRevision);
+    expect(resultRaw.fieldErrors._form).toBeUndefined();
+
+    const resultMismatch = validateSubmission(form, validValues, 'stale-rev');
+    expect(resultMismatch.fieldErrors._form).toBeDefined();
+  });
 });

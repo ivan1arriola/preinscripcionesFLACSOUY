@@ -14,7 +14,8 @@ export const UNIVERSAL_INPUTS: InputDefinition[] = [
   ['generoOtra', 'Especifique su identidad de género', 'text', false, 'Especificación de identidad de género'],
   ['etnia', 'Raza / etnia', 'text', true, 'Raza / etnia'],
   ['celular', 'Celular', 'tel', true, 'Celular'],
-  ['domicilio', 'Domicilio (incluyendo país)', 'text', true, 'Domicilio'],
+  ['ciudadResidencia', 'Ciudad de residencia', 'text', true, 'Ciudad de residencia'],
+  ['domicilio', 'Domicilio (incluyendo país)', 'text', false, 'Domicilio'],
   ['ocupacion', 'Ocupación actual', 'text', true, 'Ocupación actual'],
   ['paisNacimiento', 'País de nacimiento', 'text', true, 'País de nacimiento'],
   ['paisResidencia', 'País de residencia', 'text', true, 'País de residencia'],
@@ -60,29 +61,35 @@ export const SUPPORTED_SPECIFIC_INPUTS: Record<string, Omit<InputDefinition, 'po
 export const DOCUMENT_DEFINITIONS: Record<string, DocumentDefinition> = {
   identidad: {
     key: 'identidad', label: 'Documento de identidad', required: true,
+    canDefer: false,
     maxFiles: 2, maxBytes: 10 * 1024 * 1024,
     acceptedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
   },
   cv: {
     key: 'cv', label: 'Curriculum Vitae', required: true,
+    canDefer: false,
     maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'],
   },
   titulo: {
     key: 'titulo', label: 'Título', required: true,
+    canDefer: false,
     maxFiles: 1, maxBytes: 10 * 1024 * 1024,
     acceptedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
   },
   cartaMotivacion: {
     key: 'cartaMotivacion', label: 'Carta de motivación', required: true,
-    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'], canDefer: true,
+    canDefer: false,
+    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'],
   },
   cartaRecomendacion1: {
-    key: 'cartaRecomendacion1', label: 'Primera carta de recomendación', required: false,
-    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'], canDefer: true,
+    key: 'cartaRecomendacion1', label: 'Primera carta de recomendación', required: true,
+    canDefer: false,
+    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'],
   },
   cartaRecomendacion2: {
-    key: 'cartaRecomendacion2', label: 'Segunda carta de recomendación', required: false,
-    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'], canDefer: true,
+    key: 'cartaRecomendacion2', label: 'Segunda carta de recomendación', required: true,
+    canDefer: false,
+    maxFiles: 1, maxBytes: 10 * 1024 * 1024, acceptedMimeTypes: ['application/pdf'],
   },
 };
 
