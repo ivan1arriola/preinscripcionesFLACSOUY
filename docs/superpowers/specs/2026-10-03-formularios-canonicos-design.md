@@ -41,10 +41,11 @@ El formulario tendrá cinco pasos para todos los tipos:
 5. Convenios y declaraciones.
 
 Los campos fijos serán los ya usados por la aplicación: nombres, apellidos,
-fecha de nacimiento, documento, identidad de género, raza/etnia, países de
-nacimiento y residencia, domicilio, celular, correo, ocupación, estudios,
-posgrado FLACSO, título, escolaridad, institución, orientación, mención,
-convenio, fuente y autorización de difusión.
+fecha de nacimiento, documento, identidad de género, raza/etnia, país de
+nacimiento, país de residencia, ciudad de residencia, celular, correo,
+ocupación, estudios, posgrado FLACSO, título, escolaridad, institución,
+orientación, mención, convenio, fuente y autorización de difusión. No se pedirá
+domicilio completo.
 
 Los documentos base serán documento de identidad, CV, título y carta de
 motivación. Todos son obligatorios al enviar la preinscripción. Las maestrías
@@ -120,6 +121,7 @@ histórica.
 
 - Cada tipo muestra el mismo formulario base y los mismos documentos base.
 - Solo las maestrías muestran dos cartas de recomendación.
+- Residencia solicita país y ciudad, sin campo de domicilio completo.
 - Las opciones de orientación y mención dependen exclusivamente del catálogo
   WordPress, no de un perfil editable.
 - Convenio y posgrado aplican sus reglas condicionales con radios Sí/No.
