@@ -18,6 +18,10 @@ Copiar en el servidor:
 - `google-service-account.json` a `/opt/flacso/preinscripcionesFLACSOUY/.secrets/google-service-account.json`.
 - `google-oauth-web-client.json` a `/opt/flacso/preinscripcionesFLACSOUY/.secrets/google-oauth-web-client.json`.
 
+En producción también son obligatorios `GOOGLE_SHEETS_ID` y
+`GOOGLE_SHEETS_SHEET_NAME` en `.env.production`. La cuenta de servicio debe
+tener acceso de edición al Spreadsheet y a la carpeta raíz de Drive.
+
 Los secretos deben tener permisos restrictivos y nunca se deben copiar al repositorio. La cuenta de servicio debe tener acceso a la carpeta de Drive y al Spreadsheet institucional. La carpeta raíz de Drive se configura luego desde `/admin/perfiles`; no se agrega al `.env.production`.
 
 ## Validación sin tocar el servidor

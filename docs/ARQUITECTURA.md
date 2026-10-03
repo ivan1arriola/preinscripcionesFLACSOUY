@@ -82,6 +82,15 @@ Se permite:
 
 No se debe depender de referencias del tipo "columna C" o "columna 7".
 
+Al confirmar una preinscripción, la aplicación compone la fila a partir de los
+encabezados del Spreadsheet configurado y la agrega sin reordenar ni sobrescribir
+columnas manuales. La respuesta exitosa solo se emite después de completar esta
+operación.
+
+Los documentos siguen el flujo `almacenamiento temporal → Google Drive → Google
+Sheets → limpieza temporal`. Si Drive o Sheets falla, los archivos temporales se
+conservan para diagnóstico y no se confirma la preinscripción como completada.
+
 ---
 
 # 3. Arquitectura general
@@ -134,6 +143,23 @@ No se debe depender de referencias del tipo "columna C" o "columna 7".
 │ apertura/cierre      │  │ Drive               │
 └──────────────────────┘  └─────────────────────┘
 ```
+
+## 3.1. Jerarquía de Google Drive
+
+La raíz de Drive se configura desde el panel administrativo. Para cada destino,
+la aplicación crea o reutiliza:
+
+```text
+Ofertas académicas/<oferta>/<cohorte>/Preinscripciones/
+                                               Documentación/
+
+Seminarios/<seminario>/<edición>/Preinscripciones/
+                                      Documentación/
+```
+
+Los archivos nuevos se cargan en `Documentación` con nombres semánticos que
+incluyen apellidos, nombres, tipo documental e identificador de solicitud.
+Segundo apellido y segundo nombre se omiten cuando están vacíos.
 
 ---
 
