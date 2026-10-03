@@ -1,9 +1,6 @@
 import { Router } from 'express';
 import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
-import {
-  isSupportedOfferType,
-  validateProfileDefinition,
-} from '../../domain/form-profiles.js';
+import { isSupportedOfferType } from '../../domain/form-profiles.js';
 import {
   createRequireAdminSession,
   type AdminSessionStore,

@@ -25,19 +25,15 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   const [files, setFiles] = useState<SubmissionFileToken[]>([]);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
 
-  // Ensure steps include confirmation as the final step
-  const rawSteps: FormStepDefinition[] = form.steps && form.steps.length > 0
+  const steps: FormStepDefinition[] = form.steps && form.steps.length > 0
     ? [...form.steps].sort((a, b) => a.order - b.order)
     : [
-        { id: 'personal', title: 'Datos personales', order: 1 },
-        { id: 'contacto', title: 'Contacto', order: 2 },
-        { id: 'academico', title: 'Formación académica', order: 3 },
-        { id: 'documentos', title: 'Documentación', order: 4 },
+        { id: 'personal', title: 'Datos personales y demográficos', order: 1 },
+        { id: 'contacto', title: 'Residencia y contacto', order: 2 },
+        { id: 'academico', title: 'Trayectoria académica', order: 3 },
+        { id: 'documentos', title: 'Documentación requerida', order: 4 },
+        { id: 'declaracion', title: 'Convenios y declaraciones', order: 5 },
       ];
-
-  const steps: FormStepDefinition[] = rawSteps.some((s) => s.id === 'confirmacion')
-    ? rawSteps
-    : [...rawSteps, { id: 'confirmacion', title: 'Confirmación', order: 99 }];
 
   const currentStep = steps[currentStepIndex] || steps[0]!;
 
@@ -84,7 +80,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
         }
       }
       if (currentStep.id === 'contacto') {
-        return ['paisResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
+        return ['paisResidencia', 'ciudadResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
       }
       if (currentStep.id === 'academico') {
         return ['estudios', 'posgradoFlacso', 'posgradoCual', 'titulo', 'escolaridad', 'institucion', 'orientacion', 'mencion'].includes(i.key);
@@ -92,7 +88,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       if (currentStep.id === 'declaracion') {
         return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
       }
-      // If it's a 1-step profile (plus confirm), include any unassigned regular inputs in step 0
+      // If it's a 1-step profile, include any unassigned regular inputs in step 0
       return currentStepIndex === 0;
     });
 
@@ -103,11 +99,39 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       }
     }
 
-    // Required orientations check if in academic step
-    const hasOrientations = (form.orientations ?? []).length > 0;
-    if (currentStep.id === 'academico' && hasOrientations) {
-      if (!(values.orientacion || '').trim()) {
-        errors.orientacion = 'Debes seleccionar una orientación.';
+    // Conditional validations by step
+    if (currentStep.id === 'personal') {
+      if (values.genero === 'Otra' && !(values.generoOtra || '').trim()) {
+        errors.generoOtra = 'Debe especificar su identidad de género.';
+      }
+      if (values.tipoDocumento && values.tipoDocumento !== 'cedula_uruguaya' && !(values.paisEmisorDocumento || '').trim()) {
+        errors.paisEmisorDocumento = 'Debe especificar el país emisor del documento.';
+      }
+    }
+
+    if (currentStep.id === 'academico') {
+      if (values.posgradoFlacso === 'Si' && !(values.posgradoCual || '').trim()) {
+        errors.posgradoCual = 'Debe especificar qué posgrado cursó en FLACSO.';
+      }
+      const hasOrientations = (form.orientations ?? []).length > 0;
+      const orientacionVal = values.orientacion?.trim();
+      if (hasOrientations) {
+        if (!orientacionVal) {
+          errors.orientacion = 'Debes seleccionar una orientación.';
+        } else if (!(form.orientations ?? []).includes(orientacionVal)) {
+          errors.orientacion = 'La orientación seleccionada no es válida.';
+        }
+      }
+      const hasMentions = (form.mentions ?? []).length > 0;
+      const mencionVal = values.mencion?.trim();
+      if (hasMentions && mencionVal && !(form.mentions ?? []).includes(mencionVal)) {
+        errors.mencion = 'La mención seleccionada no es válida.';
+      }
+    }
+
+    if (currentStep.id === 'declaracion') {
+      if (values.tieneConvenio === 'Si' && !(values.convenioWordpressId || '').trim()) {
+        errors.convenioWordpressId = 'Debe seleccionar el convenio correspondiente.';
       }
     }
 
@@ -158,6 +182,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateCurrentStep()) return;
     if (!form.registrationOpen) return;
     await onSubmit(values, files);
   };
@@ -176,7 +201,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       }
     }
     if (currentStep.id === 'contacto') {
-      return ['paisResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
+      return ['paisResidencia', 'ciudadResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
     }
     if (currentStep.id === 'academico') {
       return ['estudios', 'posgradoFlacso', 'posgradoCual', 'titulo', 'escolaridad', 'institucion', 'orientacion', 'mencion'].includes(i.key);

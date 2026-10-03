@@ -4,7 +4,6 @@ import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
-import { getDefaultProfileDefinition } from '../../domain/form-profiles.js';
 import { getTargetForm } from '../../application/get-target-form.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
@@ -62,7 +61,7 @@ describe('Submission HTTP Routes', () => {
     if (!formResult.ok) throw new Error(formResult.message);
     validPayload.configRevision = formResult.form.effectiveRevision;
     const storage: TemporaryFileStoragePort = {
-      save: async () => ({ token: 'unused', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+      save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
       open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
       remove: async () => undefined,
       cleanup: async () => 0,

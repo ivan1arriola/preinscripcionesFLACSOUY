@@ -1,91 +1,79 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PreinscriptionWizard } from './PreinscriptionWizard.js';
-import type { FormDefinition } from '@flacso/contracts';
+import { getCanonicalFormDefinition } from '@flacso/contracts';
+import type { AcademicTarget, AgreementOption, FormDefinition } from '@flacso/contracts';
 
-describe('PreinscriptionWizard Component', () => {
-  const academicOfferForm: FormDefinition = {
-    targetId: 'davia-c11',
-    title: 'DAVIA Cohorte 11',
-    kind: 'academic_offer',
+const createForm = (
+  target: Partial<AcademicTarget> & { id: string; kind: 'academic_offer' | 'seminar'; title: string },
+  agreements: AgreementOption[] = []
+): FormDefinition => {
+  const fullTarget: AcademicTarget = {
     offerType: 'diploma',
     registrationOpen: true,
-    configRevision: 'davia-rev',
-    effectiveRevision: 'sha256:davia-effective-rev',
-    profileVersionId: 'ver_diploma_v1',
-    steps: [
-      { id: 'personal', title: 'Datos personales', order: 1 },
-      { id: 'contacto', title: 'Contacto', order: 2 },
-      { id: 'academico', title: 'Formación académica', order: 3 },
-      { id: 'documentos', title: 'Documentación', order: 4 },
-      { id: 'confirmacion', title: 'Confirmación y envío', order: 5 },
-    ],
-    inputs: [
-      { key: 'nombre1', label: 'Primer nombre', type: 'text', required: true, position: 1, stepId: 'personal' },
-      { key: 'apellido1', label: 'Primer apellido', type: 'text', required: true, position: 2, stepId: 'personal' },
-      { key: 'email', label: 'Correo electrónico', type: 'email', required: true, position: 3, stepId: 'contacto' },
-      { key: 'celular', label: 'Celular', type: 'tel', required: true, position: 4, stepId: 'contacto' },
-      { key: 'titulo', label: 'Título obtenido', type: 'text', required: true, position: 5, stepId: 'academico' },
-      { key: 'orientacion', label: 'Orientación', type: 'select', required: true, position: 6, stepId: 'academico' },
-      { key: 'mencion', label: 'Mención', type: 'select', required: false, position: 7, stepId: 'academico' },
-    ],
-    documents: [
-      {
-        key: 'cv',
-        stepId: 'documentos',
-        label: 'Curriculum Vitae',
-        required: true,
-        canDefer: false,
-        maxFiles: 1,
-        maxBytes: 10 * 1024 * 1024,
-      },
-    ],
-    orientations: ['Educación', 'Políticas Públicas'],
-    mentions: ['Tecnología Educativa'],
+    configRevision: 'rev-1',
+    orientations: [],
+    mentions: [],
+    ...target,
   };
+  const result = getCanonicalFormDefinition(fullTarget, agreements);
+  if (!result.ok) throw new Error(result.error.message);
+  return result.value;
+};
 
-  const seminarForm: FormDefinition = {
-    targetId: 'sem-ia',
+describe('PreinscriptionWizard Component', () => {
+  const diplomaForm = createForm(
+    {
+      id: 'davia-c11',
+      title: 'DAVIA Cohorte 11',
+      kind: 'academic_offer',
+      offerType: 'diploma',
+      registrationOpen: true,
+      configRevision: 'davia-rev',
+      orientations: ['Educación', 'Políticas Públicas'],
+      mentions: ['Tecnología Educativa'],
+    },
+    [{ id: 'conv-1', label: 'Convenio Colegio' }]
+  );
+
+  const seminarForm = createForm({
+    id: 'sem-ia',
     title: 'Seminario IA',
     kind: 'seminar',
     offerType: 'seminar',
     registrationOpen: true,
     configRevision: 'sem-rev',
-    effectiveRevision: 'sha256:sem-effective-rev',
-    profileVersionId: 'ver_seminar_v1',
-    steps: [
-      { id: 'personal', title: 'Datos personales', order: 1 },
-      { id: 'contacto', title: 'Contacto', order: 2 },
-      { id: 'academico', title: 'Formación previa', order: 3 },
-      { id: 'confirmacion', title: 'Confirmación y envío', order: 4 },
-    ],
-    inputs: [
-      { key: 'nombre1', label: 'Primer nombre', type: 'text', required: true, position: 1, stepId: 'personal' },
-      { key: 'apellido1', label: 'Primer apellido', type: 'text', required: true, position: 2, stepId: 'personal' },
-      { key: 'email', label: 'Correo electrónico', type: 'email', required: true, position: 3, stepId: 'contacto' },
-    ],
-    documents: [],
     orientations: [],
     mentions: [],
-  };
+  });
 
-  it('renders progress bar with 5 steps for academic offer and starts at step 1', () => {
-    render(<PreinscriptionWizard form={academicOfferForm} onSubmit={vi.fn()} />);
+  const maestriaForm = createForm({
+    id: 'mae-soc',
+    title: 'Maestría en Ciencias Sociales',
+    kind: 'academic_offer',
+    offerType: 'maestria',
+    registrationOpen: true,
+    configRevision: 'mae-rev',
+    orientations: [],
+    mentions: [],
+  });
 
-    expect(screen.getAllByText('Datos personales')).toHaveLength(2);
-    expect(screen.getByText('Contacto')).toBeInTheDocument();
-    expect(screen.getByText('Formación académica')).toBeInTheDocument();
-    expect(screen.getByText('Documentación')).toBeInTheDocument();
-    expect(screen.getByText('Confirmación y envío')).toBeInTheDocument();
+  it('renders progress bar with 5 canonical steps and starts at step 1', () => {
+    render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} />);
+
+    expect(screen.getAllByText('Datos personales y demográficos')).toHaveLength(2);
+    expect(screen.getByText('Residencia y contacto')).toBeInTheDocument();
+    expect(screen.getByText('Trayectoria académica')).toBeInTheDocument();
+    expect(screen.getByText('Documentación requerida')).toBeInTheDocument();
+    expect(screen.getByText('Convenios y declaraciones')).toBeInTheDocument();
 
     expect(screen.getByLabelText(/Primer nombre/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Primer apellido/i)).toBeInTheDocument();
-    // Subsequent steps are not in DOM yet
-    expect(screen.queryByLabelText(/Título obtenido/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Título/)).not.toBeInTheDocument();
   });
 
   it('blocks advance when current step required fields are missing', async () => {
-    render(<PreinscriptionWizard form={academicOfferForm} onSubmit={vi.fn()} />);
+    render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} />);
 
     // Click "Siguiente →" without filling fields
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
@@ -95,19 +83,21 @@ describe('PreinscriptionWizard Component', () => {
     expect(screen.getByLabelText(/Primer nombre/i)).toBeInTheDocument();
   });
 
-  it('advances through steps, allows navigation back to visited steps, and submits on final confirmation', async () => {
+  it('advances through all 5 steps and submits on final declaration step', async () => {
     const handleSubmit = vi.fn().mockResolvedValue(undefined);
-    const mockUpload = vi.fn().mockResolvedValue({
-      token: 'token-cv-1',
-      fieldKey: 'cv',
-      originalName: 'cv.pdf',
-      size: 1024,
-      mimeType: 'application/pdf',
-    });
+    const mockUpload = vi.fn().mockImplementation((fieldKey: string) =>
+      Promise.resolve({
+        token: `token-${fieldKey}`,
+        fieldKey,
+        originalName: `${fieldKey}.pdf`,
+        size: 1024,
+        mimeType: 'application/pdf',
+      })
+    );
 
     render(
       <PreinscriptionWizard
-        form={academicOfferForm}
+        form={diplomaForm}
         onSubmit={handleSubmit}
         onUpload={mockUpload}
       />
@@ -116,89 +106,265 @@ describe('PreinscriptionWizard Component', () => {
     // Step 1: Personal
     fireEvent.change(screen.getByLabelText(/Primer nombre/i), { target: { value: 'Lucía' } });
     fireEvent.change(screen.getByLabelText(/Primer apellido/i), { target: { value: 'Méndez' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de nacimiento/i), { target: { value: '1990-05-15' } });
+    fireEvent.change(screen.getByLabelText(/Tipo de documento/i), { target: { value: 'cedula_uruguaya' } });
+    fireEvent.change(screen.getByLabelText(/Cédula de identidad uruguaya/i), { target: { value: '34567894' } });
+    fireEvent.change(screen.getByLabelText(/Identidad de género/i), { target: { value: 'Mujer' } });
+    fireEvent.change(screen.getByLabelText(/Raza \/ etnia/i), { target: { value: 'Blanca' } });
+    fireEvent.change(screen.getByLabelText(/País de nacimiento/i), { target: { value: 'Uruguay' } });
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 2: Contacto
-    expect(screen.getByLabelText(/Correo electrónico/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/País de residencia/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/País de residencia/i), { target: { value: 'Uruguay' } });
+    fireEvent.change(screen.getByLabelText(/Ciudad de residencia/i), { target: { value: 'Montevideo' } });
+    fireEvent.change(screen.getByLabelText(/^Celular/), { target: { value: '099 123 456' } });
     fireEvent.change(screen.getByLabelText(/Correo electrónico/i), { target: { value: 'lucia@example.com' } });
-    fireEvent.change(screen.getByLabelText(/Celular/i), { target: { value: '+59899123456' } });
+    fireEvent.change(screen.getByLabelText(/Ocupación actual/i), { target: { value: 'Docente' } });
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 3: Académico
-    expect(screen.getByLabelText(/Título obtenido/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Orientación/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Mención/i)).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText(/Título obtenido/i), { target: { value: 'Licenciada' } });
+    expect(screen.getByLabelText(/Estudios cursados/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Estudios cursados/i), { target: { value: 'Universitario' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'No' })); // posgradoFlacso
+    fireEvent.change(screen.getByLabelText(/^Título/), { target: { value: 'Licenciada' } });
+    fireEvent.change(screen.getByLabelText(/Escolaridad/i), { target: { value: '10' } });
     fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
-    fireEvent.change(screen.getByLabelText(/Mención/i), { target: { value: 'Tecnología Educativa' } });
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 4: Documentos
+    expect(screen.getByLabelText(/Documento de identidad/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Curriculum Vitae/i)).toBeInTheDocument();
-    // Simulate uploading a file
-    const file = new File(['dummy content'], 'cv.pdf', { type: 'application/pdf' });
-    const fileInput = screen.getByLabelText(/Curriculum Vitae/i);
-    fireEvent.change(fileInput, { target: { files: [file] } });
+    expect(screen.getByLabelText(/^Título/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Carta de motivación/i)).toBeInTheDocument();
+
+    const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText(/Documento de identidad/i), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/Curriculum Vitae/i), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/^Título/), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/Carta de motivación/i), { target: { files: [dummyFile] } });
 
     await waitFor(() => {
+      expect(screen.getByText('identidad.pdf')).toBeInTheDocument();
       expect(screen.getByText('cv.pdf')).toBeInTheDocument();
+      expect(screen.getByText('titulo.pdf')).toBeInTheDocument();
+      expect(screen.getByText('cartaMotivacion.pdf')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-    // Step 5: Confirmación y envío
-    expect(screen.getByText('Resumen de tus datos')).toBeInTheDocument();
-    expect(screen.getByText('Lucía')).toBeInTheDocument();
-    expect(screen.getByText('Méndez')).toBeInTheDocument();
-    expect(screen.getByText('lucia@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Licenciada')).toBeInTheDocument();
-    expect(screen.getByText('Educación')).toBeInTheDocument();
-    expect(screen.getByText('Tecnología Educativa')).toBeInTheDocument();
+    // Step 5: Convenios y declaraciones
+    expect(screen.getByRole('heading', { name: 'Convenios y declaraciones' })).toBeInTheDocument();
+    const noRadios = screen.getAllByRole('radio', { name: 'No' });
+    // tieneConvenio = No
+    fireEvent.click(noRadios[0]!);
+    // fuente
+    fireEvent.change(screen.getByLabelText(/¿Cómo conociste esta propuesta\?/i), { target: { value: 'Web' } });
+    // aceptaDifusion = Sí
+    const yesRadios = screen.getAllByRole('radio', { name: 'Sí' });
+    fireEvent.click(yesRadios[1]!);
 
-    // Verify navigating back via progress button to step 1
-    const step1Btn = screen.getByRole('button', { name: /Datos personales/i });
+    // Verify navigating back to step 1 and then back to step 5 via progress buttons
+    const step1Btn = screen.getByRole('button', { name: /Datos personales y demográficos/i });
     fireEvent.click(step1Btn);
     expect(screen.getByLabelText(/Primer nombre/i)).toHaveValue('Lucía');
 
-    // Return to confirmation via progress button
-    const step5Btn = screen.getByRole('button', { name: /Confirmación y envío/i });
+    const step5Btn = screen.getByRole('button', { name: /Convenios y declaraciones/i });
     fireEvent.click(step5Btn);
 
-    // Final submit
+    // Final submit button on step 5
     const submitBtn = screen.getByRole('button', { name: /Confirmar y Enviar/i });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
       expect(handleSubmit).toHaveBeenCalledTimes(1);
-      const [submittedValues, submittedFiles] = handleSubmit.mock.calls[0] as [Record<string, unknown>, File[]];
+      const [submittedValues, submittedFiles] = handleSubmit.mock.calls[0] as [Record<string, unknown>, unknown[]];
       expect(submittedValues.nombre1).toBe('Lucía');
       expect(submittedValues.orientacion).toBe('Educación');
-      expect(submittedFiles).toHaveLength(1);
+      expect(submittedValues.ciudadResidencia).toBe('Montevideo');
+      expect(submittedFiles).toHaveLength(4);
     });
-  }, 10000);
+  }, 15000);
 
-  it('renders 4 steps for seminars and does not show orientation or mention fields', () => {
+  it('omits orientation and mention selectors when target has none (seminar)', () => {
     render(<PreinscriptionWizard form={seminarForm} onSubmit={vi.fn()} />);
 
-    // Check steps: exactly 4 steps
-    expect(screen.getAllByText('Datos personales')).toHaveLength(2);
-    expect(screen.getByText('Contacto')).toBeInTheDocument();
-    expect(screen.getByText('Formación previa')).toBeInTheDocument();
-    expect(screen.getByText('Confirmación y envío')).toBeInTheDocument();
-    expect(screen.queryByText('Documentación')).not.toBeInTheDocument();
+    // Check steps: exactly 5 canonical steps
+    expect(screen.getAllByText('Datos personales y demográficos')).toHaveLength(2);
+    expect(screen.getByText('Residencia y contacto')).toBeInTheDocument();
+    expect(screen.getByText('Trayectoria académica')).toBeInTheDocument();
+    expect(screen.getByText('Documentación requerida')).toBeInTheDocument();
+    expect(screen.getByText('Convenios y declaraciones')).toBeInTheDocument();
 
     // Fill step 1
     fireEvent.change(screen.getByLabelText(/Primer nombre/i), { target: { value: 'Carlos' } });
     fireEvent.change(screen.getByLabelText(/Primer apellido/i), { target: { value: 'Silva' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de nacimiento/i), { target: { value: '1985-02-10' } });
+    fireEvent.change(screen.getByLabelText(/Tipo de documento/i), { target: { value: 'cedula_uruguaya' } });
+    fireEvent.change(screen.getByLabelText(/Cédula de identidad uruguaya/i), { target: { value: '34567894' } });
+    fireEvent.change(screen.getByLabelText(/Identidad de género/i), { target: { value: 'Varon' } });
+    fireEvent.change(screen.getByLabelText(/Raza \/ etnia/i), { target: { value: 'Blanca' } });
+    fireEvent.change(screen.getByLabelText(/País de nacimiento/i), { target: { value: 'Uruguay' } });
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Fill step 2
+    fireEvent.change(screen.getByLabelText(/País de residencia/i), { target: { value: 'Uruguay' } });
+    fireEvent.change(screen.getByLabelText(/Ciudad de residencia/i), { target: { value: 'Maldonado' } });
+    fireEvent.change(screen.getByLabelText(/^Celular/), { target: { value: '099 123 456' } });
     fireEvent.change(screen.getByLabelText(/Correo electrónico/i), { target: { value: 'carlos@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Ocupación actual/i), { target: { value: 'Investigador' } });
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-    // Step 3 (Formación previa): verify no orientation/mención fields
+    // Step 3 (Trayectoria académica): verify no orientation or mention fields
+    expect(screen.getByRole('heading', { name: 'Trayectoria académica' })).toBeInTheDocument();
     expect(screen.queryByLabelText(/Orientación/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Mención/i)).not.toBeInTheDocument();
+  });
+
+  it('requires two recommendation letters on maestria step 4', async () => {
+    const mockUpload = vi.fn().mockImplementation((fieldKey: string) =>
+      Promise.resolve({
+        token: `token-${fieldKey}`,
+        fieldKey,
+        originalName: `${fieldKey}.pdf`,
+        size: 1024,
+        mimeType: 'application/pdf',
+      })
+    );
+
+    render(
+      <PreinscriptionWizard
+        form={maestriaForm}
+        onSubmit={vi.fn()}
+        onUpload={mockUpload}
+      />
+    );
+
+    // Step 1: Personal
+    fireEvent.change(screen.getByLabelText(/Primer nombre/i), { target: { value: 'Ana' } });
+    fireEvent.change(screen.getByLabelText(/Primer apellido/i), { target: { value: 'García' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de nacimiento/i), { target: { value: '1992-03-20' } });
+    fireEvent.change(screen.getByLabelText(/Tipo de documento/i), { target: { value: 'cedula_uruguaya' } });
+    fireEvent.change(screen.getByLabelText(/Cédula de identidad uruguaya/i), { target: { value: '34567894' } });
+    fireEvent.change(screen.getByLabelText(/Identidad de género/i), { target: { value: 'Mujer' } });
+    fireEvent.change(screen.getByLabelText(/Raza \/ etnia/i), { target: { value: 'Blanca' } });
+    fireEvent.change(screen.getByLabelText(/País de nacimiento/i), { target: { value: 'Uruguay' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 2: Contacto
+    fireEvent.change(screen.getByLabelText(/País de residencia/i), { target: { value: 'Uruguay' } });
+    fireEvent.change(screen.getByLabelText(/Ciudad de residencia/i), { target: { value: 'Salto' } });
+    fireEvent.change(screen.getByLabelText(/^Celular/), { target: { value: '099 123 456' } });
+    fireEvent.change(screen.getByLabelText(/Correo electrónico/i), { target: { value: 'ana@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Ocupación actual/i), { target: { value: 'Investigadora' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 3: Académico
+    fireEvent.change(screen.getByLabelText(/Estudios cursados/i), { target: { value: 'Universitario' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'No' }));
+    fireEvent.change(screen.getByLabelText(/^Título/), { target: { value: 'Licenciada en Sociología' } });
+    fireEvent.change(screen.getByLabelText(/Escolaridad/i), { target: { value: '11' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 4: Documentos - must include the two recommendation letters
+    expect(screen.getByLabelText(/Primera carta de recomendación/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Segunda carta de recomendación/i)).toBeInTheDocument();
+
+    // Trying to advance without uploading recommendation letters should fail
+    const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText(/Documento de identidad/i), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/Curriculum Vitae/i), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/^Título/), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/Carta de motivación/i), { target: { files: [dummyFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByText('cartaMotivacion.pdf')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Errors for the two recommendation letters
+    expect(screen.getByText(/El documento Primera carta de recomendación es obligatorio/i)).toBeInTheDocument();
+    expect(screen.getByText(/El documento Segunda carta de recomendación es obligatorio/i)).toBeInTheDocument();
+  });
+
+  it('validates conditional rules in the browser (convenio, posgrado, genero, paisEmisor)', async () => {
+    const mockUpload = vi.fn().mockImplementation((fieldKey: string) =>
+      Promise.resolve({
+        token: `token-${fieldKey}`,
+        fieldKey,
+        originalName: `${fieldKey}.pdf`,
+        size: 1024,
+        mimeType: 'application/pdf',
+      })
+    );
+
+    render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} onUpload={mockUpload} />);
+
+    // Step 1: select genero = Otra and tipoDocumento = pasaporte
+    fireEvent.change(screen.getByLabelText(/Primer nombre/i), { target: { value: 'Sam' } });
+    fireEvent.change(screen.getByLabelText(/Primer apellido/i), { target: { value: 'Taylor' } });
+    fireEvent.change(screen.getByLabelText(/Fecha de nacimiento/i), { target: { value: '1995-07-20' } });
+    fireEvent.change(screen.getByLabelText(/Tipo de documento/i), { target: { value: 'pasaporte' } });
+    fireEvent.change(screen.getByLabelText(/Número de documento/i), { target: { value: 'PAS123' } });
+    fireEvent.change(screen.getByLabelText(/Identidad de género/i), { target: { value: 'Otra' } });
+    fireEvent.change(screen.getByLabelText(/Raza \/ etnia/i), { target: { value: 'Blanca' } });
+    fireEvent.change(screen.getByLabelText(/País de nacimiento/i), { target: { value: 'Argentina' } });
+
+    // Click siguiente without specifying generoOtra and paisEmisorDocumento
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    expect(screen.getByText(/Debe especificar su identidad de género/i)).toBeInTheDocument();
+    expect(screen.getByText(/Debe especificar el país emisor del documento/i)).toBeInTheDocument();
+
+    // Fill them and advance
+    fireEvent.change(screen.getByLabelText(/Especifique su identidad de género/i), { target: { value: 'No binarie' } });
+    fireEvent.change(screen.getByLabelText(/País emisor del documento/i), { target: { value: 'Argentina' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 2: Contacto
+    fireEvent.change(screen.getByLabelText(/País de residencia/i), { target: { value: 'Argentina' } });
+    fireEvent.change(screen.getByLabelText(/Ciudad de residencia/i), { target: { value: 'Buenos Aires' } });
+    fireEvent.change(screen.getByLabelText(/^Celular/), { target: { value: '1112345678' } });
+    fireEvent.change(screen.getByLabelText(/Correo electrónico/i), { target: { value: 'sam@example.com' } });
+    fireEvent.change(screen.getByLabelText(/Ocupación actual/i), { target: { value: 'Investigadore' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 3: Académico - select posgradoFlacso = Si
+    fireEvent.change(screen.getByLabelText(/Estudios cursados/i), { target: { value: 'Universitario' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Sí' })); // posgradoFlacso
+    fireEvent.change(screen.getByLabelText(/^Título/), { target: { value: 'Licenciatura' } });
+    fireEvent.change(screen.getByLabelText(/Escolaridad/i), { target: { value: '9' } });
+    fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
+
+    // Click siguiente without specifying posgradoCual
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+    expect(screen.getByText(/Debe especificar qué posgrado cursó en FLACSO/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/¿Cuál posgrado\?/i), { target: { value: 'Diploma en Género' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 4: Documentos
+    const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText(/Documento de identidad/i), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/Curriculum Vitae/i), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/^Título/), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/Carta de motivación/i), { target: { files: [dummyFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByText('cartaMotivacion.pdf')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 5: Declaraciones - select tieneConvenio = Si
+    expect(screen.getByRole('heading', { name: 'Convenios y declaraciones' })).toBeInTheDocument();
+    const yesRadios = screen.getAllByRole('radio', { name: 'Sí' });
+    fireEvent.click(yesRadios[0]!); // tieneConvenio = Si
+    fireEvent.change(screen.getByLabelText(/¿Cómo conociste esta propuesta\?/i), { target: { value: 'Web' } });
+    fireEvent.click(yesRadios[1]!); // aceptaDifusion = Si
+
+    // Click submit without selecting agreement
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar y Enviar/i }));
+    expect(screen.getByText(/Debe seleccionar el convenio correspondiente/i)).toBeInTheDocument();
   });
 });

@@ -10,7 +10,6 @@ import { TargetSpreadsheetService } from '../../application/target-spreadsheet-s
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 
-import { composeForm } from '../../domain/form-composition.js';
 
 const target = {
   id: 'offer-1',

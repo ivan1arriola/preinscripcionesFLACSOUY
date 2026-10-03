@@ -132,7 +132,7 @@ export const FormStep: React.FC<FormStepProps> = ({
         />
       )}
 
-      {(hasOrientationInput || hasMentionInput || orientations.length > 0 || mentions.length > 0) &&
+      {(hasOrientationInput || hasMentionInput) &&
         (orientations.length > 0 || mentions.length > 0) && (
           <OrientationMentionFields
             orientations={orientations}
