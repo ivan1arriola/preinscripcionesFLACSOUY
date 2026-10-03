@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import {
+  GOOGLE_SERVICE_ACCOUNT_SCOPES,
   findSecretFile,
   loadGoogleOAuthSecrets,
   loadGoogleServiceAccountCredentials,
@@ -21,6 +22,11 @@ describe('Google Credentials Loader', () => {
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
     process.env = originalEnv;
+  });
+
+  it('requests Drive scope that can inspect and write to an existing shared root folder', () => {
+    expect(GOOGLE_SERVICE_ACCOUNT_SCOPES).toContain('https://www.googleapis.com/auth/drive');
+    expect(GOOGLE_SERVICE_ACCOUNT_SCOPES).not.toContain('https://www.googleapis.com/auth/drive.file');
   });
 
   it('returns null when secret file does not exist', () => {

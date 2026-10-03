@@ -15,6 +15,14 @@ export interface GoogleCredentialsResult {
   oauthConfig: LoadedGoogleOAuthConfig;
 }
 
+// `drive.file` is limited to files created/opened by the app and can return
+// 404 for a manually shared existing root folder. The app needs to inspect
+// that configured folder and create children inside it.
+export const GOOGLE_SERVICE_ACCOUNT_SCOPES = [
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/spreadsheets',
+] as const;
+
 const CANDIDATE_DIRS = [
   path.resolve(process.cwd(), '.secrets'),
   path.resolve(process.cwd(), '..', '.secrets'),
@@ -89,10 +97,7 @@ export function loadGoogleServiceAccountCredentials(explicitPath?: string): {
 
     const auth = new GoogleAuth({
       keyFile: file,
-      scopes: [
-        'https://www.googleapis.com/auth/drive.file',
-        'https://www.googleapis.com/auth/spreadsheets',
-      ],
+      scopes: [...GOOGLE_SERVICE_ACCOUNT_SCOPES],
     });
 
     return {
