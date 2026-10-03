@@ -9,6 +9,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
   it('reads headers from the first row of the configured sheet', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Apellido', 'Correo electrónico']]),
+      updateValues: vi.fn(),
       appendValues: vi.fn(),
     };
 
@@ -24,6 +25,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
       getValues: vi.fn().mockResolvedValue([
         ['Marca temporal', 'Observaciones Asistente', 'Nombre', 'Apellido', 'Documento'],
       ]),
+      updateValues: vi.fn(),
       appendValues: vi.fn().mockResolvedValue({
         updatedRange: 'Respuestas!A5:E5',
         updatedRows: 1,
@@ -55,6 +57,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
   it('rejects append when required columns are missing in the spreadsheet', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]), // Missing Apellido
+      updateValues: vi.fn(),
       appendValues: vi.fn(),
     };
 
@@ -74,6 +77,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
   it('diagnoses spreadsheet accessibility and missing columns safely', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Apellido', 'Columna Extra']]),
+      updateValues: vi.fn(),
       appendValues: vi.fn(),
     };
 
@@ -90,6 +94,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
   it('returns safe diagnostic report when spreadsheet is inaccessible', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockRejectedValue(new Error('Permission denied')),
+      updateValues: vi.fn(),
       appendValues: vi.fn(),
     };
 

@@ -14,8 +14,11 @@ import { TemporaryFileStorage } from './infrastructure/files/temporary-file-stor
 import { GoogleDriveRepository } from './infrastructure/google/google-drive-repository.js';
 import { GoogleSheetsRepository } from './infrastructure/google/google-sheets-repository.js';
 import { HttpGoogleSheetsClient } from './infrastructure/google/sheets-client.js';
+import { GoogleSpreadsheetProvisioner } from './infrastructure/google/google-spreadsheet-provisioner.js';
 import { loadAllGoogleCredentials } from './infrastructure/google/google-credentials.js';
 import { GoogleIdentityVerifier } from './infrastructure/auth/google-oidc.js';
+import { PostgresTargetSpreadsheetRepository } from './infrastructure/database/postgres-target-spreadsheet-repository.js';
+import { TargetSpreadsheetService } from './application/target-spreadsheet-service.js';
 
 
 const port = Number(process.env.PORT || 3000);
@@ -23,6 +26,7 @@ const db = createKyselyDb();
 
 const formProfileRepository = new PostgresFormProfileRepository(db);
 const systemSettingsRepository = new PostgresSystemSettingsRepository(db);
+const targetSpreadsheetRepository = new PostgresTargetSpreadsheetRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
   ? new WordPressAcademicCatalog(
@@ -39,9 +43,8 @@ const temporaryFileStorage = new TemporaryFileStorage({
   allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
 });
 const googleCreds = loadAllGoogleCredentials();
-const googleSheetsId = process.env.GOOGLE_SHEETS_ID?.trim();
-if (process.env.NODE_ENV === 'production' && (!googleCreds.tokenProvider || !googleSheetsId)) {
-  throw new Error('Google Sheets no está configurado: se requiere la cuenta de servicio y GOOGLE_SHEETS_ID en producción.');
+if (process.env.NODE_ENV === 'production' && !googleCreds.tokenProvider) {
+  throw new Error('Google no está configurado: se requiere la cuenta de servicio para crear Drive y Sheets por destino en producción.');
 }
 if (googleCreds.serviceAccountPath) {
   console.log(`[Google] Cuenta de servicio detectada: ${googleCreds.serviceAccountPath} (${googleCreds.clientEmail || 'sin email'})`);
@@ -75,8 +78,27 @@ const googleDriveRepository = !isMockDrive && googleCreds.tokenProvider
     }
   : undefined;
 
-const googleSheetsRepository = googleCreds.tokenProvider && googleSheetsId
-  ? new GoogleSheetsRepository(new HttpGoogleSheetsClient({ accessTokenOrProvider: googleCreds.tokenProvider }))
+const googleSheetsClient = !isMockDrive && googleCreds.tokenProvider
+  ? new HttpGoogleSheetsClient({ accessTokenOrProvider: googleCreds.tokenProvider })
+  : undefined;
+
+const googleSheetsRepository = googleSheetsClient
+  ? new GoogleSheetsRepository(googleSheetsClient)
+  : undefined;
+
+const spreadsheetProvisioner = googleCreds.tokenProvider && googleSheetsClient
+  ? new GoogleSpreadsheetProvisioner({
+      accessTokenOrProvider: googleCreds.tokenProvider,
+      sheetsClient: googleSheetsClient,
+    })
+  : undefined;
+
+const targetSpreadsheetService = spreadsheetProvisioner
+  ? new TargetSpreadsheetService(
+      targetSpreadsheetRepository,
+      spreadsheetProvisioner,
+      async () => systemSettingsRepository.getSetting('google_drive_folder_id'),
+    )
   : undefined;
 
 const googleIdentityVerifier = googleCreds.oauthConfig.clientId
@@ -114,8 +136,8 @@ const app = createApp({
   temporaryFileStorage,
   googleDriveRepository,
   spreadsheetRepository: googleSheetsRepository,
-  spreadsheetId: googleSheetsId,
-  spreadsheetSheetName: process.env.GOOGLE_SHEETS_SHEET_NAME || 'Sheet1',
+  targetSpreadsheetService,
+  targetSpreadsheetRepository,
   formProfileRepository,
   googleIdentityVerifier,
   systemSettingsRepository,

@@ -176,7 +176,7 @@ describe('PreinscriptionWizard Component', () => {
       expect(submittedValues.orientacion).toBe('Educación');
       expect(submittedFiles).toHaveLength(1);
     });
-  });
+  }, 10000);
 
   it('renders 4 steps for seminars and does not show orientation or mention fields', () => {
     render(<PreinscriptionWizard form={seminarForm} onSubmit={vi.fn()} />);

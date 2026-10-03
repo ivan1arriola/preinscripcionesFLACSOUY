@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import type { Server } from 'node:http';
 import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
@@ -6,6 +6,8 @@ import { InMemorySubmissionRepository } from '../../infrastructure/database/in-m
 import { MemoryAdminSessionStore } from '../../application/admin-session.js';
 import { MemorySystemSettingsRepository } from '../../infrastructure/fixtures/memory-system-settings-repository.js';
 import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
+import { MemoryTargetSpreadsheetRepository } from '../../infrastructure/fixtures/memory-target-spreadsheet-repository.js';
+import { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 
 describe('Admin Settings Routes (/api/admin/settings)', () => {
   let server: Server;
@@ -209,5 +211,43 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error.code).toBe('INVALID_FOLDER_ID');
+  });
+
+  it('creates missing spreadsheets automatically for every catalog target', async () => {
+    const targetSpreadsheetRepository = new MemoryTargetSpreadsheetRepository();
+    const targetSpreadsheetService = new TargetSpreadsheetService(
+      targetSpreadsheetRepository,
+      {
+        create: vi.fn(async ({ title, sheetName }) => ({
+          spreadsheetId: `sheet-${title.slice(0, 8)}`,
+          sheetName,
+          url: 'https://docs.google.com/spreadsheets/d/generated/edit',
+        })),
+      },
+      async () => 'drive-root-1',
+    );
+    const app = createApp({
+      catalog: new FixtureAcademicCatalog(),
+      repository: new InMemorySubmissionRepository(),
+      adminSessionStore: sessionStore,
+      googleIdentityVerifier: mockVerifier,
+      systemSettingsRepository: new MemorySystemSettingsRepository(),
+      targetSpreadsheetService,
+      targetSpreadsheetRepository,
+    });
+    const temporaryServer = app.listen(0);
+    await new Promise<void>((resolve) => temporaryServer.once('listening', () => resolve()));
+    const address = temporaryServer.address();
+    const res = await fetch(`http://localhost:${(address as { port: number }).port}/api/admin/settings/spreadsheets/provision`, {
+      method: 'POST',
+      headers: { Cookie: validCookie, 'x-csrf-token': csrfToken },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.spreadsheets).toHaveLength(5);
+    expect(await targetSpreadsheetRepository.list()).toHaveLength(5);
+    await new Promise<void>((resolve) => temporaryServer.close(() => resolve()));
   });
 });

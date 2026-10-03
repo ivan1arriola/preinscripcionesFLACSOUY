@@ -35,7 +35,7 @@ PostgreSQL almacena:
 - eventos de auditoría administrativa (creación y activación de versiones);
 - instantáneas (*snapshots*) canónicas de perfil asociadas a cada preinscripción enviada;
 - caché de respuestas de WordPress;
-- referencias técnicas a carpetas y Spreadsheets;
+- referencias técnicas a carpetas y Spreadsheets creados por destino;
 - sesiones de carga temporal y metadata de archivos temporales;
 - errores y eventos del sistema.
 
@@ -82,10 +82,12 @@ Se permite:
 
 No se debe depender de referencias del tipo "columna C" o "columna 7".
 
-Al confirmar una preinscripción, la aplicación compone la fila a partir de los
-encabezados del Spreadsheet configurado y la agrega sin reordenar ni sobrescribir
-columnas manuales. La respuesta exitosa solo se emite después de completar esta
-operación.
+Cada oferta académica y cada edición de seminario tiene un Spreadsheet propio.
+La aplicación lo crea automáticamente dentro de la carpeta raíz de Drive cuando
+se provisiona el destino o cuando llega su primer envío. Al confirmar una
+preinscripción, compone la fila a partir de los encabezados de esa planilla y la
+agrega sin reordenar ni sobrescribir columnas manuales. La respuesta exitosa
+solo se emite después de completar esta operación.
 
 Los documentos siguen el flujo `almacenamiento temporal → Google Drive → Google
 Sheets → limpieza temporal`. Si Drive o Sheets falla, los archivos temporales se
@@ -941,7 +943,7 @@ La primera versión debe considerarse funcional cuando:
 6. puede cargar documentos temporalmente;
 7. elimina temporales luego de 30 minutos sin actividad;
 8. puede crear la estructura necesaria bajo una única carpeta raíz de Drive;
-9. puede localizar un Spreadsheet existente;
+9. puede crear o reutilizar el Spreadsheet propio del destino;
 10. puede insertar por nombre de columna independientemente del orden;
 11. tolera columnas adicionales creadas por las asistentes;
 12. detecta columnas requeridas faltantes;

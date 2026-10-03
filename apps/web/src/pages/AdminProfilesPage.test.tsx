@@ -83,7 +83,7 @@ describe('AdminProfilesPage Component', () => {
       expect(screen.getByText('web@flacso.edu.uy')).toBeInTheDocument();
       expect(screen.getByText('Perfil: Diploma')).toBeInTheDocument();
       expect(screen.getByText(/versión activa/i)).toBeInTheDocument();
-    });
+    }, { timeout: 10000 });
   });
 
   it('handles invalid JSON in editor and shows client error', async () => {

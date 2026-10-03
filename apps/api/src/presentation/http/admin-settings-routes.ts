@@ -8,6 +8,9 @@ import {
 } from '../../application/admin-session.js';
 import { extractDriveFolderId, isValidDriveFolderId } from '../../domain/google-drive-utils.js';
 import type { GoogleDriveFolderInfo } from '../../ports/google-drive-repository.js';
+import type { AcademicCatalog } from '../../ports/academic-catalog.js';
+import { canProvisionTargetSpreadsheet, type TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
+import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 
 const UpdateDriveFolderSchema = z.object({
   folderId: z.string().min(1, 'La carpeta de Google Drive es requerida'),
@@ -17,7 +20,10 @@ export function createAdminSettingsRoutes(
   settingsRepository: SystemSettingsRepository,
   sessionStore: AdminSessionStore,
   serviceAccountEmail?: string,
-  driveConfiguration?: { inspectFolder(folderId: string): Promise<GoogleDriveFolderInfo> }
+  driveConfiguration?: { inspectFolder(folderId: string): Promise<GoogleDriveFolderInfo> },
+  catalog?: AcademicCatalog,
+  targetSpreadsheetService?: TargetSpreadsheetService,
+  targetSpreadsheetRepository?: TargetSpreadsheetRepository,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -107,6 +113,43 @@ export function createAdminSettingsRoutes(
       googleDriveFolderName: folder.name,
       googleDriveCanAddChildren: folder.canAddChildren,
     });
+  });
+
+  router.get('/spreadsheets', async (_req, res) => {
+    if (!catalog || !targetSpreadsheetRepository) {
+      res.status(503).json({ error: { code: 'SPREADSHEET_CONFIGURATION_UNAVAILABLE', message: 'La configuración de planillas no está disponible.' } });
+      return;
+    }
+    const targets = (await catalog.listTargets()).filter(canProvisionTargetSpreadsheet);
+    const configurations = await targetSpreadsheetRepository.list();
+    const byTargetId = new Map(configurations.map((configuration) => [configuration.targetId, configuration]));
+    res.json({
+      targets: targets.map((target) => ({
+        targetId: target.id,
+        title: target.title,
+        kind: target.kind,
+        spreadsheet: byTargetId.get(target.id) ?? null,
+      })),
+    });
+  });
+
+  router.post('/spreadsheets/provision', async (_req, res) => {
+    if (!catalog || !targetSpreadsheetService) {
+      res.status(503).json({ error: { code: 'SPREADSHEET_PROVISIONING_UNAVAILABLE', message: 'La creación automática de planillas no está disponible.' } });
+      return;
+    }
+    try {
+      const targets = await catalog.listTargets();
+      const configurations = await targetSpreadsheetService.ensureForTargets(targets);
+      res.json({ ok: true, spreadsheets: configurations });
+    } catch (error) {
+      res.status(502).json({
+        error: {
+          code: 'SPREADSHEET_PROVISIONING_ERROR',
+          message: error instanceof Error ? error.message : 'No se pudieron crear las planillas automáticamente.',
+        },
+      });
+    }
   });
 
   return router;

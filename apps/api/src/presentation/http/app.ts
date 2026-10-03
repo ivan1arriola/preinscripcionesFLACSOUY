@@ -26,6 +26,8 @@ import { createAdminProfileRoutes } from './admin-profile-routes.js';
 import type { SystemSettingsRepository } from '../../ports/system-settings-repository.js';
 import { MemorySystemSettingsRepository } from '../../infrastructure/fixtures/memory-system-settings-repository.js';
 import { createAdminSettingsRoutes } from './admin-settings-routes.js';
+import type { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
+import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -34,8 +36,8 @@ export interface AppDependencies {
   temporaryFileStorage?: TemporaryFileStoragePort;
   googleDriveRepository?: GoogleDriveRepositoryPort;
   spreadsheetRepository?: SpreadsheetRepository;
-  spreadsheetId?: string;
-  spreadsheetSheetName?: string;
+  targetSpreadsheetService?: TargetSpreadsheetService;
+  targetSpreadsheetRepository?: TargetSpreadsheetRepository;
   formProfileRepository?: FormProfileRepository;
   googleIdentityVerifier?: GoogleIdentityVerifierPort;
   adminSessionStore?: AdminSessionStore;
@@ -79,11 +81,10 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.temporaryFileStorage && dependencies.googleDriveRepository
       ? { storage: dependencies.temporaryFileStorage, drive: dependencies.googleDriveRepository }
       : undefined,
-    dependencies.spreadsheetRepository && dependencies.spreadsheetId
+    dependencies.spreadsheetRepository && dependencies.targetSpreadsheetService
       ? {
           repository: dependencies.spreadsheetRepository,
-          spreadsheetId: dependencies.spreadsheetId,
-          sheetName: dependencies.spreadsheetSheetName,
+          targetSpreadsheetService: dependencies.targetSpreadsheetService,
         }
       : undefined,
   );
@@ -107,6 +108,9 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.googleDriveRepository?.inspectFolder
       ? { inspectFolder: dependencies.googleDriveRepository.inspectFolder.bind(dependencies.googleDriveRepository) }
       : undefined,
+    dependencies.catalog,
+    dependencies.targetSpreadsheetService,
+    dependencies.targetSpreadsheetRepository,
   ));
 
   // Central error handler

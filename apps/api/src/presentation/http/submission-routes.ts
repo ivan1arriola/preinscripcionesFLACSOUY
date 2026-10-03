@@ -7,6 +7,7 @@ import { submitPreinscription } from '../../application/submit-preinscription.js
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
+import type { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 
 const submissionSchema = z.object({
   configRevision: z.string({ required_error: 'La revisión de configuración es obligatoria.' }),
@@ -25,8 +26,7 @@ interface SubmissionFileDependencies {
 
 interface SubmissionSpreadsheetDependencies {
   repository: SpreadsheetRepository;
-  spreadsheetId: string;
-  sheetName?: string;
+  targetSpreadsheetService: TargetSpreadsheetService;
 }
 
 export function createSubmissionRoutes(
@@ -143,14 +143,20 @@ export function createSubmissionRoutes(
 
       if (spreadsheetDependencies) {
         try {
+          const target = await catalog.revalidateTarget(targetId);
+          if (!target) {
+            res.status(404).json({ error: { code: 'NOT_FOUND', message: 'No se encontró el destino académico para crear su planilla.' } });
+            return;
+          }
+          const spreadsheet = await spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);
           await spreadsheetDependencies.repository.appendByHeaders(
-            spreadsheetDependencies.spreadsheetId,
+            spreadsheet.spreadsheetId,
             result.spreadsheet.valuesByColumnName,
             result.spreadsheet.requiredColumns,
-            spreadsheetDependencies.sheetName,
+            spreadsheet.sheetName,
           );
         } catch (error) {
-          res.status(502).json({ error: { code: 'SPREADSHEET_PROCESSING_ERROR', message: error instanceof Error ? error.message : 'No se pudo guardar la preinscripción.' } });
+          res.status(502).json({ error: { code: 'SPREADSHEET_PROCESSING_ERROR', message: error instanceof Error ? error.message : 'No se pudo crear o guardar la planilla de la preinscripción.' } });
           return;
         }
       }

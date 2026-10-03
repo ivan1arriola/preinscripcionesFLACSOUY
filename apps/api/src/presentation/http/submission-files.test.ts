@@ -6,6 +6,8 @@ import type { SubmissionRepository } from '../../ports/submission-repository.js'
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
+import { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
+import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 
 import { composeForm } from '../../domain/form-composition.js';
@@ -115,12 +117,25 @@ async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: Spreadsheet
   };
   const app = express();
   app.use(express.json());
+  const targetSpreadsheetService = spreadsheet
+    ? new TargetSpreadsheetService(
+        {
+          ensureTarget: async () => undefined,
+          get: async () => ({ targetId: target.id, spreadsheetId: 'sheet-1', sheetName: 'Inscripciones' }),
+          list: async () => [],
+          save: async () => undefined,
+        } satisfies TargetSpreadsheetRepository,
+        { create: async () => ({ spreadsheetId: 'unused', sheetName: 'Inscripciones' }) },
+        async () => 'drive-root',
+        'Inscripciones',
+      )
+    : undefined;
   app.use('/submissions', createSubmissionRoutes(
     catalog,
     repository,
     profileRepo,
     { storage, drive },
-    spreadsheet ? { repository: spreadsheet, spreadsheetId: 'sheet-1', sheetName: 'Inscripciones' } : undefined,
+    spreadsheet && targetSpreadsheetService ? { repository: spreadsheet, targetSpreadsheetService } : undefined,
   ));
   return { app, storage, effectiveRevision };
 }

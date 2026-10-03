@@ -217,4 +217,35 @@ export const apiClient = {
     }
     return res.json();
   },
+
+  async getAdminSpreadsheets(): Promise<{
+    targets: Array<{
+      targetId: string;
+      title: string;
+      kind: string;
+      spreadsheet: { spreadsheetId: string; sheetName: string; url?: string } | null;
+    }>;
+  }> {
+    const res = await fetch('/api/admin/settings/spreadsheets');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'SPREADSHEETS_ERROR', err.error?.message || 'Error al obtener las planillas');
+    }
+    return res.json();
+  },
+
+  async provisionAdminSpreadsheets(csrfToken: string): Promise<{
+    ok: boolean;
+    spreadsheets: Array<{ targetId: string; spreadsheetId: string; sheetName: string; url?: string }>;
+  }> {
+    const res = await fetch('/api/admin/settings/spreadsheets/provision', {
+      method: 'POST',
+      headers: { 'x-csrf-token': csrfToken },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'SPREADSHEETS_PROVISION_ERROR', err.error?.message || 'No se pudieron crear las planillas');
+    }
+    return res.json();
+  },
 };
