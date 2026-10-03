@@ -100,6 +100,23 @@ describe('Google Credentials Loader', () => {
     expect(typeof result.tokenProvider).toBe('function');
   });
 
+  it('configures domain-wide delegation for the requested subject', () => {
+    const saFile = path.join(tmpDir, 'google-service-account.json');
+    fs.writeFileSync(
+      saFile,
+      JSON.stringify({
+        type: 'service_account',
+        client_email: 'service@test-project.iam.gserviceaccount.com',
+        private_key: 'fake-private-key',
+        private_key_id: 'key-id',
+      }),
+    );
+    process.env.GOOGLE_SERVICE_ACCOUNT_SUBJECT = 'web@flacso.edu.uy';
+
+    const result = loadGoogleServiceAccountCredentials(saFile);
+    expect(result.tokenProvider).toBeDefined();
+  });
+
   it('falls back to GOOGLE_ACCESS_TOKEN if no service account file exists', async () => {
     process.env.GOOGLE_ACCESS_TOKEN = 'manual-bearer-token';
     const result = loadGoogleServiceAccountCredentials(path.join(tmpDir, 'none.json'));

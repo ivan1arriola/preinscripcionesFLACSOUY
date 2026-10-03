@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { GoogleAuth } from 'google-auth-library';
+import { GoogleAuth, JWT } from 'google-auth-library';
 
 export interface LoadedGoogleOAuthConfig {
   clientId?: string;
@@ -95,17 +95,39 @@ export function loadGoogleServiceAccountCredentials(explicitPath?: string): {
       clientEmail = saJson.client_email;
     } catch {}
 
-    const auth = new GoogleAuth({
-      keyFile: file,
-      scopes: [...GOOGLE_SERVICE_ACCOUNT_SCOPES],
-    });
+    const subject = process.env.GOOGLE_SERVICE_ACCOUNT_SUBJECT?.trim();
+    let auth: GoogleAuth | JWT;
+    if (subject) {
+      const credentials = JSON.parse(fs.readFileSync(file, 'utf8')) as {
+        client_email?: string;
+        private_key?: string;
+        private_key_id?: string;
+      };
+      if (!credentials.client_email || !credentials.private_key) {
+        throw new Error('La cuenta de servicio de Google no contiene client_email o private_key para delegación de dominio.');
+      }
+      auth = new JWT({
+        email: credentials.client_email,
+        key: credentials.private_key,
+        keyId: credentials.private_key_id,
+        subject,
+        scopes: [...GOOGLE_SERVICE_ACCOUNT_SCOPES],
+      });
+      console.info(`[GoogleCredentials] Delegación de dominio configurada para ${subject}.`);
+    } else {
+      auth = new GoogleAuth({
+        keyFile: file,
+        scopes: [...GOOGLE_SERVICE_ACCOUNT_SCOPES],
+      });
+    }
 
     return {
       serviceAccountPath: file,
       clientEmail,
       tokenProvider: async () => {
-        const client = await auth.getClient();
-        const tokenRes = await client.getAccessToken();
+        const tokenRes = auth instanceof JWT
+          ? await auth.getAccessToken()
+          : await (await auth.getClient()).getAccessToken();
         if (!tokenRes.token) {
           throw new Error('No se pudo obtener el token de acceso para la cuenta de servicio de Google.');
         }
