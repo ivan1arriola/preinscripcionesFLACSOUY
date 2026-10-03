@@ -6,6 +6,8 @@ import { InMemorySubmissionRepository } from '../../infrastructure/database/in-m
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 import { getDefaultProfileDefinition } from '../../domain/form-profiles.js';
 import { getTargetForm } from '../../application/get-target-form.js';
+import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
+import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 
 describe('Submission HTTP Routes', () => {
   let server: Server;
@@ -27,6 +29,7 @@ describe('Submission HTTP Routes', () => {
       genero: 'Mujer',
       etnia: 'No declara',
       celular: '+59899123456',
+      ciudadResidencia: 'Montevideo',
       domicilio: 'Montevideo',
       ocupacion: 'Docente',
       paisNacimiento: 'Uruguay',
@@ -43,18 +46,42 @@ describe('Submission HTTP Routes', () => {
       escolaridad: 'Escolaridad completa',
       institucion: 'Universidad de la República',
     },
+    files: [
+      { fieldKey: 'identidad', token: 'tok_id', originalName: 'cedula.pdf', mimeType: 'application/pdf', size: 1024 },
+      { fieldKey: 'cv', token: 'tok_cv', originalName: 'cv.pdf', mimeType: 'application/pdf', size: 1024 },
+      { fieldKey: 'titulo', token: 'tok_tit', originalName: 'titulo.pdf', mimeType: 'application/pdf', size: 1024 },
+      { fieldKey: 'cartaMotivacion', token: 'tok_mot', originalName: 'carta.pdf', mimeType: 'application/pdf', size: 1024 },
+    ],
   };
 
   beforeAll(async () => {
     const catalog = new FixtureAcademicCatalog();
     repository = new InMemorySubmissionRepository();
-    const profileRepo = new MemoryFormProfileRepository({
-      diploma: { ...getDefaultProfileDefinition('diploma'), documents: [] },
-    });
+    const profileRepo = new MemoryFormProfileRepository();
     const formResult = await getTargetForm(catalog, profileRepo, 'davia-c11');
     if (!formResult.ok) throw new Error(formResult.message);
     validPayload.configRevision = formResult.form.effectiveRevision;
-    const app = createApp({ catalog, repository, formProfileRepository: profileRepo });
+    const storage: TemporaryFileStoragePort = {
+      save: async () => ({ token: 'unused', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+      open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+      remove: async () => undefined,
+      cleanup: async () => 0,
+    };
+    const drive: GoogleDriveRepositoryPort = {
+      storeSubmissionFiles: async () => [
+        { token: 'tok_id', driveFileId: 'drive-1' },
+        { token: 'tok_cv', driveFileId: 'drive-2' },
+        { token: 'tok_tit', driveFileId: 'drive-3' },
+        { token: 'tok_mot', driveFileId: 'drive-4' },
+      ],
+    };
+    const app = createApp({
+      catalog,
+      repository,
+      formProfileRepository: profileRepo,
+      temporaryFileStorage: storage,
+      googleDriveRepository: drive,
+    });
 
     await new Promise<void>((resolve) => {
       server = app.listen(0, () => {
@@ -74,7 +101,10 @@ describe('Submission HTTP Routes', () => {
   it('POST /api/targets/:id/submissions returns 201 with submissionId for valid submission', async () => {
     const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-preinscription-session': 'session-test',
+      },
       body: JSON.stringify(validPayload),
     });
 

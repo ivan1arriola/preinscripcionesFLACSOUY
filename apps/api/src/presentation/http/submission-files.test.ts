@@ -45,6 +45,7 @@ const values = {
   etnia: 'No declara',
   celular: '+59899123456',
   domicilio: 'Montevideo',
+  ciudadResidencia: 'Montevideo',
   ocupacion: 'Docente',
   paisNacimiento: 'Uruguay',
   paisResidencia: 'Uruguay',
@@ -55,52 +56,21 @@ const values = {
   estudios: 'Licenciatura',
   posgradoFlacso: 'No',
   posgradoCual: '',
+  titulo: 'Licenciatura',
+  escolaridad: 'Completa',
+  institucion: 'UdelaR',
 };
 
-async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: SpreadsheetRepository) {
-  const profileRepo = new MemoryFormProfileRepository({
-    seminar: {
-      steps: [{ id: 'general', title: 'General', order: 1 }],
-      fields: [
-        { key: 'nombre1', stepId: 'general', order: 1, required: true, condition: 'always' },
-        { key: 'apellido1', stepId: 'general', order: 2, required: true, condition: 'always' },
-        { key: 'email', stepId: 'general', order: 3, required: true, condition: 'always' },
-        { key: 'fechaNacimiento', stepId: 'general', order: 4, required: true, condition: 'always' },
-        { key: 'tipoDocumento', stepId: 'general', order: 5, required: true, condition: 'always' },
-        { key: 'documento', stepId: 'general', order: 6, required: true, condition: 'always' },
-        { key: 'genero', stepId: 'general', order: 7, required: true, condition: 'always' },
-        { key: 'etnia', stepId: 'general', order: 8, required: true, condition: 'always' },
-        { key: 'paisNacimiento', stepId: 'general', order: 9, required: true, condition: 'always' },
-        { key: 'paisResidencia', stepId: 'general', order: 10, required: true, condition: 'always' },
-        { key: 'domicilio', stepId: 'general', order: 11, required: true, condition: 'always' },
-        { key: 'celular', stepId: 'general', order: 12, required: true, condition: 'always' },
-        { key: 'ocupacion', stepId: 'general', order: 13, required: true, condition: 'always' },
-        { key: 'estudios', stepId: 'general', order: 14, required: true, condition: 'always' },
-        { key: 'posgradoFlacso', stepId: 'general', order: 15, required: true, condition: 'always' },
-        { key: 'tieneConvenio', stepId: 'general', order: 16, required: true, condition: 'always' },
-        { key: 'fuente', stepId: 'general', order: 17, required: true, condition: 'always' },
-        { key: 'aceptaDifusion', stepId: 'general', order: 18, required: true, condition: 'always' },
-      ],
-      documents: [
-        {
-          key: 'cv',
-          stepId: 'general',
-          order: 1,
-          label: 'CV',
-          required: true,
-          canDefer: false,
-          maxFiles: 1,
-          maxBytes: 10 * 1024 * 1024,
-          acceptedMimeTypes: ['application/pdf'],
-        },
-      ],
-    },
-  });
+const testFiles = [
+  { token: 'tmp-1', fieldKey: 'identidad', originalName: 'cedula.pdf', size: 3, mimeType: 'application/pdf' },
+  { token: 'tmp-2', fieldKey: 'cv', originalName: 'cv.pdf', size: 3, mimeType: 'application/pdf' },
+  { token: 'tmp-3', fieldKey: 'titulo', originalName: 'titulo.pdf', size: 3, mimeType: 'application/pdf' },
+  { token: 'tmp-4', fieldKey: 'cartaMotivacion', originalName: 'carta.pdf', size: 3, mimeType: 'application/pdf' },
+];
 
-  const activeProfile = await profileRepo.getActive('seminar');
-  const composed = composeForm(target, activeProfile);
-  if (!composed.ok) throw new Error(composed.error.message);
-  const effectiveRevision = composed.value.effectiveRevision;
+async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: SpreadsheetRepository) {
+  const profileRepo = new MemoryFormProfileRepository();
+  const effectiveRevision = `${target.configRevision}:canonical-v1`;
 
   const catalog: AcademicCatalog = {
     getTarget: async () => target,
@@ -111,7 +81,7 @@ async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: Spreadsheet
   const repository: SubmissionRepository = { save: async () => ({ id: 'sub_1' }) };
   const storage: TemporaryFileStoragePort = {
     save: async () => { throw new Error('unused'); },
-    open: async () => ({ originalName: 'cv.pdf', mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+    open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
     remove: async () => undefined,
     cleanup: async () => 0,
   };
@@ -140,10 +110,13 @@ async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: Spreadsheet
   return { app, storage, effectiveRevision };
 }
 
+
 describe('Submission file orchestration', () => {
   it('sends temporary files to Drive and removes them only after success', async () => {
     let removed = false;
-    const drive: GoogleDriveRepositoryPort = { storeSubmissionFiles: async () => [{ token: 'tmp-1', driveFileId: 'drive-1' }] };
+    const drive: GoogleDriveRepositoryPort = {
+      storeSubmissionFiles: async () => testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+    };
     const { app, storage, effectiveRevision } = await setup(drive);
     storage.remove = async () => { removed = true; };
     const server = app.listen(0);
@@ -152,7 +125,7 @@ describe('Submission file orchestration', () => {
     try {
       const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
-        body: JSON.stringify({ configRevision: effectiveRevision, values, files: [{ token: 'tmp-1', fieldKey: 'cv', originalName: 'cv.pdf', size: 3, mimeType: 'application/pdf' }] }),
+        body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
       expect(response.status).toBe(201);
       expect(removed).toBe(true);
@@ -170,7 +143,7 @@ describe('Submission file orchestration', () => {
     try {
       const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
-        body: JSON.stringify({ configRevision: effectiveRevision, values, files: [{ token: 'tmp-1', fieldKey: 'cv', originalName: 'cv.pdf', size: 3, mimeType: 'application/pdf' }] }),
+        body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
       expect(response.status).toBe(502);
       expect(removed).toBe(false);
@@ -183,7 +156,7 @@ describe('Submission file orchestration', () => {
     const drive: GoogleDriveRepositoryPort = {
       storeSubmissionFiles: async () => {
         events.push('drive');
-        return [{ token: 'tmp-1', driveFileId: 'drive-1' }];
+        return testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` }));
       },
     };
     const spreadsheet: SpreadsheetRepository = {
@@ -208,10 +181,10 @@ describe('Submission file orchestration', () => {
     try {
       const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
-        body: JSON.stringify({ configRevision: effectiveRevision, values, files: [{ token: 'tmp-1', fieldKey: 'cv', originalName: 'cv.pdf', size: 3, mimeType: 'application/pdf' }] }),
+        body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
       expect(response.status).toBe(201);
-      expect(events).toEqual(['drive', 'sheets', 'remove']);
+      expect(events).toEqual(['drive', 'sheets', 'remove', 'remove', 'remove', 'remove']);
       expect(appendCommand?.spreadsheetId).toBe('sheet-1');
       expect(appendCommand?.sheetName).toBe('Inscripciones');
       expect(appendCommand?.valuesByColumnName['Primer nombre']).toBe('Ana');
@@ -222,7 +195,9 @@ describe('Submission file orchestration', () => {
 
   it('keeps temporary files when Sheets fails after Drive succeeds', async () => {
     let removed = false;
-    const drive: GoogleDriveRepositoryPort = { storeSubmissionFiles: async () => [{ token: 'tmp-1', driveFileId: 'drive-1' }] };
+    const drive: GoogleDriveRepositoryPort = {
+      storeSubmissionFiles: async () => testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+    };
     const spreadsheet: SpreadsheetRepository = {
       readHeaders: async () => [],
       appendByHeaders: async () => { throw new Error('Sheets caído'); },
@@ -236,10 +211,11 @@ describe('Submission file orchestration', () => {
     try {
       const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
-        body: JSON.stringify({ configRevision: effectiveRevision, values, files: [{ token: 'tmp-1', fieldKey: 'cv', originalName: 'cv.pdf', size: 3, mimeType: 'application/pdf' }] }),
+        body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
       expect(response.status).toBe(502);
       expect(removed).toBe(false);
     } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
+
 });

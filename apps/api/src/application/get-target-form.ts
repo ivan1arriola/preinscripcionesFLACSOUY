@@ -1,8 +1,7 @@
 import type { FormDefinition } from '@flacso/contracts';
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import type { FormProfileRepository } from '../ports/form-profile-repository.js';
-import { composeForm } from '../domain/form-composition.js';
-import { isSupportedOfferType } from '../domain/form-profiles.js';
+import { getCanonicalFormDefinition } from '../domain/canonical-forms.js';
 import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
 
 export type GetTargetFormResult =
@@ -11,8 +10,8 @@ export type GetTargetFormResult =
 
 export async function getTargetForm(
   catalog: AcademicCatalog,
-  profileRepository: FormProfileRepository,
-  targetId: string,
+  _profileRepository?: FormProfileRepository,
+  targetId: string = '',
 ): Promise<GetTargetFormResult> {
   const target = await catalog.getTarget(targetId);
 
@@ -63,19 +62,11 @@ export async function getTargetForm(
     }
   }
 
-  const offerType = target.kind === 'seminar'
-    ? 'seminar'
-    : target.offer?.type || target.offerType || '';
-
-  const activeProfile = isSupportedOfferType(offerType)
-    ? await profileRepository.getActive(offerType)
-    : null;
-
-  const hasAgreementField = activeProfile?.definition.fields.some((field) => field.key === 'convenioWordpressId') ?? false;
-  const agreements = hasAgreementField && catalog.listAgreements
+  const agreements = catalog.listAgreements
     ? await catalog.listAgreements()
     : [];
-  const composition = composeForm(target, activeProfile, agreements);
+
+  const composition = getCanonicalFormDefinition(target, agreements);
   if (!composition.ok) {
     return {
       ok: false,

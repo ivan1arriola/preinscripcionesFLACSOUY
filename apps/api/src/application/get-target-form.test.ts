@@ -87,6 +87,39 @@ describe('getTargetForm Use Case', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.form.targetId).toBe('sem-2');
+      expect(result.form.profileVersionId).toBe('canonical-v1');
+      expect(result.form.steps).toHaveLength(5);
+      expect(result.form.documents).toHaveLength(4);
+    }
+  });
+
+  it('composes canonical form for maestria with 2 recommendation letters and 6 total documents', async () => {
+    const maestriaOffer: AcademicTarget = {
+      id: 'maestria-test',
+      kind: 'academic_offer',
+      title: 'Maestría en Políticas Públicas',
+      offerType: 'maestria',
+      registrationOpen: true,
+      configRevision: 'wp-rev-m1',
+      orientations: [],
+      mentions: [],
+    };
+    const catalog = createMockCatalog([maestriaOffer]);
+    const result = await getTargetForm(catalog, undefined, 'maestria-test');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.form.profileVersionId).toBe('canonical-v1');
+      expect(result.form.recommendationLettersCount).toBe(2);
+      expect(result.form.documents).toHaveLength(6);
+      const keys = result.form.documents.map((d) => d.key);
+      expect(keys).toEqual([
+        'identidad',
+        'cv',
+        'titulo',
+        'cartaMotivacion',
+        'cartaRecomendacion1',
+        'cartaRecomendacion2',
+      ]);
     }
   });
 });

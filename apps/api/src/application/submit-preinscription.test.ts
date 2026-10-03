@@ -20,6 +20,13 @@ describe('submitPreinscription Use Case', () => {
     return result.form.effectiveRevision;
   }
 
+  const baseFiles = [
+    { fieldKey: 'identidad', token: 'tok_id', originalName: 'cedula.pdf', mimeType: 'application/pdf', size: 1024 },
+    { fieldKey: 'cv', token: 'tok_cv', originalName: 'cv.pdf', mimeType: 'application/pdf', size: 1024 },
+    { fieldKey: 'titulo', token: 'tok_tit', originalName: 'titulo.pdf', mimeType: 'application/pdf', size: 1024 },
+    { fieldKey: 'cartaMotivacion', token: 'tok_mot', originalName: 'carta.pdf', mimeType: 'application/pdf', size: 1024 },
+  ];
+
   const validValues = {
     nombre1: 'Valeria',
     nombre2: '',
@@ -33,6 +40,7 @@ describe('submitPreinscription Use Case', () => {
     genero: 'Mujer',
     etnia: 'No declara',
     celular: '099123456',
+    ciudadResidencia: 'Montevideo',
     domicilio: 'Montevideo',
     ocupacion: 'Docente',
     paisNacimiento: 'Uruguay',
@@ -62,6 +70,7 @@ describe('submitPreinscription Use Case', () => {
       targetId: 'davia-c11',
       configRevision: await currentRevision(),
       values: reorderedValues,
+      files: baseFiles,
     });
 
     expect(result.ok).toBe(true);
@@ -72,7 +81,7 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions).toHaveLength(1);
     expect(repo.submissions[0]?.targetId).toBe('davia-c11');
     expect(repo.submissions[0]?.configRevision).toBe(rev);
-    expect(repo.submissions[0]?.profileVersionId).toBe('ver_diploma_v1');
+    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
     expect(repo.submissions[0]?.profileSnapshot).toBeDefined();
     expect(repo.submissions[0]?.values.nombre1).toBe('Valeria');
     expect(repo.submissions[0]?.values.documento).toBe('3.456.789-4');
@@ -81,42 +90,34 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions[0]?.values.mencion).toBe('Tecnología Educativa');
   });
 
-  it('rejects a submission when the active profile changes (stale form revision) but keeps prior submissions unchanged', async () => {
+  it('rejects a submission when WordPress target revision changes (stale form revision) but keeps prior submissions unchanged', async () => {
     const repo = new InMemorySubmissionRepository();
     const oldRevision = await currentRevision();
 
-    // First submission on v1
+    // First submission with current revision
     const firstResult = await submitPreinscription(catalog, repo, profileRepo, {
       targetId: 'davia-c11',
       configRevision: oldRevision,
       values: validValues,
+      files: baseFiles,
     });
     expect(firstResult.ok).toBe(true);
-    expect(repo.submissions[0]?.profileVersionId).toBe('ver_diploma_v1');
+    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
 
-    // Admin adds and activates a new profile version v2
-    const v2 = await profileRepo.createVersion(
-      {
-        type: 'diploma',
-        definition: { ...getDefaultProfileDefinition('diploma'), documents: [] },
-      },
-      'admin@flacso.edu.uy'
-    );
-    await profileRepo.activateVersion(v2.profileId, v2.id);
-
-    // Second submission using old revision must be rejected
+    // Second submission using outdated revision must be rejected
     const secondResult = await submitPreinscription(catalog, repo, profileRepo, {
       targetId: 'davia-c11',
-      configRevision: oldRevision,
+      configRevision: 'outdated-wp-rev:canonical-v1',
       values: validValues,
+      files: baseFiles,
     });
     expect(secondResult.ok).toBe(false);
     if (secondResult.ok) return;
     expect(secondResult.code).toBe('STALE_REVISION');
 
-    // Prior submission remains intact with its original v1 snapshot
+    // Prior submission remains intact with its original snapshot
     expect(repo.submissions).toHaveLength(1);
-    expect(repo.submissions[0]?.profileVersionId).toBe('ver_diploma_v1');
+    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
   });
 
   it('rejects a closed target and does not persist', async () => {
@@ -328,10 +329,75 @@ describe('submitPreinscription Use Case', () => {
         targetId: 'sem-current',
         configRevision: formRes.form.effectiveRevision,
         values: { ...validValues, orientacion: '', mencion: '' },
+        files: baseFiles,
       });
 
       expect(result.ok).toBe(true);
       expect(repo.submissions).toHaveLength(1);
     });
   });
+
+  describe('maestria recommendation letters requirement', () => {
+    const maestriaTarget: AcademicTarget = {
+      id: 'maestria-test',
+      kind: 'academic_offer',
+      title: 'Maestría en Políticas Públicas',
+      offerType: 'maestria',
+      registrationOpen: true,
+      configRevision: 'wp-rev-m1',
+      orientations: [],
+      mentions: [],
+    };
+
+    const mockCatalog: AcademicCatalog = {
+      listTargets: async () => [maestriaTarget],
+      getTarget: async () => maestriaTarget,
+      revalidateTarget: async () => maestriaTarget,
+      revalidateTargets: async () => [maestriaTarget],
+    };
+
+    it('rejects maestria submission when recommendation letters are missing', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const formRes = await getTargetForm(mockCatalog, undefined, 'maestria-test');
+      if (!formRes.ok) throw new Error(formRes.message);
+
+      const result = await submitPreinscription(mockCatalog, repo, undefined, {
+        targetId: 'maestria-test',
+        configRevision: formRes.form.effectiveRevision,
+        values: { ...validValues, orientacion: '', mencion: '' },
+        files: baseFiles, // missing cartaRecomendacion1 and 2
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe('VALIDATION_ERROR');
+        expect(result.fieldErrors?.cartaRecomendacion1).toBeDefined();
+      }
+      expect(repo.submissions).toHaveLength(0);
+    });
+
+    it('persists maestria submission when both recommendation letters are provided', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const formRes = await getTargetForm(mockCatalog, undefined, 'maestria-test');
+      if (!formRes.ok) throw new Error(formRes.message);
+
+      const maestriaFiles = [
+        ...baseFiles,
+        { fieldKey: 'cartaRecomendacion1', token: 'tok_rec1', originalName: 'rec1.pdf', mimeType: 'application/pdf', size: 1024 },
+        { fieldKey: 'cartaRecomendacion2', token: 'tok_rec2', originalName: 'rec2.pdf', mimeType: 'application/pdf', size: 1024 },
+      ];
+
+      const result = await submitPreinscription(mockCatalog, repo, undefined, {
+        targetId: 'maestria-test',
+        configRevision: formRes.form.effectiveRevision,
+        values: { ...validValues, orientacion: '', mencion: '' },
+        files: maestriaFiles,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(repo.submissions).toHaveLength(1);
+      expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
+    });
+  });
 });
+
