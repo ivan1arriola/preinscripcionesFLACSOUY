@@ -110,7 +110,10 @@ fi
 if [[ -L "\$CURRENT" || -d "\$CURRENT" ]]; then
   docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" ps >/dev/null 2>&1 || true
   if docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" ps -q postgres | grep -q .; then
-    docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T postgres pg_dump --clean --if-exists --no-owner --no-privileges > "\$BACKUP_DIR/database.sql"
+    DB_USER="\$(grep '^POSTGRES_USER=' "\$ENV_FILE" | cut -d= -f2-)"
+    DB_NAME="\$(grep '^POSTGRES_DB=' "\$ENV_FILE" | cut -d= -f2-)"
+    test -n "\$DB_USER" && test -n "\$DB_NAME" || { echo "Faltan POSTGRES_USER o POSTGRES_DB en \$ENV_FILE" >&2; exit 1; }
+    docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T postgres pg_dump --username "\$DB_USER" --dbname "\$DB_NAME" --clean --if-exists --no-owner --no-privileges > "\$BACKUP_DIR/database.sql"
   fi
 fi
 
