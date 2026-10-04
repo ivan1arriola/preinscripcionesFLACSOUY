@@ -170,6 +170,25 @@ export interface TemporaryUploadsTable {
   expires_at: Date;
 }
 
+export interface EmailNotificationsTable {
+  id: string;
+  submission_id: string;
+  audience: 'applicant' | 'target' | 'master';
+  recipient_email: string;
+  target_id: string;
+  template_version: string;
+  payload_json: string;
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'unknown';
+  attempt_count: number;
+  provider_message_id: string | null;
+  last_error: string | null;
+  available_at: Date;
+  locked_until: Date | null;
+  sent_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -190,4 +209,6 @@ export interface DatabaseSchema {
   form_profiles: FormProfilesTable;
   form_profile_versions: FormProfileVersionsTable;
   form_profile_audit_events: FormProfileAuditEventsTable;
+  email_notifications: EmailNotificationsTable;
 }
+

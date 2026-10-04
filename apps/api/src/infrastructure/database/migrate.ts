@@ -10,6 +10,8 @@ import * as adminSessionsSchema from './migrations/008_admin_sessions.js';
 import * as temporaryUploadsSchema from './migrations/009_temporary_uploads.js';
 import * as submissionIdempotencySchema from './migrations/010_submission_idempotency.js';
 import * as academicDocumentLayoutSchema from './migrations/011_normalize_academic_document_layout.js';
+import * as targetSpreadsheetsReconciliationSchema from './migrations/012_target_spreadsheets_reconciliation.js';
+import * as emailNotificationsSchema from './migrations/013_email_notifications.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -24,6 +26,8 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await temporaryUploadsSchema.up(db);
   await submissionIdempotencySchema.up(db);
   await academicDocumentLayoutSchema.up(db);
+  await targetSpreadsheetsReconciliationSchema.up(db);
+  await emailNotificationsSchema.up(db);
   console.log('Migrations complete.');
 }
 
