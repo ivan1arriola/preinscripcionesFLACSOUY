@@ -176,8 +176,14 @@ describe('PreinscriptionWizard Component', () => {
     fireEvent.click(step5Btn);
 
     // Final submit button on step 5
-    const submitBtn = screen.getByRole('button', { name: /Revisar datos/i });
-    fireEvent.click(submitBtn);
+    const reviewBtn = screen.getByRole('button', { name: /Revisar datos/i });
+    fireEvent.click(reviewBtn);
+
+    expect(screen.getByRole('heading', { name: /Revisión de datos antes de enviar/i })).toBeInTheDocument();
+    expect(screen.getByText('Montevideo')).toBeInTheDocument();
+
+    const confirmBtn = screen.getByRole('button', { name: /Confirmar y enviar preinscripción/i });
+    fireEvent.click(confirmBtn);
 
     await waitFor(() => {
       expect(handleSubmit).toHaveBeenCalledTimes(1);
@@ -464,5 +470,66 @@ describe('PreinscriptionWizard Component', () => {
     rerender(<PreinscriptionWizard form={singleStepForm} onSubmit={vi.fn()} isSubmitting={true} />);
     const disabledBtn = screen.getByRole('button', { name: /Revisar datos/i });
     expect(disabledBtn).toBeDisabled();
+  });
+
+  it('navigates to data review screen, shows summary with sections and handles loading overlay during submission', async () => {
+    let resolveSubmit!: () => void;
+    const submitPromise = new Promise<void>((resolve) => {
+      resolveSubmit = resolve;
+    });
+    const handleSubmit = vi.fn().mockImplementation(() => submitPromise);
+
+    const testForm: FormDefinition = {
+      ...diplomaForm,
+      steps: [
+        { id: 'contacto', title: 'Residencia y contacto', order: 1 },
+        { id: 'declaracion', title: 'Convenios y declaraciones', order: 2 },
+      ],
+      inputs: [
+        { key: 'ciudadResidencia', label: 'Ciudad de residencia', type: 'text', required: true, stepId: 'contacto' },
+        { key: 'tieneConvenio', label: '¿Te corresponde algún convenio?', type: 'select', required: true, stepId: 'declaracion' },
+        { key: 'fuente', label: '¿Cómo conociste esta propuesta?', type: 'select', required: true, stepId: 'declaracion' },
+        { key: 'aceptaDifusion', label: '¿Autorizás la difusión de imagen por parte de FLACSO Uruguay?', type: 'select', required: true, stepId: 'declaracion' },
+      ],
+      documents: [],
+    };
+
+    const { rerender } = render(<PreinscriptionWizard form={testForm} onSubmit={handleSubmit} isSubmitting={false} />);
+
+    // Step 1: contacto
+    fireEvent.change(screen.getByLabelText(/Ciudad de residencia/i), { target: { value: 'Montevideo' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 2: declaracion
+    const noRadios = screen.getAllByRole('radio', { name: 'No' });
+    fireEvent.click(noRadios[0]!); // tieneConvenio = No
+    fireEvent.change(screen.getByLabelText(/¿Cómo conociste esta propuesta\?/i), { target: { value: 'Web' } });
+    const yesRadios = screen.getAllByRole('radio', { name: 'Sí' });
+    fireEvent.click(yesRadios[1]!); // aceptaDifusion = Sí
+
+    // Click Revisar datos
+    fireEvent.click(screen.getByRole('button', { name: /Revisar datos/i }));
+
+    // Check review screen
+    expect(screen.getByRole('heading', { name: /Revisión de datos antes de enviar/i })).toBeInTheDocument();
+    expect(screen.getByText('Montevideo')).toBeInTheDocument();
+    const confirmBtn = screen.getByRole('button', { name: /Confirmar y enviar preinscripción/i });
+    expect(confirmBtn).toBeInTheDocument();
+
+    // Click confirm with pending submission
+    fireEvent.click(confirmBtn);
+    expect(handleSubmit).toHaveBeenCalledTimes(1);
+
+    // While submitting, rerender with isSubmitting = true
+    rerender(<PreinscriptionWizard form={testForm} onSubmit={handleSubmit} isSubmitting={true} />);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByText('Enviando tu preinscripción…')).toBeInTheDocument();
+    expect(screen.getByText(/Guardando tus datos y documentación en FLACSO Uruguay/i)).toBeInTheDocument();
+
+    // Finish submission
+    resolveSubmit();
   });
 });

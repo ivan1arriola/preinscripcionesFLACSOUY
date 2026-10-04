@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import type { FormDefinition, FormStepDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { WizardProgress } from './WizardProgress.js';
 import { FormStep } from './FormStep.js';
+import { PreinscriptionSummary } from './PreinscriptionSummary.js';
+import { PreinscriptionLoadingOverlay } from './PreinscriptionLoadingOverlay.js';
 import { apiClient } from '../api/client.js';
 
 interface PreinscriptionWizardProps {
@@ -21,6 +23,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [highestStepReached, setHighestStepReached] = useState(0);
+  const [isReviewing, setIsReviewing] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<SubmissionFileToken[]>([]);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
@@ -67,29 +70,28 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
     return true;
   };
 
-  const validateCurrentStep = (): boolean => {
+  const validateStep = (stepToValidate: FormStepDefinition): Record<string, string> => {
     const errors: Record<string, string> = {};
 
-    // Get inputs for current step
+    // Get inputs for step
     const stepInputs = form.inputs.filter((i) => {
-      if (i.stepId) return i.stepId === currentStep.id;
+      if (i.stepId) return i.stepId === stepToValidate.id;
       // Fallback grouping by step id
-      if (currentStep.id === 'personal' || steps.length <= 2) {
+      if (stepToValidate.id === 'personal' || steps.length <= 2) {
         if (['nombre', 'nombre1', 'nombre2', 'apellido', 'apellido1', 'apellido2', 'fechaNacimiento', 'tipoDocumento', 'documento', 'paisEmisorDocumento', 'genero', 'generoOtra', 'etnia', 'paisNacimiento'].includes(i.key)) {
           return true;
         }
       }
-      if (currentStep.id === 'contacto') {
+      if (stepToValidate.id === 'contacto') {
         return ['paisResidencia', 'ciudadResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
       }
-      if (currentStep.id === 'academico') {
-        return ['estudios', 'posgradoFlacso', 'posgradoCual', 'orientacion', 'tituloDenominacion'].includes(i.key);
+      if (stepToValidate.id === 'academico') {
+        return ['estudios', 'posgradoFlacso', 'posgradoCual', 'orientacion', 'mencion', 'tituloDenominacion', 'sinTituloActual'].includes(i.key);
       }
-      if (currentStep.id === 'declaracion') {
+      if (stepToValidate.id === 'declaracion') {
         return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
       }
-      // If it's a 1-step profile, include any unassigned regular inputs in step 0
-      return currentStepIndex === 0;
+      return steps.findIndex((s) => s.id === stepToValidate.id) === 0;
     });
 
     for (const input of stepInputs) {
@@ -101,7 +103,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
     }
 
     // Conditional validations by step
-    if (currentStep.id === 'personal') {
+    if (stepToValidate.id === 'personal') {
       if (values.genero === 'Otra' && !(values.generoOtra || '').trim()) {
         errors.generoOtra = 'Debe especificar su identidad de género.';
       }
@@ -110,13 +112,13 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       }
     }
 
-    if (currentStep.id === 'academico') {
+    if (stepToValidate.id === 'academico') {
       if (values.posgradoFlacso === 'Si' && !(values.posgradoCual || '').trim()) {
         errors.posgradoCual = 'Debe especificar qué posgrado cursó en FLACSO.';
       }
     }
 
-    if (currentStep.id === 'orientacion') {
+    if (stepToValidate.id === 'orientacion') {
       const hasOrientations = (form.orientations ?? []).length > 0;
       const orientacionVal = values.orientacion?.trim();
       if (hasOrientations) {
@@ -133,21 +135,21 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       }
     }
 
-    if (currentStep.id === 'declaracion') {
+    if (stepToValidate.id === 'declaracion') {
       if (values.tieneConvenio === 'Si' && !(values.convenioWordpressId || '').trim()) {
         errors.convenioWordpressId = 'Debe seleccionar el convenio correspondiente.';
       }
     }
 
-    // Get documents for current step
+    // Get documents for step
     const stepDocs = (form.documents ?? []).filter((d) => {
-      if (d.stepId) return d.stepId === currentStep.id;
-      return currentStep.id === 'documentos';
+      if (d.stepId) return d.stepId === stepToValidate.id;
+      return stepToValidate.id === 'documentos';
     });
 
     const titleDoc = stepDocs.find((doc) => doc.key === 'titulo');
     if (titleDoc) {
-      const isSinTitulo = values.sinTituloActual === 'Si';
+      const isSinTitulo = values.sinTituloActual === 'Si' || values.sinTituloActual === 'true';
       if (!isSinTitulo) {
         if (!(values.tituloDenominacion || '').trim()) {
           errors.tituloDenominacion = 'El campo Denominación del título es obligatorio.';
@@ -170,8 +172,38 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       }
     }
 
-    if (Object.keys(errors).length > 0) {
-      setClientErrors(errors);
+    return errors;
+  };
+
+  const validateCurrentStep = (): boolean => {
+    const errs = validateStep(currentStep);
+    if (Object.keys(errs).length > 0) {
+      setClientErrors(errs);
+      return false;
+    }
+    setClientErrors({});
+    return true;
+  };
+
+  const validateAllSteps = (): boolean => {
+    let allErrors: Record<string, string> = {};
+    let firstErrorIndex = -1;
+
+    steps.forEach((step, idx) => {
+      const stepErrs = validateStep(step);
+      if (Object.keys(stepErrs).length > 0) {
+        allErrors = { ...allErrors, ...stepErrs };
+        if (firstErrorIndex === -1) {
+          firstErrorIndex = idx;
+        }
+      }
+    });
+
+    if (firstErrorIndex !== -1) {
+      setClientErrors(allErrors);
+      setCurrentStepIndex(firstErrorIndex);
+      setIsReviewing(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return false;
     }
 
@@ -198,14 +230,27 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   const handleStepClick = (index: number) => {
     if (index <= highestStepReached) {
+      setIsReviewing(false);
       setCurrentStepIndex(index);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  const handleFinalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleReview = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!validateCurrentStep()) return;
+    setIsReviewing(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleEditStep = (stepIndex: number) => {
+    setIsReviewing(false);
+    setCurrentStepIndex(stepIndex);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleFinalConfirm = async () => {
+    if (!validateAllSteps()) return;
     if (!form.registrationOpen) return;
     await onSubmit(values, files);
   };
@@ -227,7 +272,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       return ['paisResidencia', 'ciudadResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
     }
     if (currentStep.id === 'academico') {
-      return ['estudios', 'posgradoFlacso', 'posgradoCual', 'orientacion', 'tituloDenominacion'].includes(i.key);
+      return ['estudios', 'posgradoFlacso', 'posgradoCual', 'orientacion', 'mencion', 'tituloDenominacion', 'sinTituloActual'].includes(i.key);
     }
     if (currentStep.id === 'declaracion') {
       return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
@@ -243,7 +288,9 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   const isFinalStep = currentStepIndex === steps.length - 1;
 
   return (
-    <div className="preinscription-wizard mx-auto py-4">
+    <div className="preinscription-wizard mx-auto py-4 relative">
+      {isSubmitting && <PreinscriptionLoadingOverlay />}
+
       <WizardProgress
         steps={steps}
         currentStepIndex={currentStepIndex}
@@ -251,69 +298,87 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
         onStepClick={handleStepClick}
       />
 
-      <form onSubmit={isFinalStep ? handleFinalSubmit : (e) => { e.preventDefault(); handleNext(); }}>
+      {isReviewing ? (
         <div className="form-step-card bg-white shadow rounded-lg p-6 mb-6">
-          <FormStep
-            step={currentStep}
-            inputs={currentStepInputs}
-            documents={currentStepDocs}
+          <PreinscriptionSummary
+            form={form}
             values={values}
-            allInputs={form.inputs}
-            allDocuments={form.documents ?? []}
-            errors={errors}
-            disabled={isSubmitting || !form.registrationOpen}
-            onChange={handleInputChange}
             files={files}
-            onUpload={onUpload}
-            onFileToken={handleFileToken}
-            onRemoveToken={handleRemoveToken}
-            orientations={form.orientations ?? []}
-            mentions={form.mentions ?? []}
-            agreements={form.agreements ?? []}
+            onEditStep={handleEditStep}
+            onConfirm={handleFinalConfirm}
+            disabled={isSubmitting || !form.registrationOpen}
           />
-        </div>
-
-        {serverErrors._form && (
-          <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
-            {serverErrors._form.join(', ')}
-          </div>
-        )}
-
-        <div className="wizard-navigation flex justify-between items-center pt-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={handleBack}
-            disabled={currentStepIndex === 0 || isSubmitting}
-            className={`px-4 py-2 text-sm font-medium rounded-md border ${
-              currentStepIndex === 0
-                ? 'invisible'
-                : 'wizard-secondary-action border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            ← Anterior
-          </button>
-
-          {!isFinalStep ? (
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={isSubmitting || !form.registrationOpen}
-              className="wizard-primary-action px-6 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
-            >
-              Siguiente →
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleFinalSubmit}
-              disabled={isSubmitting || !form.registrationOpen}
-              className="wizard-submit-action px-6 py-2 text-sm font-semibold rounded-md shadow-sm transition-colors"
-            >
-              Revisar datos
-            </button>
+          {serverErrors._form && (
+            <div className="mt-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
+              {serverErrors._form.join(', ')}
+            </div>
           )}
         </div>
-      </form>
+      ) : (
+        <form onSubmit={isFinalStep ? handleReview : (e) => { e.preventDefault(); handleNext(); }}>
+          <div className="form-step-card bg-white shadow rounded-lg p-6 mb-6">
+            <FormStep
+              step={currentStep}
+              inputs={currentStepInputs}
+              documents={currentStepDocs}
+              values={values}
+              allInputs={form.inputs}
+              allDocuments={form.documents ?? []}
+              errors={errors}
+              disabled={isSubmitting || !form.registrationOpen}
+              onChange={handleInputChange}
+              files={files}
+              onUpload={onUpload}
+              onFileToken={handleFileToken}
+              onRemoveToken={handleRemoveToken}
+              orientations={form.orientations ?? []}
+              mentions={form.mentions ?? []}
+              agreements={form.agreements ?? []}
+            />
+          </div>
+
+          {serverErrors._form && (
+            <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
+              {serverErrors._form.join(', ')}
+            </div>
+          )}
+
+          <div className="wizard-navigation flex justify-between items-center pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={handleBack}
+              disabled={currentStepIndex === 0 || isSubmitting}
+              className={`px-4 py-2 text-sm font-medium rounded-md border ${
+                currentStepIndex === 0
+                  ? 'invisible'
+                  : 'wizard-secondary-action border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              ← Anterior
+            </button>
+
+            {!isFinalStep ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={isSubmitting || !form.registrationOpen}
+                className="wizard-primary-action px-6 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
+              >
+                Siguiente →
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleReview}
+                disabled={isSubmitting || !form.registrationOpen}
+                className="wizard-submit-action px-6 py-2 text-sm font-semibold rounded-md shadow-sm transition-colors"
+              >
+                Revisar datos
+              </button>
+            )}
+          </div>
+        </form>
+      )}
     </div>
   );
 };
