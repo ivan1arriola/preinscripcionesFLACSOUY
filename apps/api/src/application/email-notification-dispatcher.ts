@@ -227,3 +227,44 @@ export class EmailNotificationDispatcher {
     }
   }
 }
+
+export interface NotificationSupervisor {
+  stop: () => Promise<void> | void;
+}
+
+export function startNotificationSupervisor(
+  dispatcherFactory: () => Promise<EmailNotificationDispatcher | null>,
+  intervalMs = 15_000
+): NotificationSupervisor {
+  let isRunning = true;
+  let isExecuting = false;
+
+  const tick = async () => {
+    if (!isRunning || isExecuting) return;
+    isExecuting = true;
+    try {
+      const dispatcher = await dispatcherFactory();
+      if (dispatcher) {
+        await dispatcher.dispatchPending();
+      }
+    } catch (err) {
+      console.error('[NotificationSupervisor] Error durante ciclo de despacho:', err);
+    } finally {
+      isExecuting = false;
+    }
+  };
+
+  const timer = setInterval(() => {
+    void tick();
+  }, intervalMs);
+  timer.unref();
+
+  void tick();
+
+  return {
+    stop: () => {
+      isRunning = false;
+      clearInterval(timer);
+    },
+  };
+}
