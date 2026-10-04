@@ -40,7 +40,7 @@ describe('Form Profiles Domain', () => {
       'cartaRecomendacion2',
     ]);
     expect(maestria.recommendationLettersCount).toBe(2);
-    expect(maestria.steps.length).toBe(5);
+    expect(maestria.steps.length).toBe(6);
 
     // Especialización: Identidad, CV, título y carta de motivación
     const esp = getDefaultProfileDefinition('especializacion');
@@ -51,7 +51,7 @@ describe('Form Profiles Domain', () => {
       'cartaMotivacion',
     ]);
     expect(esp.recommendationLettersCount).toBe(0);
-    expect(esp.steps.length).toBe(5);
+    expect(esp.steps.length).toBe(6);
 
     // Diplomado: Identidad, CV, título y carta de motivación
     const dip = getDefaultProfileDefinition('diplomado');
@@ -61,7 +61,7 @@ describe('Form Profiles Domain', () => {
       'titulo',
       'cartaMotivacion',
     ]);
-    expect(dip.steps.length).toBe(5);
+    expect(dip.steps.length).toBe(6);
 
     // Diploma: Identidad, CV y título
     const diploma = getDefaultProfileDefinition('diploma');
@@ -70,7 +70,7 @@ describe('Form Profiles Domain', () => {
       'cv',
       'titulo',
     ]);
-    expect(diploma.steps.length).toBe(5);
+    expect(diploma.steps.length).toBe(6);
 
     // Seminario: 4 steps, no orientation or mention rules
     const seminar = getDefaultProfileDefinition('seminar');
@@ -81,6 +81,16 @@ describe('Form Profiles Domain', () => {
     const fieldConditions = seminar.fields.map((f) => f.condition);
     expect(fieldConditions).not.toContain('has_orientations');
     expect(fieldConditions).not.toContain('has_mentions');
+  });
+
+  it('keeps the academic step focused and places the title document there', () => {
+    const profile = getDefaultProfileDefinition('maestria');
+
+    expect(profile.fields.map((field) => field.key)).not.toContain('institucion');
+    expect(profile.fields.map((field) => field.key)).not.toContain('escolaridad');
+    expect(profile.fields.find((field) => field.key === 'mencion')?.stepId).toBe('orientacion');
+    expect(profile.fields.find((field) => field.key === 'orientacion')?.stepId).toBe('orientacion');
+    expect(profile.documents.find((document) => document.key === 'titulo')?.stepId).toBe('academico');
   });
 
   it('throws when requesting default profile definition for unsupported doctorado', () => {

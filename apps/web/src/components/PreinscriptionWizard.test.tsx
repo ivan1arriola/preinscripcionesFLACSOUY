@@ -58,12 +58,13 @@ describe('PreinscriptionWizard Component', () => {
     mentions: [],
   });
 
-  it('renders progress bar with 5 canonical steps and starts at step 1', () => {
+  it('renders progress bar with the separate orientation step and starts at step 1', () => {
     render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} />);
 
     expect(screen.getAllByText('Datos personales y demográficos')).toHaveLength(2);
     expect(screen.getByText('Residencia y contacto')).toBeInTheDocument();
     expect(screen.getByText('Trayectoria académica')).toBeInTheDocument();
+    expect(screen.getByText('Orientación y mención')).toBeInTheDocument();
     expect(screen.getByText('Documentación requerida')).toBeInTheDocument();
     expect(screen.getByText('Convenios y declaraciones')).toBeInTheDocument();
 
@@ -127,33 +128,35 @@ describe('PreinscriptionWizard Component', () => {
     expect(screen.getByLabelText(/Estudios cursados/i)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Estudios cursados/i), { target: { value: 'Universitario' } });
     fireEvent.click(screen.getByRole('radio', { name: 'No' })); // posgradoFlacso
-    fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
+    fireEvent.change(screen.getByLabelText(/Denominación del título/i), { target: { value: 'Licenciada' } });
+    const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText(/Archivo del título/i), { target: { files: [dummyFile] } });
+    await waitFor(() => expect(screen.getByText('titulo.pdf')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-    // Step 4: Documentos
+    // Step 4: Orientación y mención
+    fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
+    fireEvent.change(screen.getByLabelText(/Mención/i), { target: { value: 'Tecnología Educativa' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 5: Documentos
     expect(screen.getByLabelText(/Documento de identidad/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Curriculum Vitae/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Denominación del título/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Archivo del título/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Carta de motivación/i)).toBeInTheDocument();
 
-    const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
     fireEvent.change(screen.getByLabelText(/Documento de identidad/i), { target: { files: [dummyFile] } });
     fireEvent.change(screen.getByLabelText(/Curriculum Vitae/i), { target: { files: [dummyFile] } });
-    fireEvent.change(screen.getByLabelText(/Denominación del título/i), { target: { value: 'Licenciada' } });
-    fireEvent.change(screen.getByLabelText(/Archivo del título/i), { target: { files: [dummyFile] } });
     fireEvent.change(screen.getByLabelText(/Carta de motivación/i), { target: { files: [dummyFile] } });
 
     await waitFor(() => {
       expect(screen.getByText('identidad.pdf')).toBeInTheDocument();
       expect(screen.getByText('cv.pdf')).toBeInTheDocument();
-      expect(screen.getByText('titulo.pdf')).toBeInTheDocument();
       expect(screen.getByText('cartaMotivacion.pdf')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-    // Step 5: Convenios y declaraciones
+    // Step 6: Convenios y declaraciones
     expect(screen.getByRole('heading', { name: 'Convenios y declaraciones' })).toBeInTheDocument();
     const noRadios = screen.getAllByRole('radio', { name: 'No' });
     // tieneConvenio = No
@@ -263,6 +266,10 @@ describe('PreinscriptionWizard Component', () => {
     // Step 3: Académico
     fireEvent.change(screen.getByLabelText(/Estudios cursados/i), { target: { value: 'Universitario' } });
     fireEvent.click(screen.getByRole('radio', { name: 'No' }));
+    fireEvent.change(screen.getByLabelText(/Denominación del título/i), { target: { value: 'Licenciada en Sociología' } });
+    const academicTitleFile = new File(['dummy content'], 'title.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText(/Archivo del título/i), { target: { files: [academicTitleFile] } });
+    await waitFor(() => expect(screen.getByText('titulo.pdf')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 4: Documentos - must include the two recommendation letters
@@ -273,8 +280,6 @@ describe('PreinscriptionWizard Component', () => {
     const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
     fireEvent.change(screen.getByLabelText(/Documento de identidad/i), { target: { files: [dummyFile] } });
     fireEvent.change(screen.getByLabelText(/Curriculum Vitae/i), { target: { files: [dummyFile] } });
-    fireEvent.change(screen.getByLabelText(/Denominación del título/i), { target: { value: 'Licenciada en Sociología' } });
-    fireEvent.change(screen.getByLabelText(/Archivo del título/i), { target: { files: [dummyFile] } });
     fireEvent.change(screen.getByLabelText(/Carta de motivación/i), { target: { files: [dummyFile] } });
 
     await waitFor(() => {
@@ -333,10 +338,17 @@ describe('PreinscriptionWizard Component', () => {
     // Step 3: Académico
     fireEvent.change(screen.getByLabelText(/Estudios cursados/i), { target: { value: 'Terciario' } });
     fireEvent.click(screen.getByRole('radio', { name: 'No' }));
+    const noTituloCheckbox = screen.getByLabelText(/No poseo actualmente título/i);
+    fireEvent.click(noTituloCheckbox);
+    expect(screen.queryByLabelText(/Denominación del título/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Archivo del título/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 4: Orientación y mención
     fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-    // Step 4: Documentos
+    // Step 5: Documentos
     const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
     fireEvent.change(screen.getByLabelText(/Documento de identidad/i), { target: { files: [dummyFile] } });
     fireEvent.change(screen.getByLabelText(/Curriculum Vitae/i), { target: { files: [dummyFile] } });
@@ -345,14 +357,6 @@ describe('PreinscriptionWizard Component', () => {
     await waitFor(() => {
       expect(screen.getByText('cartaMotivacion.pdf')).toBeInTheDocument();
     });
-
-    // Check "No poseo actualmente título"
-    const noTituloCheckbox = screen.getByLabelText(/No poseo actualmente título/i);
-    fireEvent.click(noTituloCheckbox);
-
-    // Denomination and file input should disappear
-    expect(screen.queryByLabelText(/Denominación del título/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Archivo del título/i)).not.toBeInTheDocument();
 
     // Advancing should succeed without degree fields
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
@@ -404,21 +408,26 @@ describe('PreinscriptionWizard Component', () => {
     // Step 3: Académico - select posgradoFlacso = Si
     fireEvent.change(screen.getByLabelText(/Estudios cursados/i), { target: { value: 'Universitario' } });
     fireEvent.click(screen.getByRole('radio', { name: 'Sí' })); // posgradoFlacso
-    fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
 
     // Click siguiente without specifying posgradoCual
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
     expect(screen.getByText(/Debe especificar qué posgrado cursó en FLACSO/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/¿Cuál posgrado\?/i), { target: { value: 'Diploma en Género' } });
+    fireEvent.change(screen.getByLabelText(/Denominación del título/i), { target: { value: 'Licenciatura' } });
+    const academicFile = new File(['dummy content'], 'title.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText(/Archivo del título/i), { target: { files: [academicFile] } });
+    await waitFor(() => expect(screen.getByText('titulo.pdf')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-    // Step 4: Documentos
+    // Step 4: Orientación y mención
+    fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
+    fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    // Step 5: Documentos
     const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
     fireEvent.change(screen.getByLabelText(/Documento de identidad/i), { target: { files: [dummyFile] } });
     fireEvent.change(screen.getByLabelText(/Curriculum Vitae/i), { target: { files: [dummyFile] } });
-    fireEvent.change(screen.getByLabelText(/Denominación del título/i), { target: { value: 'Licenciatura' } });
-    fireEvent.change(screen.getByLabelText(/Archivo del título/i), { target: { files: [dummyFile] } });
     fireEvent.change(screen.getByLabelText(/Carta de motivación/i), { target: { files: [dummyFile] } });
 
     await waitFor(() => {

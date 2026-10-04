@@ -172,8 +172,9 @@ export function getDefaultProfileDefinition(type: SupportedOfferType): FormProfi
         { id: 'personal', title: 'Datos personales y demográficos', order: 1 },
         { id: 'contacto', title: 'Residencia y contacto', order: 2 },
         { id: 'academico', title: 'Trayectoria académica', order: 3 },
-        { id: 'documentos', title: 'Documentación requerida', order: 4 },
-        { id: 'declaracion', title: 'Convenios y declaraciones', order: 5 },
+        { id: 'orientacion', title: 'Orientación y mención', order: 4 },
+        { id: 'documentos', title: 'Documentación requerida', order: 5 },
+        { id: 'declaracion', title: 'Convenios y declaraciones', order: 6 },
       ];
 
   const personalFields: FieldRuleDefinition[] = [
@@ -207,19 +208,17 @@ export function getDefaultProfileDefinition(type: SupportedOfferType): FormProfi
 
   if (!isSeminar) {
     academicoFields.push(
-      { key: 'titulo', stepId: 'academico', order: 21, required: true, condition: 'always' },
-      { key: 'escolaridad', stepId: 'academico', order: 22, required: true, condition: 'always' },
-      { key: 'institucion', stepId: 'academico', order: 23, required: false, condition: 'always' },
-      { key: 'orientacion', stepId: 'academico', order: 24, required: true, condition: 'has_orientations' },
-      { key: 'mencion', stepId: 'academico', order: 25, required: false, condition: 'has_mentions' },
+      { key: 'tituloDenominacion', stepId: 'academico', order: 21, required: false, condition: 'always' },
+      { key: 'orientacion', stepId: 'orientacion', order: 22, required: true, condition: 'has_orientations' },
+      { key: 'mencion', stepId: 'orientacion', order: 23, required: false, condition: 'has_mentions' },
     );
   }
 
   const declaracionFields: FieldRuleDefinition[] = [
-    { key: 'tieneConvenio', stepId: 'declaracion', order: 26, required: true, condition: 'always' },
-    { key: 'convenioWordpressId', stepId: 'declaracion', order: 27, required: false, condition: 'always' },
-    { key: 'fuente', stepId: 'declaracion', order: 28, required: true, condition: 'always' },
-    { key: 'aceptaDifusion', stepId: 'declaracion', order: 29, required: true, condition: 'always' },
+    { key: 'tieneConvenio', stepId: 'declaracion', order: 24, required: true, condition: 'always' },
+    { key: 'convenioWordpressId', stepId: 'declaracion', order: 25, required: false, condition: 'always' },
+    { key: 'fuente', stepId: 'declaracion', order: 26, required: true, condition: 'always' },
+    { key: 'aceptaDifusion', stepId: 'declaracion', order: 27, required: true, condition: 'always' },
   ];
 
   const fields = [...personalFields, ...contactoFields, ...academicoFields, ...declaracionFields];
@@ -255,7 +254,7 @@ export function getDefaultProfileDefinition(type: SupportedOfferType): FormProfi
       },
       {
         key: 'titulo',
-        stepId: 'documentos',
+        stepId: 'academico',
         order: 3,
         label: 'Título',
         required: true,

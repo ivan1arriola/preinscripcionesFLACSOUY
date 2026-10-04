@@ -83,7 +83,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
         return ['paisResidencia', 'ciudadResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
       }
       if (currentStep.id === 'academico') {
-        return ['estudios', 'posgradoFlacso', 'posgradoCual', 'institucion', 'orientacion', 'mencion'].includes(i.key);
+        return ['estudios', 'posgradoFlacso', 'posgradoCual', 'orientacion', 'tituloDenominacion'].includes(i.key);
       }
       if (currentStep.id === 'declaracion') {
         return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
@@ -114,6 +114,9 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       if (values.posgradoFlacso === 'Si' && !(values.posgradoCual || '').trim()) {
         errors.posgradoCual = 'Debe especificar qué posgrado cursó en FLACSO.';
       }
+    }
+
+    if (currentStep.id === 'orientacion') {
       const hasOrientations = (form.orientations ?? []).length > 0;
       const orientacionVal = values.orientacion?.trim();
       if (hasOrientations) {
@@ -142,36 +145,28 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       return currentStep.id === 'documentos';
     });
 
-    if (currentStep.id === 'documentos') {
+    const titleDoc = stepDocs.find((doc) => doc.key === 'titulo');
+    if (titleDoc) {
       const isSinTitulo = values.sinTituloActual === 'Si';
-      const hasTituloDoc = stepDocs.some((d) => d.key === 'titulo');
-      if (hasTituloDoc) {
-        if (!isSinTitulo) {
-          if (!(values.tituloDenominacion || '').trim()) {
-            errors.tituloDenominacion = 'El campo Denominación del título es obligatorio.';
-          }
-          if (!files.some((f) => f.fieldKey === 'titulo')) {
-            errors.titulo = 'El documento Título de grado o terciario es obligatorio.';
-          }
+      if (!isSinTitulo) {
+        if (!(values.tituloDenominacion || '').trim()) {
+          errors.tituloDenominacion = 'El campo Denominación del título es obligatorio.';
+        }
+        if (!files.some((f) => f.fieldKey === 'titulo')) {
+          errors.titulo = 'El documento Título de grado o terciario es obligatorio.';
         }
       }
+    }
 
-      for (const doc of stepDocs) {
-        if (doc.key === 'titulo') continue;
-        if (doc.alternative?.kind === 'defer') {
-          const isDeferred = values[doc.alternative.valueKey] === 'Si';
-          if (!isDeferred && !files.some((f) => f.fieldKey === doc.key)) {
-            errors[doc.key] = `El documento ${doc.label} es obligatorio.`;
-          }
-        } else if (doc.required && !files.some((f) => f.fieldKey === doc.key)) {
+    for (const doc of stepDocs) {
+      if (doc.key === 'titulo') continue;
+      if (doc.alternative?.kind === 'defer') {
+        const isDeferred = values[doc.alternative.valueKey] === 'Si';
+        if (!isDeferred && !files.some((f) => f.fieldKey === doc.key)) {
           errors[doc.key] = `El documento ${doc.label} es obligatorio.`;
         }
-      }
-    } else {
-      for (const doc of stepDocs) {
-        if (doc.required && !doc.canDefer && !files.some((f) => f.fieldKey === doc.key)) {
-          errors[doc.key] = `El documento ${doc.label} es obligatorio.`;
-        }
+      } else if (doc.required && !files.some((f) => f.fieldKey === doc.key)) {
+        errors[doc.key] = `El documento ${doc.label} es obligatorio.`;
       }
     }
 
@@ -232,7 +227,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       return ['paisResidencia', 'ciudadResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
     }
     if (currentStep.id === 'academico') {
-      return ['estudios', 'posgradoFlacso', 'posgradoCual', 'institucion', 'orientacion', 'mencion'].includes(i.key);
+      return ['estudios', 'posgradoFlacso', 'posgradoCual', 'orientacion', 'tituloDenominacion'].includes(i.key);
     }
     if (currentStep.id === 'declaracion') {
       return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);

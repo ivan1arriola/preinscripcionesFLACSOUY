@@ -33,6 +33,16 @@ const isValidCedula = (value: string) => {
 };
 const regionNames = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['es'], { type: 'region' }) : undefined;
 const flagFor = (country: CountryCode) => String.fromCodePoint(...[...country].map((letter) => 0x1F1E6 + letter.charCodeAt(0) - 65));
+const phonePlaceholders: Partial<Record<CountryCode, string>> = {
+  UY: '99 123 456',
+  AR: '11 1234 5678',
+  BR: '(11) 91234-5678',
+  CL: '9 1234 5678',
+  PY: '981 123 456',
+  US: '(201) 555-0123',
+  ES: '612 345 678',
+};
+const phonePlaceholderFor = (country: CountryCode) => phonePlaceholders[country] ?? 'Número local';
 const yesNoKeys = new Set(['tieneConvenio', 'aceptaDifusion', 'posgradoFlacso']);
 
 export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values, errors, disabled, onChange, agreements = [] }) => {
@@ -71,8 +81,7 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
         <label htmlFor="phone-country" className="sr-only">País del teléfono</label>
         <div className="phone-input">
           <select id="phone-country" value={phoneCountry} disabled={disabled} onChange={(event) => setPhoneCountry(event.target.value as CountryCode)}>{getCountries().map((country) => <option key={country} value={country}>{flagFor(country)} {regionNames?.of(country) ?? country} +{getCountryCallingCode(country)}</option>)}</select>
-          <span className="phone-prefix" aria-hidden="true">{flagFor(phoneCountry)} +{getCountryCallingCode(phoneCountry)}</span>
-          <input id={`input-${input.key}`} name={input.key} type="tel" value={phoneInputValue} onChange={(event) => updatePhone(event.target.value)} disabled={disabled} placeholder="99 123 456" aria-describedby="celular-ayuda celular-estado" />
+          <input id={`input-${input.key}`} name={input.key} type="tel" value={phoneInputValue} onChange={(event) => updatePhone(event.target.value)} disabled={disabled} placeholder={phonePlaceholderFor(phoneCountry)} aria-describedby="celular-ayuda celular-estado" />
         </div>
         <p id="celular-ayuda" className="mt-1 text-xs text-gray-500">Elegí el país e ingresá el número. Se guardará con el código internacional.</p>
         {phoneStatus && <p id="celular-estado" className="mt-1 text-xs text-gray-600" aria-live="polite">{phoneStatus}</p>}

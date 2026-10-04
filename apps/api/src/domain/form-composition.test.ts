@@ -77,7 +77,7 @@ describe('composeForm with Form Profiles', () => {
       if (type === 'seminar') {
         expect(result.value.steps.length).toBe(4);
       } else {
-        expect(result.value.steps.length).toBe(5);
+        expect(result.value.steps.length).toBe(6);
       }
     }
   });
@@ -154,7 +154,7 @@ describe('composeForm with Form Profiles', () => {
       expect(keys).not.toContain('mencion');
     });
 
-    it('includes mencion and omits orientacion when only mentions are present in target', () => {
+    it('places mention in the separate orientation step when the target has mentions', () => {
       const targetWithMentionsOnly: AcademicTarget = {
         ...baseTarget,
         orientations: [],
@@ -170,6 +170,7 @@ describe('composeForm with Form Profiles', () => {
       const keys = result.value.inputs.map((i) => i.key);
       expect(keys).not.toContain('orientacion');
       expect(keys).toContain('mencion');
+      expect(result.value.inputs.find((input) => input.key === 'mencion')?.stepId).toBe('orientacion');
     });
 
     it('omits both orientacion and mencion when both target lists are empty', () => {
@@ -188,6 +189,21 @@ describe('composeForm with Form Profiles', () => {
       const keys = result.value.inputs.map((i) => i.key);
       expect(keys).not.toContain('orientacion');
       expect(keys).not.toContain('mencion');
+    });
+
+    it('does not compose institution or mention fields into the academic step', () => {
+      const target: AcademicTarget = {
+        ...baseTarget,
+        orientations: [],
+        mentions: ['Tecnología Educativa'],
+      };
+      const result = composeForm(target, mockEffectiveProfile('maestria'));
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.inputs.map((input) => input.key)).not.toContain('institucion');
+      expect(result.value.inputs.find((input) => input.key === 'mencion')?.stepId).toBe('orientacion');
+      expect(result.value.documents.find((document) => document.key === 'titulo')?.stepId).toBe('academico');
     });
   });
 

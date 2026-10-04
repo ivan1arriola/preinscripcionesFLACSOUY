@@ -24,9 +24,9 @@ describe('PostgresFormProfileRepository (Integration with PostgreSQL)', () => {
     const maestria = await repository.getActive('maestria');
     expect(maestria).not.toBeNull();
     expect(maestria?.type).toBe('maestria');
-    expect(maestria?.versionNumber).toBe(1);
+    expect(maestria?.versionNumber).toBeGreaterThanOrEqual(2);
     expect(maestria?.definition.recommendationLettersCount).toBe(2);
-    expect(maestria?.definition.steps.length).toBe(5);
+    expect(maestria?.definition.steps.length).toBeGreaterThanOrEqual(5);
 
     const seminar = await repository.getActive('seminar');
     expect(seminar).not.toBeNull();

@@ -13,8 +13,9 @@ export const CANONICAL_STEPS: FormStepDefinition[] = [
   { id: 'personal', title: 'Datos personales y demográficos', order: 1 },
   { id: 'contacto', title: 'Residencia y contacto', order: 2 },
   { id: 'academico', title: 'Trayectoria académica', order: 3 },
-  { id: 'documentos', title: 'Documentación requerida', order: 4 },
-  { id: 'declaracion', title: 'Convenios y declaraciones', order: 5 },
+  { id: 'orientacion', title: 'Orientación y mención', order: 4 },
+  { id: 'documentos', title: 'Documentación requerida', order: 5 },
+  { id: 'declaracion', title: 'Convenios y declaraciones', order: 6 },
 ];
 
 export const CANONICAL_BASE_INPUTS: Array<Omit<InputDefinition, 'position'>> = [
@@ -43,11 +44,10 @@ export const CANONICAL_BASE_INPUTS: Array<Omit<InputDefinition, 'position'>> = [
   { key: 'estudios', label: 'Estudios cursados', type: 'textarea', required: true, stepId: 'academico', spreadsheetColumn: 'Estudios cursados' },
   { key: 'posgradoFlacso', label: '¿Cursaste algún posgrado en FLACSO?', type: 'select', required: true, stepId: 'academico', spreadsheetColumn: '¿Cursó posgrado en FLACSO?' },
   { key: 'posgradoCual', label: '¿Cuál posgrado?', type: 'text', required: false, stepId: 'academico', spreadsheetColumn: 'Cuál posgrado' },
-  { key: 'institucion', label: 'Institución', type: 'text', required: false, stepId: 'academico', spreadsheetColumn: 'Institución' },
 
-  // Step 4: Documentación requerida
-  { key: 'tituloDenominacion', label: 'Denominación del título', type: 'text', required: false, stepId: 'documentos', spreadsheetColumn: 'Denominación del título' },
-  { key: 'sinTituloActual', label: 'No poseo actualmente título', type: 'checkbox', required: false, stepId: 'documentos', spreadsheetColumn: 'No posee actualmente título' },
+  // Title companion fields are rendered with the title document in Trayectoria académica.
+  { key: 'tituloDenominacion', label: 'Denominación del título', type: 'text', required: false, stepId: 'academico', spreadsheetColumn: 'Denominación del título' },
+  { key: 'sinTituloActual', label: 'No poseo actualmente título', type: 'checkbox', required: false, stepId: 'academico', spreadsheetColumn: 'No posee actualmente título' },
 
   // Step 5: Convenios y declaraciones
   { key: 'tieneConvenio', label: '¿Te corresponde algún convenio?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: '¿Te corresponde algún convenio?' },
@@ -87,7 +87,7 @@ export const CANONICAL_CORE_DOCUMENTS: DocumentDefinition[] = [
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
     acceptedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
-    stepId: 'documentos',
+    stepId: 'academico',
     position: 3,
     companionInputKey: 'tituloDenominacion',
     alternative: {
@@ -211,7 +211,7 @@ export function getCanonicalFormDefinition(
         type: 'select',
         required: true,
         position: position++,
-        stepId: 'academico',
+        stepId: 'orientacion',
         optionsSource: 'wordpress.orientaciones',
         condition: 'has_orientations',
         spreadsheetColumn: 'Orientación',
@@ -225,7 +225,7 @@ export function getCanonicalFormDefinition(
         type: 'select',
         required: false,
         position: position++,
-        stepId: 'academico',
+        stepId: 'orientacion',
         optionsSource: 'wordpress.menciones',
         condition: 'has_mentions',
         spreadsheetColumn: 'Mención',
@@ -272,6 +272,9 @@ export function getCanonicalFormDefinition(
     ...doc,
     position: idx + 1,
   }));
+  const steps = CANONICAL_STEPS.filter(
+    (step) => step.id !== 'orientacion' || targetOrientations.length > 0 || targetMentions.length > 0,
+  );
 
   return {
     ok: true,
@@ -284,7 +287,7 @@ export function getCanonicalFormDefinition(
       effectiveRevision: `${target.configRevision}:${CANONICAL_SCHEMA_VERSION}`,
       registrationOpen: target.registrationOpen,
       configRevision: target.configRevision,
-      steps: CANONICAL_STEPS,
+      steps,
       inputs,
       documents,
       orientations: targetOrientations,

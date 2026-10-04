@@ -47,7 +47,7 @@ describe('Catalog Application Use Cases & Fixture Adapter', () => {
     );
     expect(result.form.orientations).toEqual(['Educación', 'Políticas Públicas']);
     expect(result.form.mentions).toEqual(['Tecnología Educativa', 'Gestión de Entornos Digitales']);
-    expect(result.form.steps.length).toBe(5);
+    expect(result.form.steps.length).toBe(6);
   });
 
   it('returns NOT_FOUND for a nonexistent target', async () => {

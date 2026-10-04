@@ -126,7 +126,9 @@ export function composeForm(
   const hash = crypto.createHash('sha256').update(revisionPayload).digest('hex');
   const effectiveRevision = `sha256:${hash}`;
 
-  const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
+  const sortedSteps = [...steps]
+    .filter((step) => step.id !== 'orientacion' || targetOrientations.length > 0 || targetMentions.length > 0)
+    .sort((a, b) => a.order - b.order);
 
   return {
     ok: true,

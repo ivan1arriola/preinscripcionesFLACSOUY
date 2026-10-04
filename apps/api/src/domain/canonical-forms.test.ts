@@ -18,12 +18,13 @@ describe('Canonical Forms Specification', () => {
     mentions: [],
   };
 
-  it('defines 5 canonical steps for all offer types', () => {
-    expect(CANONICAL_STEPS).toHaveLength(5);
+  it('defines the canonical steps including a separate orientation segment', () => {
+    expect(CANONICAL_STEPS).toHaveLength(6);
     expect(CANONICAL_STEPS.map((s) => s.id)).toEqual([
       'personal',
       'contacto',
       'academico',
+      'orientacion',
       'documentos',
       'declaracion',
     ]);
@@ -31,6 +32,7 @@ describe('Canonical Forms Specification', () => {
       'Datos personales y demográficos',
       'Residencia y contacto',
       'Trayectoria académica',
+      'Orientación y mención',
       'Documentación requerida',
       'Convenios y declaraciones',
     ]);

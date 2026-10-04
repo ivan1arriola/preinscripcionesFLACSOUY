@@ -47,6 +47,21 @@ describe('UniversalFields identity and contact controls', () => {
   it('shows the country flag and calling code next to the phone number', () => {
     render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={vi.fn()} />);
 
-    expect(screen.getByText('🇺🇾 +598')).toBeInTheDocument();
+    expect(screen.getByLabelText(/País del teléfono/i)).toHaveValue('UY');
+    expect(screen.getByRole('option', { name: /Uruguay \+598/i })).toBeInTheDocument();
+  });
+
+  it('updates the phone placeholder when the selected country changes', () => {
+    render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/País del teléfono/i), { target: { value: 'AR' } });
+
+    expect(screen.getByLabelText(/^Celular/)).toHaveAttribute('placeholder', '11 1234 5678');
+  });
+
+  it('does not render a duplicate prefix over the country selector', () => {
+    const { container } = render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={vi.fn()} />);
+
+    expect(container.querySelector('.phone-prefix')).not.toBeInTheDocument();
   });
 });
