@@ -21,6 +21,7 @@ import { PostgresTargetSpreadsheetRepository } from './infrastructure/database/p
 import { TargetSpreadsheetService } from './application/target-spreadsheet-service.js';
 import { PostgresAdminSessionStore } from './infrastructure/database/postgres-admin-session-store.js';
 import { getAdminSessionTtlMs } from './application/admin-session.js';
+import { PostgresTemporaryUploadRepository } from './infrastructure/database/postgres-temporary-upload-repository.js';
 
 
 const port = Number(process.env.PORT || 3000);
@@ -29,6 +30,7 @@ const db = createKyselyDb();
 const formProfileRepository = new PostgresFormProfileRepository(db);
 const systemSettingsRepository = new PostgresSystemSettingsRepository(db);
 const targetSpreadsheetRepository = new PostgresTargetSpreadsheetRepository(db);
+const temporaryUploadRepository = new PostgresTemporaryUploadRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
   ? new WordPressAcademicCatalog(
@@ -43,6 +45,7 @@ const temporaryFileStorage = new TemporaryFileStorage({
   rootDir: process.env.UPLOAD_TMP_DIR || '/tmp/flacso-preinscripciones',
   maxBytes: 10 * 1024 * 1024,
   allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+  repository: temporaryUploadRepository,
 });
 const googleCreds = loadAllGoogleCredentials();
 if (process.env.NODE_ENV === 'production' && !googleCreds.tokenProvider) {

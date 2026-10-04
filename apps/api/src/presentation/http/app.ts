@@ -52,7 +52,7 @@ export function createApp(dependencies: AppDependencies): Express {
   app.use(cookieParser());
 
   if (dependencies.temporaryFileStorage) {
-    app.use('/api/uploads', createUploadRoutes(dependencies.temporaryFileStorage));
+    app.use('/api/uploads', createUploadRoutes(dependencies.temporaryFileStorage, dependencies.catalog));
   }
 
   app.get('/api/health', async (_req, res) => {

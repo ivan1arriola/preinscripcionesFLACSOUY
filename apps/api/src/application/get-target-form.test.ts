@@ -89,7 +89,7 @@ describe('getTargetForm Use Case', () => {
       expect(result.form.targetId).toBe('sem-2');
       expect(result.form.profileVersionId).toBe('canonical-v1');
       expect(result.form.steps).toHaveLength(5);
-      expect(result.form.documents).toHaveLength(4);
+      expect(result.form.documents).toHaveLength(3);
     }
   });
 

@@ -153,6 +153,19 @@ export interface AdminSessionsTable {
   expires_at: Date;
 }
 
+export interface TemporaryUploadsTable {
+  token: string;
+  session_id: string;
+  target_id: string | null;
+  field_key: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  created_at: Generated<Date>;
+  last_activity_at: Generated<Date>;
+  expires_at: Date;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -169,6 +182,7 @@ export interface DatabaseSchema {
   spreadsheet_operations: SpreadsheetOperationsTable;
   admin_users: AdminUsersTable;
   admin_sessions: AdminSessionsTable;
+  temporary_uploads: TemporaryUploadsTable;
   form_profiles: FormProfilesTable;
   form_profile_versions: FormProfileVersionsTable;
   form_profile_audit_events: FormProfileAuditEventsTable;

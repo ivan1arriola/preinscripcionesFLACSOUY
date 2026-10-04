@@ -2,37 +2,270 @@ import { describe, expect, it } from 'vitest';
 import express from 'express';
 import { createUploadRoutes } from './upload-routes.js';
 import { TemporaryFileStorage } from '../../infrastructure/files/temporary-file-storage.js';
+import type { AcademicCatalog } from '../../ports/academic-catalog.js';
+import type { AcademicTarget } from '@flacso/contracts';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 describe('Upload HTTP Routes', () => {
-  it('stores a selected file immediately and returns a private token', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'flacso-upload-route-'));
-    const storage = new TemporaryFileStorage({ rootDir: root, maxBytes: 1024, allowedMimeTypes: ['application/pdf'] });
-    const app = express();
-    app.use('/api/uploads', createUploadRoutes(storage));
-    const form = new FormData();
-    form.append('targetId', 'target-1');
-    form.append('fieldKey', 'cv');
-    form.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'cv.pdf');
+  const openDiploma: AcademicTarget = {
+    id: 'diploma-davia',
+    kind: 'academic_offer',
+    offerType: 'diploma',
+    title: 'Diploma DAVIA',
+    registrationOpen: true,
+    configRevision: 'rev-1',
+    orientations: [],
+    mentions: [],
+  };
 
+  const openSeminar: AcademicTarget = {
+    id: 'seminar-ia',
+    kind: 'seminar',
+    title: 'Seminario IA',
+    registrationOpen: true,
+    configRevision: 'rev-sem',
+    orientations: [],
+    mentions: [],
+  };
+
+  const closedTarget: AcademicTarget = {
+    id: 'target-closed',
+    kind: 'academic_offer',
+    offerType: 'diploma',
+    title: 'Diploma Cerrado',
+    registrationOpen: false,
+    configRevision: 'rev-closed',
+    orientations: [],
+    mentions: [],
+  };
+
+  const mockCatalog: AcademicCatalog = {
+    listTargets: async () => [openDiploma, openSeminar, closedTarget],
+    revalidateTarget: async (id) => {
+      if (id === 'diploma-davia') return openDiploma;
+      if (id === 'seminar-ia') return openSeminar;
+      if (id === 'target-closed') return closedTarget;
+      return null;
+    },
+  };
+
+  async function setupApp(storageOptions?: { maxBytes?: number; maxTotalBytes?: number }) {
+    const root = await mkdtemp(join(tmpdir(), 'flacso-upload-test-'));
+    const storage = new TemporaryFileStorage({
+      rootDir: root,
+      maxBytes: storageOptions?.maxBytes ?? 10 * 1024 * 1024,
+      allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+    });
+    const app = express();
+    app.use(express.json());
+    app.use('/api/uploads', createUploadRoutes(storage, mockCatalog));
     const server = app.listen(0);
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('server address missing');
+    const baseUrl = `http://127.0.0.1:${address.port}/api/uploads`;
+    return {
+      storage,
+      baseUrl,
+      close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    };
+  }
+
+  it('stores a valid file immediately and returns a private token', async () => {
+    const { baseUrl, storage, close } = await setupApp();
     try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/api/uploads`, {
+      const form = new FormData();
+      form.append('targetId', 'diploma-davia');
+      form.append('fieldKey', 'cv');
+      form.append('file', new Blob([Buffer.from('pdf data')], { type: 'application/pdf' }), 'curriculum.pdf');
+
+      const response = await fetch(baseUrl, {
         method: 'POST',
-        headers: { 'x-preinscription-session': 'session-a' },
+        headers: { 'x-preinscription-session': 'session-alpha' },
         body: form,
       });
+
       expect(response.status).toBe(201);
-      const payload = await response.json() as { token: string; fieldKey: string };
+      const payload = (await response.json()) as { token: string; fieldKey: string; originalName: string };
       expect(payload.token).toMatch(/^[a-f0-9]{32}$/);
       expect(payload.fieldKey).toBe('cv');
-      await expect(storage.open(payload.token, 'session-a')).resolves.toMatchObject({ originalName: 'cv.pdf' });
+      expect(payload.originalName).toBe('curriculum.pdf');
+      await expect(storage.open(payload.token, 'session-alpha')).resolves.toMatchObject({
+        originalName: 'curriculum.pdf',
+      });
     } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await close();
+    }
+  });
+
+  it('rejects upload when session header is missing', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      const form = new FormData();
+      form.append('targetId', 'diploma-davia');
+      form.append('fieldKey', 'cv');
+      form.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'cv.pdf');
+
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        body: form,
+      });
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error.message).toMatch(/sesión.*obligatoria/i);
+    } finally {
+      await close();
+    }
+  });
+
+  it('rejects upload for closed target or non-existent target', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      // Closed target
+      const formClosed = new FormData();
+      formClosed.append('targetId', 'target-closed');
+      formClosed.append('fieldKey', 'cv');
+      formClosed.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'cv.pdf');
+
+      const resClosed = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-alpha' },
+        body: formClosed,
+      });
+      expect(resClosed.status).toBe(400);
+
+      // Unknown target
+      const formUnknown = new FormData();
+      formUnknown.append('targetId', 'unknown-target');
+      formUnknown.append('fieldKey', 'cv');
+      formUnknown.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'cv.pdf');
+
+      const resUnknown = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-alpha' },
+        body: formUnknown,
+      });
+      expect(resUnknown.status).toBe(404);
+    } finally {
+      await close();
+    }
+  });
+
+  it('rejects unsupported field for target (e.g. motivation or recommendations on seminar)', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      const form = new FormData();
+      form.append('targetId', 'seminar-ia');
+      form.append('fieldKey', 'cartaMotivacion'); // Seminars do not accept motivation letter
+      form.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'carta.pdf');
+
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-alpha' },
+        body: form,
+      });
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error.message).toMatch(/no corresponde/i);
+    } finally {
+      await close();
+    }
+  });
+
+  it('rejects unaccepted MIME type for field (e.g. image for CV which only accepts PDF)', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      const form = new FormData();
+      form.append('targetId', 'diploma-davia');
+      form.append('fieldKey', 'cv');
+      form.append('file', new Blob([Buffer.from('image bytes')], { type: 'image/png' }), 'cv.png');
+
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-alpha' },
+        body: form,
+      });
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error.message).toMatch(/no permitido/i);
+    } finally {
+      await close();
+    }
+  });
+
+  it('rejects file exceeding max files per requirement (e.g. second CV)', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      // 1st CV upload: succeeds
+      const form1 = new FormData();
+      form1.append('targetId', 'diploma-davia');
+      form1.append('fieldKey', 'cv');
+      form1.append('file', new Blob([Buffer.from('cv 1')], { type: 'application/pdf' }), 'cv1.pdf');
+
+      const res1 = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-beta' },
+        body: form1,
+      });
+      expect(res1.status).toBe(201);
+
+      // 2nd CV upload for same session: fails
+      const form2 = new FormData();
+      form2.append('targetId', 'diploma-davia');
+      form2.append('fieldKey', 'cv');
+      form2.append('file', new Blob([Buffer.from('cv 2')], { type: 'application/pdf' }), 'cv2.pdf');
+
+      const res2 = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-beta' },
+        body: form2,
+      });
+      expect(res2.status).toBe(400);
+      const data = await res2.json();
+      expect(data.error.message).toMatch(/máximo de archivos/i);
+    } finally {
+      await close();
+    }
+  });
+
+  it('DELETE /api/uploads/:token removes only owned token and rejects foreign token', async () => {
+    const { baseUrl, storage, close } = await setupApp();
+    try {
+      // Upload as session-1
+      const form = new FormData();
+      form.append('targetId', 'diploma-davia');
+      form.append('fieldKey', 'cv');
+      form.append('file', new Blob([Buffer.from('cv content')], { type: 'application/pdf' }), 'cv.pdf');
+
+      const uploadRes = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-1' },
+        body: form,
+      });
+      const { token } = (await uploadRes.json()) as { token: string };
+
+      // Attempt delete from foreign session: rejected (404/403)
+      const foreignDelete = await fetch(`${baseUrl}/${token}`, {
+        method: 'DELETE',
+        headers: { 'x-preinscription-session': 'session-other' },
+      });
+      expect([403, 404]).toContain(foreignDelete.status);
+
+      // Attempt delete from owner session: succeeds
+      const ownerDelete = await fetch(`${baseUrl}/${token}`, {
+        method: 'DELETE',
+        headers: { 'x-preinscription-session': 'session-1' },
+      });
+      expect([200, 204]).toContain(ownerDelete.status);
+
+      // Storage should no longer have the file
+      await expect(storage.open(token, 'session-1')).rejects.toThrow();
+    } finally {
+      await close();
     }
   });
 });
