@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildSpreadsheetRow,
   validateSpreadsheetHeaders,
+  resolveAdditiveHeaders,
   type RowBuildResult,
 } from './spreadsheet-row.js';
 
@@ -81,5 +82,33 @@ describe('Spreadsheet Row Builder & Header Resolution (Pure Domain)', () => {
     const diag = validateSpreadsheetHeaders(headers, required);
     expect(diag.valid).toBe(true);
     expect(diag.missingColumns).toEqual([]);
+  });
+
+  describe('resolveAdditiveHeaders (Pure Domain)', () => {
+    it('appends missing required columns preserving the exact order of existing headers and manual columns', () => {
+      const currentHeaders = ['Timestamp', 'Observaciones Asistente', 'Nombre', 'País de residencia'];
+      const requiredColumns = ['Timestamp', 'Nombre', 'País de residencia', 'Ciudad de residencia'];
+
+      const result = resolveAdditiveHeaders(currentHeaders, requiredColumns);
+
+      expect(result.updatedHeaders).toEqual([
+        'Timestamp',
+        'Observaciones Asistente',
+        'Nombre',
+        'País de residencia',
+        'Ciudad de residencia',
+      ]);
+      expect(result.missingColumnsAdded).toEqual(['Ciudad de residencia']);
+    });
+
+    it('does not duplicate columns if all required columns already exist', () => {
+      const currentHeaders = ['Nombre', 'Apellido', 'Documento'];
+      const requiredColumns = ['Nombre', 'Documento'];
+
+      const result = resolveAdditiveHeaders(currentHeaders, requiredColumns);
+
+      expect(result.updatedHeaders).toEqual(['Nombre', 'Apellido', 'Documento']);
+      expect(result.missingColumnsAdded).toEqual([]);
+    });
   });
 });

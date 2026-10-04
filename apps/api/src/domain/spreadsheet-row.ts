@@ -78,3 +78,26 @@ export function buildSpreadsheetRow(
     row,
   };
 }
+
+export function resolveAdditiveHeaders(
+  currentHeaders: string[],
+  requiredColumns: string[]
+): {
+  updatedHeaders: string[];
+  missingColumnsAdded: string[];
+} {
+  const normalizedCurrent = currentHeaders.map((h) => h.trim());
+  const currentSet = new Set(normalizedCurrent);
+  const missingColumnsAdded: string[] = [];
+
+  for (const col of requiredColumns) {
+    if (!currentSet.has(col.trim())) {
+      missingColumnsAdded.push(col);
+    }
+  }
+
+  return {
+    updatedHeaders: [...currentHeaders, ...missingColumnsAdded],
+    missingColumnsAdded,
+  };
+}

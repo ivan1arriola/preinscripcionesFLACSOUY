@@ -5,6 +5,7 @@ import type {
 } from '../../ports/spreadsheet-repository.js';
 import {
   buildSpreadsheetRow,
+  resolveAdditiveHeaders,
   validateSpreadsheetHeaders,
 } from '../../domain/spreadsheet-row.js';
 import type { SheetsClient } from './sheets-client.js';
@@ -13,6 +14,16 @@ export class IncompatibleSpreadsheetError extends Error {
   constructor(message: string, public readonly missingColumns: string[]) {
     super(message);
     this.name = 'IncompatibleSpreadsheetError';
+  }
+}
+
+export class SpreadsheetSchemaRepairError extends IncompatibleSpreadsheetError {
+  constructor(missingColumns: string[], public readonly cause?: unknown) {
+    super(
+      `No se pudieron reparar las columnas faltantes en la planilla: ${missingColumns.join(', ')}`,
+      missingColumns
+    );
+    this.name = 'SpreadsheetSchemaRepairError';
   }
 }
 
@@ -34,14 +45,27 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
     requiredColumns: string[],
     sheetName = 'Sheet1'
   ): Promise<AppendResult> {
-    const headers = await this.readHeaders(spreadsheetId, sheetName);
-    const buildResult = buildSpreadsheetRow(headers, valuesByColumnName, requiredColumns);
+    let headers = await this.readHeaders(spreadsheetId, sheetName);
+    let buildResult = buildSpreadsheetRow(headers, valuesByColumnName, requiredColumns);
 
     if (!buildResult.success) {
-      throw new IncompatibleSpreadsheetError(
-        `El Spreadsheet no contiene todas las columnas requeridas: ${buildResult.missingColumns.join(', ')}`,
-        buildResult.missingColumns
-      );
+      const initialMissingColumns = buildResult.missingColumns;
+      const { updatedHeaders, missingColumnsAdded } = resolveAdditiveHeaders(headers, requiredColumns);
+
+      if (missingColumnsAdded.length > 0) {
+        try {
+          const headerRange = `${sheetName}!1:1`;
+          await this.client.updateValues(spreadsheetId, headerRange, [updatedHeaders]);
+          headers = updatedHeaders;
+          buildResult = buildSpreadsheetRow(headers, valuesByColumnName, requiredColumns);
+        } catch (repairError) {
+          throw new SpreadsheetSchemaRepairError(initialMissingColumns, repairError);
+        }
+      }
+
+      if (!buildResult.success) {
+        throw new SpreadsheetSchemaRepairError(buildResult.missingColumns);
+      }
     }
 
     const range = `${sheetName}!A:A`;

@@ -54,10 +54,54 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     ]);
   });
 
-  it('rejects append when required columns are missing in the spreadsheet', async () => {
+  it('repairs missing required columns additively preserving existing order and manual columns, then appends the complete row', async () => {
+    const mockClient: SheetsClient = {
+      getValues: vi.fn().mockResolvedValue([
+        ['Timestamp', 'Observaciones Asistente', 'Nombre', 'País de residencia'],
+      ]),
+      updateValues: vi.fn().mockResolvedValue(undefined),
+      appendValues: vi.fn().mockResolvedValue({
+        updatedRange: 'Inscripciones!A2:E2',
+        updatedRows: 1,
+      }),
+    };
+
+    const repo = new GoogleSheetsRepository(mockClient);
+
+    const result = await repo.appendByHeaders(
+      'sheet_123',
+      {
+        'Timestamp': '2026-10-04 12:00:00',
+        'Nombre': 'Carlos',
+        'País de residencia': 'Uruguay',
+        'Ciudad de residencia': 'Montevideo',
+      },
+      ['Timestamp', 'Nombre', 'País de residencia', 'Ciudad de residencia'],
+      'Inscripciones'
+    );
+
+    // Header row 1:1 updated additively with Ciudad de residencia at the end
+    expect(mockClient.updateValues).toHaveBeenCalledWith(
+      'sheet_123',
+      'Inscripciones!1:1',
+      [['Timestamp', 'Observaciones Asistente', 'Nombre', 'País de residencia', 'Ciudad de residencia']]
+    );
+
+    // Row appended using the updated header layout
+    expect(mockClient.appendValues).toHaveBeenCalledWith(
+      'sheet_123',
+      'Inscripciones!A:A',
+      [['2026-10-04 12:00:00', '', 'Carlos', 'Uruguay', 'Montevideo']]
+    );
+
+    expect(result.updatedRange).toBe('Inscripciones!A2:E2');
+    expect(result.updatedRows).toBe(1);
+  });
+
+  it('fails safely without calling appendValues when updateValues is rejected during schema repair', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]), // Missing Apellido
-      updateValues: vi.fn(),
+      updateValues: vi.fn().mockRejectedValue(new Error('Permission denied on header write')),
       appendValues: vi.fn(),
     };
 
@@ -71,6 +115,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
       )
     ).rejects.toThrow(IncompatibleSpreadsheetError);
 
+    expect(mockClient.updateValues).toHaveBeenCalled();
     expect(mockClient.appendValues).not.toHaveBeenCalled();
   });
 

@@ -10,6 +10,7 @@ import { TargetSpreadsheetService } from '../../application/target-spreadsheet-s
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
+import { SpreadsheetSchemaRepairError } from '../../infrastructure/google/google-sheets-repository.js';
 
 
 const target = {
@@ -238,5 +239,43 @@ describe('Submission file orchestration', () => {
       });
       expect(response.status).toBe(201);
     } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
+  });
+
+  it('preserves temporary files and responds with 502 when Sheets encounters a SpreadsheetSchemaRepairError', async () => {
+    let removed = false;
+    const drive: GoogleDriveRepositoryPort = {
+      storeSubmissionFiles: async () => testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+    };
+    const spreadsheet: SpreadsheetRepository = {
+      readHeaders: async () => [],
+      appendByHeaders: async () => {
+        throw new SpreadsheetSchemaRepairError(['Ciudad de residencia']);
+      },
+      diagnose: async () => ({
+        spreadsheetId: 'sheet-1',
+        accessible: true,
+        sheetFound: true,
+        headerDiagnostic: { valid: false, foundColumns: [], missingColumns: ['Ciudad de residencia'], extraColumns: [] },
+      }),
+    };
+    const { app, storage, effectiveRevision } = await setup(drive, spreadsheet);
+    storage.remove = async () => { removed = true; };
+    const server = app.listen(0);
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('server address missing');
+    try {
+      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
+        body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
+      });
+      expect(response.status).toBe(502);
+      const body = await response.json();
+      expect(body.error.code).toBe('SPREADSHEET_PROCESSING_ERROR');
+      expect(body.error.message).toContain('Ciudad de residencia');
+      expect(removed).toBe(false);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });
