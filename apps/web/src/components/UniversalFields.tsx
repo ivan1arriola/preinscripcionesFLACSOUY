@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as Flags from 'country-flag-icons/react/3x2';
 import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
 import type { AgreementOption, InputDefinition } from '@flacso/contracts';
 
@@ -32,7 +33,6 @@ const isValidCedula = (value: string) => {
   return (10 - (weights.reduce((sum, weight, index) => sum + Number(digits[index]) * weight, 0) % 10)) % 10 === Number(digits[7]);
 };
 const regionNames = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['es'], { type: 'region' }) : undefined;
-const flagFor = (country: CountryCode) => String.fromCodePoint(...[...country].map((letter) => 0x1F1E6 + letter.charCodeAt(0) - 65));
 const phonePlaceholders: Partial<Record<CountryCode, string>> = {
   UY: '99 123 456',
   AR: '11 1234 5678',
@@ -49,6 +49,7 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
   const [phoneCountry, setPhoneCountry] = useState<CountryCode>('UY');
   const [phoneStatus, setPhoneStatus] = useState('');
   const [cedulaStatus, setCedulaStatus] = useState('');
+  const FlagComponent = Flags[phoneCountry as keyof typeof Flags] as React.ComponentType<{ className?: string; title?: string }> | undefined;
   const isUruguayanCedula = values.tipoDocumento === 'cedula_uruguaya';
   const visible = (input: InputDefinition) => {
     if (input.key === 'generoOtra') return values.genero === 'Otra';
@@ -80,8 +81,36 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
       {input.key === 'celular' ? <>
         <label htmlFor="phone-country" className="sr-only">País del teléfono</label>
         <div className="phone-input">
-          <select id="phone-country" value={phoneCountry} disabled={disabled} onChange={(event) => setPhoneCountry(event.target.value as CountryCode)}>{getCountries().map((country) => <option key={country} value={country}>{flagFor(country)} {regionNames?.of(country) ?? country} +{getCountryCallingCode(country)}</option>)}</select>
-          <input id={`input-${input.key}`} name={input.key} type="tel" value={phoneInputValue} onChange={(event) => updatePhone(event.target.value)} disabled={disabled} placeholder={phonePlaceholderFor(phoneCountry)} aria-describedby="celular-ayuda celular-estado" />
+          <div className="phone-country-control">
+            <div className="phone-country-trigger" aria-hidden="true">
+              {FlagComponent && <FlagComponent className="phone-flag" title={regionNames?.of(phoneCountry) ?? phoneCountry} />}
+              <span className="phone-calling-code">+{getCountryCallingCode(phoneCountry)}</span>
+              <span className="phone-chevron">▾</span>
+            </div>
+            <select
+              id="phone-country"
+              className="phone-country-select"
+              value={phoneCountry}
+              disabled={disabled}
+              onChange={(event) => setPhoneCountry(event.target.value as CountryCode)}
+            >
+              {getCountries().map((country) => (
+                <option key={country} value={country}>
+                  {regionNames?.of(country) ?? country} +{getCountryCallingCode(country)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <input
+            id={`input-${input.key}`}
+            name={input.key}
+            type="tel"
+            value={phoneInputValue}
+            onChange={(event) => updatePhone(event.target.value)}
+            disabled={disabled}
+            placeholder={phonePlaceholderFor(phoneCountry)}
+            aria-describedby="celular-ayuda celular-estado"
+          />
         </div>
         <p id="celular-ayuda" className="mt-1 text-xs text-gray-500">Elegí el país e ingresá el número. Se guardará con el código internacional.</p>
         {phoneStatus && <p id="celular-estado" className="mt-1 text-xs text-gray-600" aria-live="polite">{phoneStatus}</p>}

@@ -51,6 +51,28 @@ describe('UniversalFields identity and contact controls', () => {
     expect(screen.getByRole('option', { name: /Uruguay \+598/i })).toBeInTheDocument();
   });
 
+  it('renders the Uruguay SVG flag and calling code by default', () => {
+    const { container } = render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={vi.fn()} />);
+
+    expect(screen.getByLabelText(/País del teléfono/i)).toHaveValue('UY');
+    const svg = container.querySelector('.phone-input svg');
+    expect(svg).toBeInTheDocument();
+    expect(svg?.tagName.toLowerCase()).toBe('svg');
+    expect(screen.getByText('+598')).toBeInTheDocument();
+  });
+
+  it('updates the visible flag and calling code when country changes', () => {
+    const { container } = render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/País del teléfono/i), { target: { value: 'AR' } });
+
+    expect(screen.getByLabelText(/País del teléfono/i)).toHaveValue('AR');
+    expect(screen.getByText('+54')).toBeInTheDocument();
+    const svg = container.querySelector('.phone-input svg');
+    expect(svg).toBeInTheDocument();
+    expect(svg?.innerHTML).toContain('338AF3');
+  });
+
   it('updates the phone placeholder when the selected country changes', () => {
     render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={vi.fn()} />);
 
