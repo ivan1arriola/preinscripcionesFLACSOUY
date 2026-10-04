@@ -1,4 +1,5 @@
 import type { SubmissionNotificationSnapshot, NotificationAudience } from '../application/notification-snapshot.js';
+export type { NotificationAudience };
 
 export type NotificationStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'unknown';
 

@@ -6,7 +6,7 @@ import { validateSubmission } from '../domain/form-validation.js';
 import { normalizeIdentityValues } from '../domain/identity-validation.js';
 import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
 import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
-import type { SubmissionFileToken } from '@flacso/contracts';
+import type { AcademicTarget, FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 
 export interface SubmitPreinscriptionCommand {
   clientSubmissionId?: string;
@@ -25,6 +25,9 @@ export type SubmitPreinscriptionResult =
         requiredColumns: string[];
       };
       driveTarget: ReturnType<typeof driveTargetDescriptor>;
+      target: AcademicTarget;
+      form: FormDefinition;
+      normalizedValues: Record<string, string>;
     }
   | {
       ok: false;
@@ -149,5 +152,8 @@ export async function submitPreinscription(
         .map((input) => input.spreadsheetColumn ?? input.label),
     },
     driveTarget: driveTargetDescriptor(target),
+    target,
+    form,
+    normalizedValues,
   };
 }

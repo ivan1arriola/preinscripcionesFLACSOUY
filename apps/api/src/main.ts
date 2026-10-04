@@ -22,6 +22,7 @@ import { TargetSpreadsheetService } from './application/target-spreadsheet-servi
 import { PostgresAdminSessionStore } from './infrastructure/database/postgres-admin-session-store.js';
 import { getAdminSessionTtlMs } from './application/admin-session.js';
 import { EncryptedSettingsService } from './infrastructure/security/encrypted-settings.js';
+import { PostgresEmailNotificationRepository } from './infrastructure/database/postgres-email-notification-repository.js';
 
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
@@ -33,6 +34,7 @@ const encryptedSettingsService = new EncryptedSettingsService(
   process.env.APP_SETTINGS_ENCRYPTION_KEY
 );
 const targetSpreadsheetRepository = new PostgresTargetSpreadsheetRepository(db);
+const emailNotificationRepository = new PostgresEmailNotificationRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
   ? new WordPressAcademicCatalog(
@@ -152,6 +154,7 @@ const app = createApp({
   adminSessionStore,
   systemSettingsRepository,
   encryptedSettingsService,
+  emailNotificationRepository,
   serviceAccountEmail: googleCreds.clientEmail,
   checkDatabase: checkDb,
 });

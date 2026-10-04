@@ -29,6 +29,8 @@ import { createAdminSettingsRoutes } from './admin-settings-routes.js';
 import type { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 import { EncryptedSettingsService } from '../../infrastructure/security/encrypted-settings.js';
+import type { EmailNotificationRepository } from '../../ports/email-notification-repository.js';
+import { loadEmailConfig } from '../../infrastructure/email/email-config.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -44,6 +46,8 @@ export interface AppDependencies {
   adminSessionStore?: AdminSessionStore;
   systemSettingsRepository?: SystemSettingsRepository;
   encryptedSettingsService?: EncryptedSettingsService;
+  emailNotificationRepository?: EmailNotificationRepository;
+  getMasterEmails?: () => Promise<string[]> | string[];
   serviceAccountEmail?: string;
 }
 
@@ -75,6 +79,11 @@ export function createApp(dependencies: AppDependencies): Express {
 
   // Target routes and nested submission routes
   const profileRepo = dependencies.formProfileRepository ?? new MemoryFormProfileRepository();
+  const settingsRepo = dependencies.systemSettingsRepository ?? new MemorySystemSettingsRepository();
+  const encryptedSettingsService =
+    dependencies.encryptedSettingsService ??
+    new EncryptedSettingsService(settingsRepo, process.env.APP_SETTINGS_ENCRYPTION_KEY);
+
   const targetRoutes = createTargetRoutes(dependencies.catalog, profileRepo);
   const submissionRoutes = createSubmissionRoutes(
     dependencies.catalog,
@@ -89,6 +98,22 @@ export function createApp(dependencies: AppDependencies): Express {
           targetSpreadsheetService: dependencies.targetSpreadsheetService,
         }
       : undefined,
+    dependencies.emailNotificationRepository
+      ? {
+          repository: dependencies.emailNotificationRepository,
+          getMasterEmails: async () => {
+            if (dependencies.getMasterEmails) {
+              return dependencies.getMasterEmails();
+            }
+            try {
+              const cfg = await loadEmailConfig(encryptedSettingsService);
+              return cfg.masterEmails;
+            } catch {
+              return [];
+            }
+          },
+        }
+      : undefined,
   );
 
   targetRoutes.use('/:id/submissions', submissionRoutes);
@@ -101,11 +126,6 @@ export function createApp(dependencies: AppDependencies): Express {
   }
   app.use('/api/admin', createAdminMeRoute(sessionStore));
   app.use('/api/admin/profiles', createAdminProfileRoutes(profileRepo, sessionStore));
-
-  const settingsRepo = dependencies.systemSettingsRepository ?? new MemorySystemSettingsRepository();
-  const encryptedSettingsService =
-    dependencies.encryptedSettingsService ??
-    new EncryptedSettingsService(settingsRepo, process.env.APP_SETTINGS_ENCRYPTION_KEY);
 
   app.use('/api/admin/settings', createAdminSettingsRoutes(
     settingsRepo,

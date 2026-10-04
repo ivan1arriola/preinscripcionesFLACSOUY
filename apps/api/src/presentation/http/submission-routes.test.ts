@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import type { Server } from 'node:http';
 import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
@@ -7,11 +7,13 @@ import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memor
 import { getTargetForm } from '../../application/get-target-form.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
+import { InMemoryEmailNotificationRepository } from '../../infrastructure/database/in-memory-email-notification-repository.js';
 
 describe('Submission HTTP Routes', () => {
   let server: Server;
   let baseUrl: string;
   let repository: InMemorySubmissionRepository;
+  let notificationRepository: InMemoryEmailNotificationRepository;
 
   const validPayload = {
     configRevision: 'davia-c11-v1',
@@ -78,12 +80,14 @@ describe('Submission HTTP Routes', () => {
         documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
       }),
     };
+    notificationRepository = new InMemoryEmailNotificationRepository();
     const app = createApp({
       catalog,
       repository,
       formProfileRepository: profileRepo,
       temporaryFileStorage: storage,
       googleDriveRepository: drive,
+      emailNotificationRepository: notificationRepository,
     });
 
     await new Promise<void>((resolve) => {
@@ -115,6 +119,13 @@ describe('Submission HTTP Routes', () => {
     const data = await res.json();
     expect(data.submissionId).toBeDefined();
     expect(data.submissionId).toMatch(/^sub_/);
+
+    const queuedNotifications = await notificationRepository.listNotifications({ submissionId: data.submissionId });
+    expect(queuedNotifications.length).toBeGreaterThan(0);
+    const applicantNotif = queuedNotifications.find((n) => n.audience === 'applicant');
+    expect(applicantNotif).toBeDefined();
+    expect(applicantNotif?.recipientEmail).toBe('lucia@example.com');
+    expect(applicantNotif?.payload.documentsFolderUrl).toBe('https://drive.google.com/drive/folders/folder-1');
   });
 
   it('POST /api/targets/:id/submissions returns 409 when target is closed', async () => {
@@ -201,5 +212,283 @@ describe('Submission HTTP Routes', () => {
     expect(text).not.toContain('postgres://');
     expect(text).not.toContain('password');
     expect(text).not.toContain('secret');
+  });
+
+  describe('Notification enqueuing & order of operations', () => {
+    it('executes in strict order: saveOrGet, Drive, Sheets, markProcessing(success), and ensureForSubmission', async () => {
+      const order: string[] = [];
+      const catalog = new FixtureAcademicCatalog();
+      const profileRepo = new MemoryFormProfileRepository();
+      const testRepo = new InMemorySubmissionRepository();
+      const originalSaveOrGet = testRepo.saveOrGet.bind(testRepo);
+      testRepo.saveOrGet = async (cmd) => {
+        order.push('saveOrGet');
+        return originalSaveOrGet(cmd);
+      };
+      const originalMarkProcessing = testRepo.markProcessing.bind(testRepo);
+      testRepo.markProcessing = async (id, status, error) => {
+        order.push(`markProcessing:${status}`);
+        return originalMarkProcessing(id, status, error);
+      };
+
+      const storage: TemporaryFileStoragePort = {
+        save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+        remove: async () => { order.push('removeTemporaryFile'); },
+        cleanup: async () => 0,
+      };
+
+      const drive: GoogleDriveRepositoryPort = {
+        storeSubmissionFiles: async () => {
+          order.push('drive:storeFiles');
+          return {
+            files: [
+              { token: 'tok_id', driveFileId: 'drive-1' },
+              { token: 'tok_cv', driveFileId: 'drive-2' },
+              { token: 'tok_tit', driveFileId: 'drive-3' },
+              { token: 'tok_mot', driveFileId: 'drive-4' },
+            ],
+            documentsFolderId: 'folder-target-123',
+            documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-target-123',
+          };
+        },
+      };
+
+      const spreadsheetRepo = {
+        readHeaders: async () => [],
+        appendByHeaders: async () => {
+          order.push('sheets:append');
+          return {
+            spreadsheetId: 'sheet-abc',
+            sheetName: 'Inscripciones',
+            sheetId: 12345,
+            updatedRange: 'Inscripciones!A15:Z15',
+            rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=12345&range=A15:Z15',
+            updatedRows: 1,
+          };
+        },
+        diagnose: async () => ({ spreadsheetId: 'sheet-abc', accessible: true, sheetFound: true, headerDiagnostic: { valid: true, foundColumns: [], missingColumns: [], extraColumns: [] } }),
+      };
+
+      const notifRepo = new InMemoryEmailNotificationRepository();
+      const originalEnsure = notifRepo.ensureForSubmission.bind(notifRepo);
+      notifRepo.ensureForSubmission = async (input) => {
+        order.push('notifications:ensure');
+        return originalEnsure(input);
+      };
+
+      const app = createApp({
+        catalog,
+        repository: testRepo,
+        formProfileRepository: profileRepo,
+        temporaryFileStorage: storage,
+        googleDriveRepository: drive,
+        spreadsheetRepository: spreadsheetRepo,
+        targetSpreadsheetService: {
+          ensureForTarget: async () => ({ spreadsheetId: 'sheet-abc', sheetName: 'Inscripciones' }),
+        } as any,
+        emailNotificationRepository: notifRepo,
+        getMasterEmails: async () => ['master@flacso.edu.uy'],
+      });
+
+      const tempServer = app.listen(0);
+      const port = (tempServer.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-preinscription-session': 'sess-1',
+          },
+          body: JSON.stringify(validPayload),
+        });
+
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        expect(data.submissionId).toBeDefined();
+
+        expect(order).toEqual([
+          'saveOrGet',
+          'drive:storeFiles',
+          'sheets:append',
+          'markProcessing:success',
+          'notifications:ensure',
+          'removeTemporaryFile',
+          'removeTemporaryFile',
+          'removeTemporaryFile',
+          'removeTemporaryFile',
+        ]);
+
+        const enqueued = await notifRepo.listNotifications({ submissionId: data.submissionId });
+        expect(enqueued.length).toBeGreaterThanOrEqual(2); // applicant + target and/or master
+        expect(enqueued.some((n) => n.audience === 'applicant')).toBe(true);
+        expect(enqueued[0]?.payload.spreadsheetRowUrl).toBe(
+          'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=12345&range=A15:Z15'
+        );
+        expect(enqueued[0]?.payload.documentsFolderUrl).toBe(
+          'https://drive.google.com/drive/folders/folder-target-123'
+        );
+      } finally {
+        await new Promise<void>((resolve) => tempServer.close(() => resolve()));
+      }
+    });
+
+    it('does not enqueue notifications when Drive fails', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const profileRepo = new MemoryFormProfileRepository();
+      const testRepo = new InMemorySubmissionRepository();
+      const notifRepo = new InMemoryEmailNotificationRepository();
+      const ensureSpy = vi.spyOn(notifRepo, 'ensureForSubmission');
+
+      const storage: TemporaryFileStoragePort = {
+        save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+        remove: async () => undefined,
+        cleanup: async () => 0,
+      };
+
+      const drive: GoogleDriveRepositoryPort = {
+        storeSubmissionFiles: async () => { throw new Error('Drive error'); },
+      };
+
+      const app = createApp({
+        catalog,
+        repository: testRepo,
+        formProfileRepository: profileRepo,
+        temporaryFileStorage: storage,
+        googleDriveRepository: drive,
+        emailNotificationRepository: notifRepo,
+      });
+
+      const tempServer = app.listen(0);
+      const port = (tempServer.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-preinscription-session': 'sess-1',
+          },
+          body: JSON.stringify(validPayload),
+        });
+
+        expect(res.status).toBe(502);
+        expect(ensureSpy).not.toHaveBeenCalled();
+      } finally {
+        await new Promise<void>((resolve) => tempServer.close(() => resolve()));
+      }
+    });
+
+    it('does not enqueue notifications when Sheets fails', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const profileRepo = new MemoryFormProfileRepository();
+      const testRepo = new InMemorySubmissionRepository();
+      const notifRepo = new InMemoryEmailNotificationRepository();
+      const ensureSpy = vi.spyOn(notifRepo, 'ensureForSubmission');
+
+      const storage: TemporaryFileStoragePort = {
+        save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+        remove: async () => undefined,
+        cleanup: async () => 0,
+      };
+
+      const drive: GoogleDriveRepositoryPort = {
+        storeSubmissionFiles: async () => ({
+          files: [],
+          documentsFolderId: 'f1',
+          documentsFolderUrl: 'https://drive.google.com/drive/folders/f1',
+        }),
+      };
+
+      const app = createApp({
+        catalog,
+        repository: testRepo,
+        formProfileRepository: profileRepo,
+        temporaryFileStorage: storage,
+        googleDriveRepository: drive,
+        spreadsheetRepository: {
+          readHeaders: async () => [],
+          appendByHeaders: async () => { throw new Error('Sheets connection timeout'); },
+          diagnose: async () => ({ spreadsheetId: 'sheet-1', accessible: false, sheetFound: false, headerDiagnostic: { valid: false, foundColumns: [], missingColumns: [], extraColumns: [] } }),
+        },
+        targetSpreadsheetService: {
+          ensureForTarget: async () => ({ spreadsheetId: 'sheet-1', sheetName: 'Inscripciones' }),
+        } as any,
+        emailNotificationRepository: notifRepo,
+      });
+
+      const tempServer = app.listen(0);
+      const port = (tempServer.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-preinscription-session': 'sess-1',
+          },
+          body: JSON.stringify(validPayload),
+        });
+
+        expect(res.status).toBe(502);
+        expect(ensureSpy).not.toHaveBeenCalled();
+      } finally {
+        await new Promise<void>((resolve) => tempServer.close(() => resolve()));
+      }
+    });
+
+    it('does not block or fail HTTP 201 response if outbox enqueuing throws an unexpected error', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const profileRepo = new MemoryFormProfileRepository();
+      const testRepo = new InMemorySubmissionRepository();
+      const notifRepo = new InMemoryEmailNotificationRepository();
+      notifRepo.ensureForSubmission = async () => {
+        throw new Error('Database disk full on outbox table');
+      };
+
+      const storage: TemporaryFileStoragePort = {
+        save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+        remove: async () => undefined,
+        cleanup: async () => 0,
+      };
+
+      const drive: GoogleDriveRepositoryPort = {
+        storeSubmissionFiles: async () => ({
+          files: [],
+          documentsFolderId: 'f1',
+          documentsFolderUrl: 'https://drive.google.com/drive/folders/f1',
+        }),
+      };
+
+      const app = createApp({
+        catalog,
+        repository: testRepo,
+        formProfileRepository: profileRepo,
+        temporaryFileStorage: storage,
+        googleDriveRepository: drive,
+        emailNotificationRepository: notifRepo,
+      });
+
+      const tempServer = app.listen(0);
+      const port = (tempServer.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-preinscription-session': 'sess-1',
+          },
+          body: JSON.stringify(validPayload),
+        });
+
+        // Fail-safe: Outbox failure does NOT block user from successfully submitting
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        expect(data.submissionId).toBeDefined();
+      } finally {
+        await new Promise<void>((resolve) => tempServer.close(() => resolve()));
+      }
+    });
   });
 });

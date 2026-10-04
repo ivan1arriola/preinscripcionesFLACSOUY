@@ -8,6 +8,8 @@ import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
 import type { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
+import type { EmailNotificationRepository } from '../../ports/email-notification-repository.js';
+import { createPreinscriptionNotifications } from '../../application/create-preinscription-notifications.js';
 
 const submissionSchema = z.object({
   clientSubmissionId: z.string().optional(),
@@ -30,12 +32,18 @@ interface SubmissionSpreadsheetDependencies {
   targetSpreadsheetService: TargetSpreadsheetService;
 }
 
+export interface SubmissionNotificationDependencies {
+  repository: EmailNotificationRepository;
+  getMasterEmails?: () => Promise<string[]> | string[];
+}
+
 export function createSubmissionRoutes(
   catalog: AcademicCatalog,
   repository: SubmissionRepository,
   profileRepository: FormProfileRepository,
   fileDependencies?: SubmissionFileDependencies,
   spreadsheetDependencies?: SubmissionSpreadsheetDependencies,
+  notificationDependencies?: SubmissionNotificationDependencies,
 ): Router {
   const router = Router({ mergeParams: true });
 
@@ -114,6 +122,7 @@ export function createSubmissionRoutes(
 
       const files = parsed.data.files ?? [];
       let storedDriveFiles: Array<{ token: string; driveFileId?: string }> = [];
+      let documentsFolderUrl = '';
       if (files.length > 0) {
         if (!fileDependencies) {
           await repository.markProcessing(result.submissionId, 'failed', 'La carga de documentación no está disponible en este momento.');
@@ -138,8 +147,10 @@ export function createSubmissionRoutes(
             target: result.driveTarget,
             values: parsed.data.values,
           });
-          storedDriveFiles = stored.files;
-          for (const file of stored.files) {
+          const fileItems = Array.isArray(stored) ? stored : (stored.files ?? stored);
+          storedDriveFiles = fileItems;
+          documentsFolderUrl = (!Array.isArray(stored) && stored.documentsFolderUrl) ? stored.documentsFolderUrl : '';
+          for (const file of fileItems) {
             if (file.driveFileId) {
               await repository.markFileStored(file.token, file.driveFileId);
             }
@@ -155,6 +166,7 @@ export function createSubmissionRoutes(
         }
       }
 
+      let spreadsheetRowUrl = '';
       if (spreadsheetDependencies) {
         try {
           const target = await catalog.revalidateTarget(targetId);
@@ -164,12 +176,15 @@ export function createSubmissionRoutes(
             return;
           }
           const spreadsheet = await spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);
-          await spreadsheetDependencies.repository.appendByHeaders(
+          const appendRes = await spreadsheetDependencies.repository.appendByHeaders(
             spreadsheet.spreadsheetId,
             result.spreadsheet.valuesByColumnName,
             result.spreadsheet.requiredColumns,
             spreadsheet.sheetName,
           );
+          if (appendRes?.rowUrl) {
+            spreadsheetRowUrl = appendRes.rowUrl;
+          }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'No se pudo crear o guardar la planilla de la preinscripción.';
           await repository.markProcessing(result.submissionId, 'failed', message);
@@ -179,6 +194,25 @@ export function createSubmissionRoutes(
       }
 
       await repository.markProcessing(result.submissionId, 'success');
+
+      if (notificationDependencies) {
+        try {
+          const masterRecipients = notificationDependencies.getMasterEmails
+            ? await notificationDependencies.getMasterEmails()
+            : [];
+          await createPreinscriptionNotifications(notificationDependencies.repository, {
+            submissionId: result.submissionId,
+            target: result.target,
+            form: result.form,
+            values: result.normalizedValues,
+            spreadsheetRowUrl,
+            documentsFolderUrl,
+            masterRecipients,
+          });
+        } catch (notificationError) {
+          console.error('[Notifications] Error al encolar notificaciones de preinscripción:', notificationError);
+        }
+      }
 
       if (files.length > 0) {
         const sessionId = req.header('x-preinscription-session')?.trim();
