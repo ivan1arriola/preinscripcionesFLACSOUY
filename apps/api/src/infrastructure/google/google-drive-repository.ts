@@ -79,12 +79,18 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
       for (const name of buildDriveFolderNames(command.target)) {
         uploadFolderId = await this.ensureChildFolder(uploadFolderId, name, token);
       }
-      await this.ensureChildFolder(uploadFolderId, 'Preinscripciones', token);
-      uploadFolderId = await this.ensureChildFolder(uploadFolderId, 'Documentación', token);
+      const preinscripcionesId = await this.ensureChildFolder(uploadFolderId, 'Preinscripciones', token);
+      uploadFolderId = await this.ensureChildFolder(preinscripcionesId, 'Documentación', token);
     }
     const result: StoredDriveFile[] = [];
     const ordinals = new Map<string, number>();
     for (const file of command.files) {
+      const existingFileId = await this.findExistingFile(uploadFolderId, command.submissionId, file.token, token);
+      if (existingFileId) {
+        result.push({ token: file.token, driveFileId: existingFileId });
+        continue;
+      }
+
       const boundary = `flacso-${command.submissionId}-${file.token}`;
       const ordinal = (ordinals.get(file.fieldKey ?? '') ?? 0) + 1;
       ordinals.set(file.fieldKey ?? '', ordinal);
@@ -129,6 +135,30 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
       result.push({ token: file.token, driveFileId: payload.id });
     }
     return result;
+  }
+
+  private async findExistingFile(
+    folderId: string,
+    submissionId: string,
+    fileToken: string,
+    token: string
+  ): Promise<string | null> {
+    const query = [
+      `'${folderId.replace(/'/g, "\\'")}' in parents`,
+      `appProperties has { key='flacsoSubmissionId' and value='${submissionId.replace(/'/g, "\\'")}' }`,
+      `appProperties has { key='flacsoFileToken' and value='${fileToken.replace(/'/g, "\\'")}' }`,
+      'trashed = false',
+    ].join(' and ');
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+    const response = await this.fetchImpl(listUrl, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`Google Drive no permitió consultar archivos existentes (HTTP ${response.status}).`);
+    }
+    const payload = (await response.json()) as { files?: Array<{ id?: string }> };
+    return payload.files?.[0]?.id ?? null;
   }
 
   private async ensureChildFolder(parentId: string, name: string, token: string): Promise<string> {

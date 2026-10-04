@@ -43,12 +43,19 @@ describe('Upload HTTP Routes', () => {
 
   const mockCatalog: AcademicCatalog = {
     listTargets: async () => [openDiploma, openSeminar, closedTarget],
+    getTarget: async (id) => {
+      if (id === 'diploma-davia') return openDiploma;
+      if (id === 'seminar-ia') return openSeminar;
+      if (id === 'target-closed') return closedTarget;
+      return null;
+    },
     revalidateTarget: async (id) => {
       if (id === 'diploma-davia') return openDiploma;
       if (id === 'seminar-ia') return openSeminar;
       if (id === 'target-closed') return closedTarget;
       return null;
     },
+    revalidateTargets: async () => [openDiploma, openSeminar, closedTarget],
   };
 
   async function setupApp(storageOptions?: { maxBytes?: number; maxTotalBytes?: number }) {

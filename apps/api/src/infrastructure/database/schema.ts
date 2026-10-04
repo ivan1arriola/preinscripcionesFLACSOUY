@@ -43,6 +43,7 @@ export interface OrientationMentionsTable {
 
 export interface SubmissionsTable {
   id: string;
+  client_submission_id?: string | null;
   target_id: string;
   config_revision: string;
   submitted_at: Generated<Date>;

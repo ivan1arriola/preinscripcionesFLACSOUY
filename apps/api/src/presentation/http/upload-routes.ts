@@ -201,7 +201,7 @@ export function createUploadRoutes(
     (req as Request).pipe(parser);
   });
 
-  router.delete('/:token', async (req, res, next) => {
+  router.delete('/:token', async (req, res) => {
     const sessionId = req.header('x-preinscription-session')?.trim();
     if (!sessionId) {
       res.status(400).json({

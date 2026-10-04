@@ -76,4 +76,80 @@ describe('PostgresSubmissionRepository (Integration with PostgreSQL)', () => {
     expect(targetRow).toBeDefined();
     expect(targetRow?.title).toBe('DAVIA Cohorte 11');
   });
+
+  it('handles client submission idempotency via saveOrGet', async () => {
+    const clientSubmissionId = `test-client-${Date.now()}-${Math.random()}`;
+    const submissionData = {
+      clientSubmissionId,
+      targetId: 'davia-c11',
+      configRevision: 'davia-c11-v1',
+      targetTitle: 'DAVIA Cohorte 11',
+      targetKind: 'academic_offer',
+      values: {
+        nombre: 'María',
+        email: 'maria@example.com',
+      },
+    };
+
+    const firstResult = await repository.saveOrGet(submissionData);
+    expect(firstResult.id).toBeDefined();
+    expect(firstResult.existing).toBe(false);
+
+    const secondResult = await repository.saveOrGet(submissionData);
+    expect(secondResult.id).toBe(firstResult.id);
+    expect(secondResult.existing).toBe(true);
+  });
+
+  it('updates processing and file statuses', async () => {
+    const fileToken = `token-${Date.now()}-${Math.random()}`;
+    const submissionData = {
+      targetId: 'davia-c11',
+      configRevision: 'davia-c11-v1',
+      targetTitle: 'DAVIA Cohorte 11',
+      targetKind: 'academic_offer',
+      values: {
+        nombre: 'Pedro',
+      },
+      files: [
+        {
+          token: fileToken,
+          fieldKey: 'cv',
+          originalName: 'cv.pdf',
+          mimeType: 'application/pdf',
+          size: 1024,
+        },
+      ],
+    };
+
+    const result = await repository.save(submissionData);
+
+    // markProcessing
+    await repository.markProcessing(result.id, 'success');
+    const procRow = await db
+      .selectFrom('submission_processing')
+      .selectAll()
+      .where('submission_id', '=', result.id)
+      .executeTakeFirst();
+    expect(procRow?.status).toBe('success');
+
+    // markFileStored
+    await repository.markFileStored(fileToken, 'drive-123');
+    const fileRow = await db
+      .selectFrom('submission_files')
+      .selectAll()
+      .where('token', '=', fileToken)
+      .executeTakeFirst();
+    expect(fileRow?.status).toBe('success');
+    expect(fileRow?.drive_file_id).toBe('drive-123');
+
+    // markFileFailed
+    await repository.markFileFailed(fileToken, 'Network error');
+    const fileRowFailed = await db
+      .selectFrom('submission_files')
+      .selectAll()
+      .where('token', '=', fileToken)
+      .executeTakeFirst();
+    expect(fileRowFailed?.status).toBe('failed');
+    expect(fileRowFailed?.error_message).toBe('Network error');
+  });
 });

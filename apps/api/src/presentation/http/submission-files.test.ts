@@ -9,6 +9,7 @@ import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.j
 import { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
+import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
 
 
 const target = {
@@ -77,7 +78,7 @@ async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: Spreadsheet
     revalidateTarget: async () => target,
     revalidateTargets: async () => [target],
   };
-  const repository: SubmissionRepository = { save: async () => ({ id: 'sub_1' }) };
+  const repository: SubmissionRepository = new InMemorySubmissionRepository();
   const storage: TemporaryFileStoragePort = {
     save: async () => { throw new Error('unused'); },
     open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
