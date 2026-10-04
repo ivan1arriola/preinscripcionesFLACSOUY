@@ -115,7 +115,11 @@ describe('Submission file orchestration', () => {
   it('sends temporary files to Drive and removes them only after success', async () => {
     let removed = false;
     const drive: GoogleDriveRepositoryPort = {
-      storeSubmissionFiles: async () => testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+      storeSubmissionFiles: async () => ({
+        files: testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+        documentsFolderId: 'folder-1',
+        documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+      }),
     };
     const { app, storage, effectiveRevision } = await setup(drive);
     storage.remove = async () => { removed = true; };
@@ -156,7 +160,11 @@ describe('Submission file orchestration', () => {
     const drive: GoogleDriveRepositoryPort = {
       storeSubmissionFiles: async () => {
         events.push('drive');
-        return testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` }));
+        return {
+          files: testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+          documentsFolderId: 'folder-1',
+          documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+        };
       },
     };
     const spreadsheet: SpreadsheetRepository = {
@@ -169,7 +177,14 @@ describe('Submission file orchestration', () => {
           requiredColumns: args[2],
           sheetName: args[3],
         };
-        return { spreadsheetId: args[0], updatedRange: 'Inscripciones!A2:Z2', updatedRows: 1 };
+        return {
+          spreadsheetId: args[0],
+          sheetName: args[3] ?? 'Inscripciones',
+          sheetId: 0,
+          updatedRange: 'Inscripciones!A2:Z2',
+          rowUrl: `https://docs.google.com/spreadsheets/d/${args[0]}/edit#gid=0&range=A2:Z2`,
+          updatedRows: 1,
+        };
       },
       diagnose: async () => ({ spreadsheetId: 'sheet-1', accessible: true, sheetFound: true, headerDiagnostic: { valid: true, foundColumns: [], missingColumns: [], extraColumns: [] } }),
     };
@@ -196,7 +211,11 @@ describe('Submission file orchestration', () => {
   it('keeps temporary files when Sheets fails after Drive succeeds', async () => {
     let removed = false;
     const drive: GoogleDriveRepositoryPort = {
-      storeSubmissionFiles: async () => testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+      storeSubmissionFiles: async () => ({
+        files: testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+        documentsFolderId: 'folder-1',
+        documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+      }),
     };
     const spreadsheet: SpreadsheetRepository = {
       readHeaders: async () => [],
@@ -220,11 +239,22 @@ describe('Submission file orchestration', () => {
 
   it('does not fail submission if cleanup fails after Drive and Sheets succeed', async () => {
     const drive: GoogleDriveRepositoryPort = {
-      storeSubmissionFiles: async () => testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+      storeSubmissionFiles: async () => ({
+        files: testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+        documentsFolderId: 'folder-1',
+        documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+      }),
     };
     const spreadsheet: SpreadsheetRepository = {
       readHeaders: async () => [],
-      appendByHeaders: async () => ({ spreadsheetId: 'sheet-1', updatedRange: 'Inscripciones!A2:Z2', updatedRows: 1 }),
+      appendByHeaders: async () => ({
+        spreadsheetId: 'sheet-1',
+        sheetName: 'Inscripciones',
+        sheetId: 0,
+        updatedRange: 'Inscripciones!A2:Z2',
+        rowUrl: 'https://docs.google.com/spreadsheets/d/sheet-1/edit#gid=0&range=A2:Z2',
+        updatedRows: 1,
+      }),
       diagnose: async () => ({ spreadsheetId: 'sheet-1', accessible: true, sheetFound: true, headerDiagnostic: { valid: true, foundColumns: [], missingColumns: [], extraColumns: [] } }),
     };
     const { app, storage, effectiveRevision } = await setup(drive, spreadsheet);
@@ -244,7 +274,11 @@ describe('Submission file orchestration', () => {
   it('preserves temporary files and responds with 502 when Sheets encounters a SpreadsheetSchemaRepairError', async () => {
     let removed = false;
     const drive: GoogleDriveRepositoryPort = {
-      storeSubmissionFiles: async () => testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+      storeSubmissionFiles: async () => ({
+        files: testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+        documentsFolderId: 'folder-1',
+        documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+      }),
     };
     const spreadsheet: SpreadsheetRepository = {
       readHeaders: async () => [],

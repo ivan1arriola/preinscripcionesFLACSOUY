@@ -46,7 +46,11 @@ describe('Document Flow Integration', () => {
         driveFileId: `drive-${f.token}-${i}`,
       }));
       storedDriveFiles.push(...results);
-      return results.map((r) => ({ token: r.token, driveFileId: r.driveFileId }));
+      return {
+        files: results.map((r) => ({ token: r.token, driveFileId: r.driveFileId })),
+        documentsFolderId: 'folder-doc',
+        documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-doc',
+      };
     },
   };
 
@@ -56,7 +60,10 @@ describe('Document Flow Integration', () => {
       appendedSpreadsheetRows.push(valuesByColumnName);
       return {
         spreadsheetId,
+        sheetName: sheetName || 'Inscripciones',
+        sheetId: 0,
         updatedRange: `${sheetName || 'Inscripciones'}!A1:Z1`,
+        rowUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=0&range=A1:Z1`,
         updatedRows: 1,
       };
     },

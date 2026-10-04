@@ -138,8 +138,8 @@ export function createSubmissionRoutes(
             target: result.driveTarget,
             values: parsed.data.values,
           });
-          storedDriveFiles = stored;
-          for (const file of stored) {
+          storedDriveFiles = stored.files;
+          for (const file of stored.files) {
             if (file.driveFileId) {
               await repository.markFileStored(file.token, file.driveFileId);
             }

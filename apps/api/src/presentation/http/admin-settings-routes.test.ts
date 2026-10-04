@@ -47,7 +47,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       encryptedSettingsService,
       serviceAccountEmail: 'preinscripciones@flacso-uruguay.iam.gserviceaccount.com',
       googleDriveRepository: {
-        storeSubmissionFiles: async () => [],
+        storeSubmissionFiles: async () => ({ files: [], documentsFolderId: 'folder-1', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1' }),
         inspectFolder: async (folderId) => ({ id: folderId, name: 'Preinscripciones FLACSO', canAddChildren: true }),
       },
     });
@@ -183,7 +183,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       googleIdentityVerifier: mockVerifier,
       systemSettingsRepository: readOnlySettings,
       googleDriveRepository: {
-        storeSubmissionFiles: async () => [],
+        storeSubmissionFiles: async () => ({ files: [], documentsFolderId: 'folder-1', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1' }),
         inspectFolder: async (folderId) => ({ id: folderId, name: 'Solo lectura', canAddChildren: false }),
       },
     });
@@ -278,7 +278,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       googleIdentityVerifier: mockVerifier,
       systemSettingsRepository: customSettings,
       googleDriveRepository: {
-        storeSubmissionFiles: async () => [],
+        storeSubmissionFiles: async () => ({ files: [], documentsFolderId: 'folder-1', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1' }),
         inspectFolder: async (folderId) => ({ id: folderId, name: 'Carpeta Nueva', canAddChildren: true }),
       },
       targetSpreadsheetService,
@@ -337,7 +337,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       googleIdentityVerifier: mockVerifier,
       systemSettingsRepository: customSettings,
       googleDriveRepository: {
-        storeSubmissionFiles: async () => [],
+        storeSubmissionFiles: async () => ({ files: [], documentsFolderId: 'folder-1', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1' }),
         inspectFolder: async (folderId) => ({ id: folderId, name: 'Carpeta Nueva', canAddChildren: true }),
       },
       targetSpreadsheetService,

@@ -67,12 +67,16 @@ describe('Submission HTTP Routes', () => {
       cleanup: async () => 0,
     };
     const drive: GoogleDriveRepositoryPort = {
-      storeSubmissionFiles: async () => [
-        { token: 'tok_id', driveFileId: 'drive-1' },
-        { token: 'tok_cv', driveFileId: 'drive-2' },
-        { token: 'tok_tit', driveFileId: 'drive-3' },
-        { token: 'tok_mot', driveFileId: 'drive-4' },
-      ],
+      storeSubmissionFiles: async () => ({
+        files: [
+          { token: 'tok_id', driveFileId: 'drive-1' },
+          { token: 'tok_cv', driveFileId: 'drive-2' },
+          { token: 'tok_tit', driveFileId: 'drive-3' },
+          { token: 'tok_mot', driveFileId: 'drive-4' },
+        ],
+        documentsFolderId: 'folder-1',
+        documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+      }),
     };
     const app = createApp({
       catalog,
