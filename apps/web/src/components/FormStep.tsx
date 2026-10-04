@@ -106,9 +106,14 @@ export const FormStep: React.FC<FormStepProps> = ({
     );
   }
 
-  // Filter out orientacion and mencion from standard UniversalFields if they are rendered separately
+  // Filter out orientacion and mencion from standard UniversalFields if they are rendered separately,
+  // and exclude title denomination/alternative inputs which are rendered inside DocumentUploadFields
   const regularInputs = inputs.filter(
-    (input) => input.key !== 'orientacion' && input.key !== 'mencion'
+    (input) =>
+      input.key !== 'orientacion' &&
+      input.key !== 'mencion' &&
+      input.key !== 'tituloDenominacion' &&
+      input.key !== 'sinTituloActual'
   );
 
   const hasOrientationInput = inputs.some((i) => i.key === 'orientacion');
@@ -153,8 +158,10 @@ export const FormStep: React.FC<FormStepProps> = ({
         <DocumentUploadFields
           documents={documents}
           files={files}
+          values={values}
           disabled={disabled}
           errors={errors}
+          onChange={onChange}
           onUpload={onUpload}
           onFileToken={onFileToken}
           onRemoveToken={onRemoveToken}

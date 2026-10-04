@@ -83,7 +83,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
         return ['paisResidencia', 'ciudadResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
       }
       if (currentStep.id === 'academico') {
-        return ['estudios', 'posgradoFlacso', 'posgradoCual', 'titulo', 'escolaridad', 'institucion', 'orientacion', 'mencion'].includes(i.key);
+        return ['estudios', 'posgradoFlacso', 'posgradoCual', 'institucion', 'orientacion', 'mencion'].includes(i.key);
       }
       if (currentStep.id === 'declaracion') {
         return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
@@ -93,6 +93,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
     });
 
     for (const input of stepInputs) {
+      if (input.key === 'tituloDenominacion' || input.key === 'sinTituloActual') continue;
       if (!visibleInput(input.key)) continue;
       if (input.required && !(values[input.key] || '').trim()) {
         errors[input.key] = `El campo ${input.label} es obligatorio.`;
@@ -141,9 +142,36 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       return currentStep.id === 'documentos';
     });
 
-    for (const doc of stepDocs) {
-      if (doc.required && !doc.canDefer && !files.some((f) => f.fieldKey === doc.key)) {
-        errors[doc.key] = `El documento ${doc.label} es obligatorio.`;
+    if (currentStep.id === 'documentos') {
+      const isSinTitulo = values.sinTituloActual === 'Si';
+      const hasTituloDoc = stepDocs.some((d) => d.key === 'titulo');
+      if (hasTituloDoc) {
+        if (!isSinTitulo) {
+          if (!(values.tituloDenominacion || '').trim()) {
+            errors.tituloDenominacion = 'El campo Denominación del título es obligatorio.';
+          }
+          if (!files.some((f) => f.fieldKey === 'titulo')) {
+            errors.titulo = 'El documento Título de grado o terciario es obligatorio.';
+          }
+        }
+      }
+
+      for (const doc of stepDocs) {
+        if (doc.key === 'titulo') continue;
+        if (doc.alternative?.kind === 'defer') {
+          const isDeferred = values[doc.alternative.valueKey] === 'Si';
+          if (!isDeferred && !files.some((f) => f.fieldKey === doc.key)) {
+            errors[doc.key] = `El documento ${doc.label} es obligatorio.`;
+          }
+        } else if (doc.required && !files.some((f) => f.fieldKey === doc.key)) {
+          errors[doc.key] = `El documento ${doc.label} es obligatorio.`;
+        }
+      }
+    } else {
+      for (const doc of stepDocs) {
+        if (doc.required && !doc.canDefer && !files.some((f) => f.fieldKey === doc.key)) {
+          errors[doc.key] = `El documento ${doc.label} es obligatorio.`;
+        }
       }
     }
 
@@ -204,7 +232,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       return ['paisResidencia', 'ciudadResidencia', 'domicilio', 'celular', 'telefono', 'email', 'emailConfirmacion', 'ocupacion'].includes(i.key);
     }
     if (currentStep.id === 'academico') {
-      return ['estudios', 'posgradoFlacso', 'posgradoCual', 'titulo', 'escolaridad', 'institucion', 'orientacion', 'mencion'].includes(i.key);
+      return ['estudios', 'posgradoFlacso', 'posgradoCual', 'institucion', 'orientacion', 'mencion'].includes(i.key);
     }
     if (currentStep.id === 'declaracion') {
       return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);

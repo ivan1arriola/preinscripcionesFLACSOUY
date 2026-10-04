@@ -42,6 +42,17 @@ export const apiClient = {
     return res.json();
   },
 
+  async removeUpload(token: string): Promise<void> {
+    const res = await fetch(`/api/uploads/${encodeURIComponent(token)}`, {
+      method: 'DELETE',
+      headers: { 'x-preinscription-session': apiClient.sessionId() },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'DELETE_ERROR', err.error?.message || 'No se pudo eliminar el archivo.');
+    }
+  },
+
   async listTargets(): Promise<DiagnosticTarget[]> {
     const res = await fetch('/api/targets');
     if (!res.ok) {

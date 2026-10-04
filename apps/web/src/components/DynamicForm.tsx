@@ -69,7 +69,13 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({ form, onSubmit, isSubm
   const errors: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(clientErrors)) errors[key] = value;
   for (const [key, messages] of Object.entries(serverErrors)) errors[key] = messages.join(', ');
-  const regularInputs = form.inputs.filter((input) => input.key !== 'orientacion' && input.key !== 'mencion');
+  const regularInputs = form.inputs.filter(
+    (input) =>
+      input.key !== 'orientacion' &&
+      input.key !== 'mencion' &&
+      input.key !== 'tituloDenominacion' &&
+      input.key !== 'sinTituloActual'
+  );
 
   return <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow">
     {!form.registrationOpen && <div className="p-4 mb-4 text-sm text-amber-800 rounded-lg bg-amber-50 border border-amber-200" role="alert"><strong>Preinscripción cerrada:</strong> Este destino académico no se encuentra aceptando preinscripciones actualmente.</div>}
@@ -91,8 +97,10 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({ form, onSubmit, isSubm
     <DocumentUploadFields
       documents={form.documents ?? []}
       files={files}
+      values={values}
       disabled={!form.registrationOpen || isSubmitting}
       errors={errors}
+      onChange={handleInputChange}
       onUpload={(fieldKey, file) => apiClient.upload(form.targetId, fieldKey, file)}
       onFileToken={(file) => setFiles((current) => {
         const definition = (form.documents ?? []).find((document) => document.key === file.fieldKey);
