@@ -11,9 +11,48 @@ import type { GoogleDriveFolderInfo } from '../../ports/google-drive-repository.
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import { canProvisionTargetSpreadsheet, type TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
+import type { EncryptedSettingsService } from '../../infrastructure/security/encrypted-settings.js';
+import {
+  maskEmail,
+  maskString,
+  parseMasterEmails,
+  serializeMasterEmails,
+  SETTING_EMAIL_NOTIFICATIONS_ENABLED,
+  SETTING_NOTIFICATION_MASTER_EMAILS,
+  SETTING_SES_AWS_ACCESS_KEY_ID,
+  SETTING_SES_AWS_SECRET_ACCESS_KEY,
+  SETTING_SES_AWS_SESSION_TOKEN,
+  SETTING_SES_REGION,
+  SETTING_SES_FROM_EMAIL,
+  SETTING_SES_REPLY_TO_EMAIL,
+  SETTING_SES_CONFIGURATION_SET,
+} from '../../infrastructure/email/email-config.js';
 
 const UpdateDriveFolderSchema = z.object({
   folderId: z.string().min(1, 'La carpeta de Google Drive es requerida'),
+});
+
+const UpdateEmailSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  masterEmails: z.array(z.string().email('Formato de correo inválido')).optional(),
+  awsAccessKeyId: z.string().min(1).optional(),
+  awsSecretAccessKey: z.string().min(1).optional(),
+  awsSessionToken: z.string().nullable().optional(),
+  region: z.string().min(1).optional(),
+  fromEmail: z.string().email('Formato de correo remitente inválido').optional(),
+  replyToEmail: z.string().email('Formato de correo reply-to inválido').nullable().optional(),
+  configurationSet: z.string().nullable().optional(),
+  ses: z
+    .object({
+      accessKeyId: z.string().min(1).optional(),
+      secretAccessKey: z.string().min(1).optional(),
+      sessionToken: z.string().nullable().optional(),
+      region: z.string().min(1).optional(),
+      fromEmail: z.string().email('Formato de correo remitente inválido').optional(),
+      replyToEmail: z.string().email('Formato de correo reply-to inválido').nullable().optional(),
+      configurationSet: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 export function createAdminSettingsRoutes(
@@ -24,6 +63,7 @@ export function createAdminSettingsRoutes(
   catalog?: AcademicCatalog,
   targetSpreadsheetService?: TargetSpreadsheetService,
   targetSpreadsheetRepository?: TargetSpreadsheetRepository,
+  encryptedSettingsService?: EncryptedSettingsService,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -161,6 +201,206 @@ export function createAdminSettingsRoutes(
         error: {
           code: 'SPREADSHEET_PROVISIONING_ERROR',
           message: error instanceof Error ? error.message : 'No se pudieron crear las planillas automáticamente.',
+        },
+      });
+    }
+  });
+
+  router.get('/email', async (_req, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({
+        error: {
+          code: 'ENCRYPTION_UNAVAILABLE',
+          message: 'El servicio de cifrado no está disponible.',
+        },
+      });
+      return;
+    }
+
+    try {
+      const enabled = (await encryptedSettingsService.getEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED)) === 'true';
+      const rawMasters = await encryptedSettingsService.getEncryptedSetting(SETTING_NOTIFICATION_MASTER_EMAILS);
+      const masterEmails = parseMasterEmails(rawMasters);
+
+      const accessKeyId = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID);
+      const secretAccessKey = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_SECRET_ACCESS_KEY);
+      const sessionToken = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN);
+      const region = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_REGION);
+      const fromEmail = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_FROM_EMAIL);
+      const replyToEmail = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL);
+      const configurationSet = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_CONFIGURATION_SET);
+
+      const hasAccessKey = Boolean(accessKeyId);
+      const hasSecretKey = Boolean(secretAccessKey);
+      const hasSessionToken = Boolean(sessionToken);
+      const isConfigured = Boolean(accessKeyId && secretAccessKey && region && fromEmail);
+      const fromEmailMasked = fromEmail ? maskEmail(fromEmail) : null;
+      const replyToEmailMasked = replyToEmail ? maskEmail(replyToEmail) : null;
+      const accessKeyIdMasked = accessKeyId ? maskString(accessKeyId) : null;
+
+      const record = await settingsRepository.getSettingRecord(SETTING_SES_AWS_ACCESS_KEY_ID);
+
+      res.json({
+        ok: true,
+        enabled,
+        configured: isConfigured,
+        region: region || null,
+        fromEmailMasked,
+        replyToEmailMasked,
+        accessKeyIdMasked,
+        configurationSet: configurationSet || null,
+        ses: {
+          configured: isConfigured,
+          hasAccessKey,
+          hasSecretKey,
+          hasSessionToken,
+          region: region || null,
+          fromEmail: fromEmailMasked,
+          replyToEmail: replyToEmailMasked,
+          configurationSet: configurationSet || null,
+        },
+        masterEmails,
+        updatedAt: record?.updatedAt ?? null,
+        updatedBy: record?.updatedBy ?? null,
+      });
+    } catch (error) {
+      res.status(503).json({
+        error: {
+          code: 'ENCRYPTION_ERROR',
+          message: error instanceof Error ? error.message : 'Error al leer la configuración de correo.',
+        },
+      });
+    }
+  });
+
+  router.put('/email', async (req: RequestWithAdminSession, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({
+        error: {
+          code: 'ENCRYPTION_UNAVAILABLE',
+          message: 'El servicio de cifrado no está disponible.',
+        },
+      });
+      return;
+    }
+
+    const parsed = UpdateEmailSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'Datos de configuración de correo inválidos.',
+          issues: parsed.error.issues,
+        },
+      });
+      return;
+    }
+
+    const actor = req.adminUser?.email || 'admin';
+    const { enabled, masterEmails } = parsed.data;
+
+    const accessKeyToSet = parsed.data.awsAccessKeyId ?? parsed.data.ses?.accessKeyId;
+    const secretKeyToSet = parsed.data.awsSecretAccessKey ?? parsed.data.ses?.secretAccessKey;
+    const sessionTokenToSet = parsed.data.awsSessionToken !== undefined ? parsed.data.awsSessionToken : parsed.data.ses?.sessionToken;
+    const regionToSet = parsed.data.region ?? parsed.data.ses?.region;
+    const fromEmailToSet = parsed.data.fromEmail ?? parsed.data.ses?.fromEmail;
+    const replyToEmailToSet = parsed.data.replyToEmail !== undefined ? parsed.data.replyToEmail : parsed.data.ses?.replyToEmail;
+    const configSetToSet = parsed.data.configurationSet !== undefined ? parsed.data.configurationSet : parsed.data.ses?.configurationSet;
+
+    try {
+      if (typeof enabled === 'boolean') {
+        await encryptedSettingsService.setEncryptedSetting(
+          SETTING_EMAIL_NOTIFICATIONS_ENABLED,
+          enabled ? 'true' : 'false',
+          actor
+        );
+      }
+
+      if (masterEmails !== undefined) {
+        await encryptedSettingsService.setEncryptedSetting(
+          SETTING_NOTIFICATION_MASTER_EMAILS,
+          serializeMasterEmails(masterEmails),
+          actor
+        );
+      }
+
+      if (accessKeyToSet !== undefined) {
+        await encryptedSettingsService.setEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID, accessKeyToSet.trim(), actor);
+      }
+      if (secretKeyToSet !== undefined) {
+        await encryptedSettingsService.setEncryptedSetting(SETTING_SES_AWS_SECRET_ACCESS_KEY, secretKeyToSet.trim(), actor);
+      }
+      if (sessionTokenToSet !== undefined) {
+        if (sessionTokenToSet === null || sessionTokenToSet.trim() === '') {
+          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN, '', actor);
+        } else {
+          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN, sessionTokenToSet.trim(), actor);
+        }
+      }
+      if (regionToSet !== undefined) {
+        await encryptedSettingsService.setEncryptedSetting(SETTING_SES_REGION, regionToSet.trim(), actor);
+      }
+      if (fromEmailToSet !== undefined) {
+        await encryptedSettingsService.setEncryptedSetting(SETTING_SES_FROM_EMAIL, fromEmailToSet.trim(), actor);
+      }
+      if (replyToEmailToSet !== undefined) {
+        if (replyToEmailToSet === null || replyToEmailToSet.trim() === '') {
+          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL, '', actor);
+        } else {
+          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL, replyToEmailToSet.trim(), actor);
+        }
+      }
+      if (configSetToSet !== undefined) {
+        if (configSetToSet === null || configSetToSet.trim() === '') {
+          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_CONFIGURATION_SET, '', actor);
+        } else {
+          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_CONFIGURATION_SET, configSetToSet.trim(), actor);
+        }
+      }
+
+      const updatedEnabled = (await encryptedSettingsService.getEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED)) === 'true';
+      const rawMasters = await encryptedSettingsService.getEncryptedSetting(SETTING_NOTIFICATION_MASTER_EMAILS);
+      const updatedMasterEmails = parseMasterEmails(rawMasters);
+
+      const accessKeyId = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID);
+      const secretAccessKey = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_SECRET_ACCESS_KEY);
+      const sessionToken = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN);
+      const region = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_REGION);
+      const fromEmail = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_FROM_EMAIL);
+      const replyToEmail = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL);
+      const configurationSet = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_CONFIGURATION_SET);
+
+      const isConfigured = Boolean(accessKeyId && secretAccessKey && region && fromEmail);
+      const fromEmailMasked = fromEmail ? maskEmail(fromEmail) : null;
+      const replyToEmailMasked = replyToEmail ? maskEmail(replyToEmail) : null;
+      const accessKeyIdMasked = accessKeyId ? maskString(accessKeyId) : null;
+
+      res.json({
+        ok: true,
+        enabled: updatedEnabled,
+        configured: isConfigured,
+        region: region || null,
+        fromEmailMasked,
+        replyToEmailMasked,
+        accessKeyIdMasked,
+        configurationSet: configurationSet || null,
+        ses: {
+          configured: isConfigured,
+          hasAccessKey: Boolean(accessKeyId),
+          hasSecretKey: Boolean(secretAccessKey),
+          hasSessionToken: Boolean(sessionToken),
+          region: region || null,
+          fromEmail: fromEmailMasked,
+          replyToEmail: replyToEmailMasked,
+          configurationSet: configurationSet || null,
+        },
+        masterEmails: updatedMasterEmails,
+      });
+    } catch (error) {
+      res.status(503).json({
+        error: {
+          code: 'ENCRYPTION_ERROR',
+          message: error instanceof Error ? error.message : 'Error al guardar la configuración de correo.',
         },
       });
     }

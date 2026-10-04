@@ -21,13 +21,17 @@ import { PostgresTargetSpreadsheetRepository } from './infrastructure/database/p
 import { TargetSpreadsheetService } from './application/target-spreadsheet-service.js';
 import { PostgresAdminSessionStore } from './infrastructure/database/postgres-admin-session-store.js';
 import { getAdminSessionTtlMs } from './application/admin-session.js';
-
+import { EncryptedSettingsService } from './infrastructure/security/encrypted-settings.js';
 
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
 
 const formProfileRepository = new PostgresFormProfileRepository(db);
 const systemSettingsRepository = new PostgresSystemSettingsRepository(db);
+const encryptedSettingsService = new EncryptedSettingsService(
+  systemSettingsRepository,
+  process.env.APP_SETTINGS_ENCRYPTION_KEY
+);
 const targetSpreadsheetRepository = new PostgresTargetSpreadsheetRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
@@ -147,6 +151,7 @@ const app = createApp({
   googleIdentityVerifier,
   adminSessionStore,
   systemSettingsRepository,
+  encryptedSettingsService,
   serviceAccountEmail: googleCreds.clientEmail,
   checkDatabase: checkDb,
 });

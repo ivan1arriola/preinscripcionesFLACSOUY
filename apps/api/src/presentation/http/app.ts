@@ -28,6 +28,7 @@ import { MemorySystemSettingsRepository } from '../../infrastructure/fixtures/me
 import { createAdminSettingsRoutes } from './admin-settings-routes.js';
 import type { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
+import { EncryptedSettingsService } from '../../infrastructure/security/encrypted-settings.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -42,6 +43,7 @@ export interface AppDependencies {
   googleIdentityVerifier?: GoogleIdentityVerifierPort;
   adminSessionStore?: AdminSessionStore;
   systemSettingsRepository?: SystemSettingsRepository;
+  encryptedSettingsService?: EncryptedSettingsService;
   serviceAccountEmail?: string;
 }
 
@@ -101,6 +103,10 @@ export function createApp(dependencies: AppDependencies): Express {
   app.use('/api/admin/profiles', createAdminProfileRoutes(profileRepo, sessionStore));
 
   const settingsRepo = dependencies.systemSettingsRepository ?? new MemorySystemSettingsRepository();
+  const encryptedSettingsService =
+    dependencies.encryptedSettingsService ??
+    new EncryptedSettingsService(settingsRepo, process.env.APP_SETTINGS_ENCRYPTION_KEY);
+
   app.use('/api/admin/settings', createAdminSettingsRoutes(
     settingsRepo,
     sessionStore,
@@ -111,6 +117,7 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.catalog,
     dependencies.targetSpreadsheetService,
     dependencies.targetSpreadsheetRepository,
+    encryptedSettingsService,
   ));
 
   // Central error handler

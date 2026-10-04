@@ -8,14 +8,18 @@ import { MemorySystemSettingsRepository } from '../../infrastructure/fixtures/me
 import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
 import { MemoryTargetSpreadsheetRepository } from '../../infrastructure/fixtures/memory-target-spreadsheet-repository.js';
 import { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
+import { EncryptedSettingsService } from '../../infrastructure/security/encrypted-settings.js';
 
 describe('Admin Settings Routes (/api/admin/settings)', () => {
   let server: Server;
   let baseUrl: string;
   let sessionStore: MemoryAdminSessionStore;
   let settingsRepository: MemorySystemSettingsRepository;
+  let encryptedSettingsService: EncryptedSettingsService;
   let validCookie: string;
   let csrfToken: string;
+
+  const testMasterKey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
   const mockVerifier: GoogleIdentityVerifierPort = {
     verify: async () => ({
@@ -32,6 +36,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
     settingsRepository = new MemorySystemSettingsRepository({
       google_drive_folder_id: '1hxhuUoIyoocL-laSfD3A8rgLigUgOH4e',
     });
+    encryptedSettingsService = new EncryptedSettingsService(settingsRepository, testMasterKey);
 
     const app = createApp({
       catalog: new FixtureAcademicCatalog(),
@@ -39,6 +44,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       adminSessionStore: sessionStore,
       googleIdentityVerifier: mockVerifier,
       systemSettingsRepository: settingsRepository,
+      encryptedSettingsService,
       serviceAccountEmail: 'preinscripciones@flacso-uruguay.iam.gserviceaccount.com',
       googleDriveRepository: {
         storeSubmissionFiles: async () => [],
@@ -366,5 +372,100 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
     expect(await customSettings.getSetting('google_drive_folder_id')).toBe('new-root-folder-perm');
 
     await new Promise<void>((resolve) => temporaryServer.close(() => resolve()));
+  });
+
+  describe('Email & SES Settings (/api/admin/settings/email)', () => {
+    it('GET /email rejects unauthenticated requests with 401', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/email`);
+      expect(res.status).toBe(401);
+    });
+
+    it('GET /email returns default unconfigured state when nothing has been configured', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
+        headers: { Cookie: validCookie },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.enabled).toBe(false);
+      expect(body.ses.configured).toBe(false);
+      expect(body.ses.region).toBeNull();
+      expect(body.ses.fromEmail).toBeNull();
+      expect(body.masterEmails).toEqual([]);
+    });
+
+    it('PUT /email rejects invalid master emails format with 400', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          masterEmails: ['valid@flacso.edu.uy', 'invalid-email-address'],
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBeDefined();
+    });
+
+    it('PUT /email saves SES configuration and master emails encrypted, never exposes plaintext secrets', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enabled: true,
+          ses: {
+            accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
+            secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+            region: 'us-east-1',
+            fromEmail: 'preinscripciones@flacso.edu.uy',
+            replyToEmail: 'consultas@flacso.edu.uy',
+            configurationSet: 'flacso-notifications-config',
+          },
+          masterEmails: ['coordinacion@flacso.edu.uy', 'soporte@flacso.edu.uy'],
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.enabled).toBe(true);
+      expect(body.ses.configured).toBe(true);
+      expect(body.ses.region).toBe('us-east-1');
+      expect(body.ses.fromEmail).toBe('pr***s@flacso.edu.uy');
+      expect(body.ses.replyToEmail).toBe('co***s@flacso.edu.uy');
+      expect(body.ses.hasAccessKey).toBe(true);
+      expect(body.ses.hasSecretKey).toBe(true);
+      expect(body.masterEmails).toEqual(['coordinacion@flacso.edu.uy', 'soporte@flacso.edu.uy']);
+
+      // CRITICAL: Plaintext secrets MUST NEVER appear in API response
+      expect(JSON.stringify(body)).not.toContain('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+
+      // CRITICAL: Plaintext secrets MUST NEVER appear in raw repository
+      const rawSecret = await settingsRepository.getSetting('ses_aws_secret_access_key');
+      expect(rawSecret).not.toBeNull();
+      expect(rawSecret).not.toContain('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+      expect(rawSecret!.startsWith('enc:v1:')).toBe(true);
+    });
+
+    it('GET /email returns masked credentials after configuration without plaintext secrets', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
+        headers: { Cookie: validCookie },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+
+      expect(body.enabled).toBe(true);
+      expect(body.ses.configured).toBe(true);
+      expect(body.ses.fromEmail).toBe('pr***s@flacso.edu.uy');
+      expect(body.ses.region).toBe('us-east-1');
+      expect(body.masterEmails).toEqual(['coordinacion@flacso.edu.uy', 'soporte@flacso.edu.uy']);
+      expect(JSON.stringify(body)).not.toContain('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+    });
   });
 });
