@@ -176,7 +176,7 @@ describe('PreinscriptionWizard Component', () => {
     fireEvent.click(step5Btn);
 
     // Final submit button on step 5
-    const submitBtn = screen.getByRole('button', { name: /Confirmar y Enviar/i });
+    const submitBtn = screen.getByRole('button', { name: /Revisar datos/i });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
@@ -443,7 +443,26 @@ describe('PreinscriptionWizard Component', () => {
     fireEvent.click(yesRadios[1]!); // aceptaDifusion = Si
 
     // Click submit without selecting agreement
-    fireEvent.click(screen.getByRole('button', { name: /Confirmar y Enviar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Revisar datos/i }));
     expect(screen.getByText(/Debe seleccionar el convenio correspondiente/i)).toBeInTheDocument();
+  });
+
+  it('renders final submit button with institutional blue palette, wizard-submit-action class and no green classes', () => {
+    const singleStepForm: FormDefinition = {
+      ...diplomaForm,
+      steps: [{ id: 'declaracion', title: 'Declaración', description: '', order: 1 }],
+      inputs: [],
+      documents: [],
+    };
+    const { rerender } = render(<PreinscriptionWizard form={singleStepForm} onSubmit={vi.fn()} isSubmitting={false} />);
+    const submitBtn = screen.getByRole('button', { name: /Revisar datos/i });
+    expect(submitBtn).toBeInTheDocument();
+    expect(submitBtn).toHaveClass('wizard-submit-action');
+    expect(submitBtn.className).not.toMatch(/green/i);
+    expect(submitBtn).not.toBeDisabled();
+
+    rerender(<PreinscriptionWizard form={singleStepForm} onSubmit={vi.fn()} isSubmitting={true} />);
+    const disabledBtn = screen.getByRole('button', { name: /Revisar datos/i });
+    expect(disabledBtn).toBeDisabled();
   });
 });

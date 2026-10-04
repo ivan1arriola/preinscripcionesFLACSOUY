@@ -217,6 +217,10 @@ textarea { min-height: 6.75rem; resize: vertical; }
 .target-card-primary-action, .wizard-primary-action, .wizard-submit-action { border-radius: .625rem; box-shadow: 0 5px 12px rgba(23, 92, 211, .18); transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
 .target-card-primary-action:hover, .wizard-primary-action:hover, .wizard-submit-action:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(23, 92, 211, .23); }
 .target-card-secondary-action { font-weight: 600; text-underline-offset: 3px; }
+.wizard-submit-action { background: linear-gradient(145deg, #175cd3, #164cae); color: #fff; border: 1px solid #164cae; }
+.wizard-submit-action:hover:not(:disabled) { background: linear-gradient(145deg, #164cae, #133f8e); }
+.wizard-submit-action:focus-visible { outline: 3px solid rgba(23, 92, 211, .3); outline-offset: 2px; }
+.wizard-submit-action:disabled { background: #94a3b8; border-color: #94a3b8; color: #fff; box-shadow: none; cursor: not-allowed; transform: none; }
 
 /* Target and form journey */
 .target-page { max-width: 48rem; }

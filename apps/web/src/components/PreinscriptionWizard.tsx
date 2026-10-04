@@ -307,9 +307,9 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
               type="button"
               onClick={handleFinalSubmit}
               disabled={isSubmitting || !form.registrationOpen}
-              className="wizard-submit-action px-6 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 shadow-sm transition-colors"
+              className="wizard-submit-action px-6 py-2 text-sm font-semibold rounded-md shadow-sm transition-colors"
             >
-              {isSubmitting ? 'Enviando preinscripción…' : 'Confirmar y Enviar'}
+              Revisar datos
             </button>
           )}
         </div>
