@@ -78,6 +78,7 @@ export interface AcademicTarget {
   kind: AcademicTargetKind;
   title: string;
   offerType?: string;
+  notificationEmail?: string;
   registrationOpen: boolean;
   registrationAvailability?: RegistrationAvailability;
   registrationWindow?: RegistrationWindow;

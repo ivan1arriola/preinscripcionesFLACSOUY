@@ -26,6 +26,7 @@ const simplifiedV1Response = {
         number: 11,
         name: 'Cohorte XI',
       },
+      notificationEmail: 'coordinacion@flacso.edu.uy',
       registrationOpen: true,
       registrationWindow: {
         from: null,
@@ -59,6 +60,7 @@ const simplifiedV1Response = {
         number: 3,
         name: 'Edición 2026-03',
       },
+      notificationEmail: null,
       registrationOpen: false,
       registrationAvailability: 'closed',
       registrationWindow: {
@@ -138,11 +140,14 @@ describe('WordPress Client & Contract Adapter', () => {
     expect(response.targets[0]!.offer?.type).toBe('diploma');
     expect(response.targets[0]!.orientations).toEqual(['Educación', 'Políticas Públicas']);
     expect(response.targets[0]!.mentions).toEqual(['Tecnología Educativa', 'Innovación Pública']);
+    expect(response.targets[0]!.notificationEmail).toBe('coordinacion@flacso.edu.uy');
     expect(response.targets[1]!.registrationOpen).toBe(false);
     expect(response.targets[1]!.registrationAvailability).toBe('closed');
+    expect(response.targets[1]!.notificationEmail).toBeNull();
     expect(response.targets[1]!.seminar?.type).toBe('seminar');
     expect(response.targets[2]!.registrationOpen).toBe(true);
     expect(response.targets[2]!.registrationAvailability).toBeUndefined();
+    expect(response.targets[2]!.notificationEmail).toBeUndefined();
   });
 
   it('reads published agreements from the native WordPress REST endpoint', async () => {
@@ -307,13 +312,38 @@ describe('WordPress Client & Contract Adapter', () => {
       'Innovación Pública',
     ]);
     expect(targets1[0]!.title).toBe('Diploma Superior en Aprendizaje Visual e Inteligencia Artificial — Cohorte XI');
+    expect(targets1[0]!.notificationEmail).toBe('coordinacion@flacso.edu.uy');
     expect(targets1[1]!.registrationAvailability).toBe('closed');
+    expect(targets1[1]!.notificationEmail).toBeUndefined();
     expect(targets1[2]!.registrationAvailability).toBeUndefined();
+    expect(targets1[2]!.notificationEmail).toBeUndefined();
 
     // Second call: upstream fails, but cache provides targets
     const targets2 = await catalog.listTargets();
     expect(targets2).toHaveLength(3);
     expect(targets2[0]!.id).toBe('target_davia_c11');
+  });
+
+  it('rejects targets with invalid notificationEmail format', async () => {
+    const invalidEmailResponse = {
+      version: 1,
+      targets: [
+        {
+          ...simplifiedV1Response.targets[0],
+          notificationEmail: 'not-an-email',
+        },
+      ],
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => invalidEmailResponse,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+    await expect(client.getPreinscriptions()).rejects.toThrow();
   });
 
   it('revalidates single target bypassing cache', async () => {

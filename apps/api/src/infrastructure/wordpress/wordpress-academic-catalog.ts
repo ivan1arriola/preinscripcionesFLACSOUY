@@ -82,6 +82,7 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
       kind: raw.kind,
       title,
       offerType,
+      notificationEmail: raw.notificationEmail && raw.notificationEmail.trim().length > 0 ? raw.notificationEmail.trim() : undefined,
       registrationOpen: raw.registrationOpen,
       registrationAvailability: raw.registrationAvailability,
       registrationWindow: {

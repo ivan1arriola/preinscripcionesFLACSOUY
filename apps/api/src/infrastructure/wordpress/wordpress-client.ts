@@ -35,6 +35,7 @@ export const WordPressTargetSchema = z.object({
   id: z.string(),
   kind: z.enum(['academic_offer', 'seminar']),
   title: z.string(),
+  notificationEmail: z.string().email().nullable().optional(),
   registrationOpen: z.boolean(),
   registrationAvailability: z.enum(['open', 'closed', 'conflict']).optional(),
   registrationWindow: z.object({
