@@ -89,6 +89,9 @@ export interface TargetSpreadsheetsTable {
   target_id: string;
   spreadsheet_id: string;
   sheet_name: string;
+  root_folder_id: string | null;
+  status: string | null;
+  last_discovered_at: Date | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }

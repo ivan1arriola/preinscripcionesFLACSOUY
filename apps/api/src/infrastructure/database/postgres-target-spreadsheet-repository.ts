@@ -35,6 +35,9 @@ export class PostgresTargetSpreadsheetRepository implements TargetSpreadsheetRep
       targetId: row.target_id,
       spreadsheetId: row.spreadsheet_id,
       sheetName: row.sheet_name,
+      rootFolderId: row.root_folder_id ?? undefined,
+      status: (row.status as any) ?? undefined,
+      lastDiscoveredAt: row.last_discovered_at ? new Date(row.last_discovered_at) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };
@@ -50,6 +53,9 @@ export class PostgresTargetSpreadsheetRepository implements TargetSpreadsheetRep
       targetId: row.target_id,
       spreadsheetId: row.spreadsheet_id,
       sheetName: row.sheet_name,
+      rootFolderId: row.root_folder_id ?? undefined,
+      status: (row.status as any) ?? undefined,
+      lastDiscoveredAt: row.last_discovered_at ? new Date(row.last_discovered_at) : undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     }));
@@ -62,12 +68,18 @@ export class PostgresTargetSpreadsheetRepository implements TargetSpreadsheetRep
         target_id: configuration.targetId,
         spreadsheet_id: configuration.spreadsheetId,
         sheet_name: configuration.sheetName,
+        root_folder_id: configuration.rootFolderId ?? null,
+        status: configuration.status ?? null,
+        last_discovered_at: configuration.lastDiscoveredAt ?? null,
         created_at: configuration.createdAt ?? new Date(),
         updated_at: configuration.updatedAt ?? new Date(),
       })
       .onConflict((oc) => oc.column('target_id').doUpdateSet({
         spreadsheet_id: configuration.spreadsheetId,
         sheet_name: configuration.sheetName,
+        root_folder_id: configuration.rootFolderId ?? null,
+        status: configuration.status ?? null,
+        last_discovered_at: configuration.lastDiscoveredAt ?? null,
         updated_at: configuration.updatedAt ?? new Date(),
       }))
       .execute();

@@ -107,11 +107,20 @@ export function createAdminSettingsRoutes(
     const actor = req.adminUser?.email || 'admin';
     await settingsRepository.setSetting('google_drive_folder_id', extractedId, actor);
 
+    let reconciliationResult: any = undefined;
+    let ok = true;
+    if (catalog && targetSpreadsheetService) {
+      const targets = (await catalog.listTargets()).filter(canProvisionTargetSpreadsheet);
+      reconciliationResult = await targetSpreadsheetService.reconcileTargets(targets);
+      ok = reconciliationResult.status === 'completed';
+    }
+
     res.json({
-      ok: true,
+      ok,
       googleDriveFolderId: extractedId,
       googleDriveFolderName: folder.name,
       googleDriveCanAddChildren: folder.canAddChildren,
+      ...(reconciliationResult ? { reconciliation: reconciliationResult } : {}),
     });
   });
 
@@ -139,9 +148,14 @@ export function createAdminSettingsRoutes(
       return;
     }
     try {
-      const targets = await catalog.listTargets();
+      const targets = (await catalog.listTargets()).filter(canProvisionTargetSpreadsheet);
+      const reconciliation = await targetSpreadsheetService.reconcileTargets(targets);
       const configurations = await targetSpreadsheetService.ensureForTargets(targets);
-      res.json({ ok: true, spreadsheets: configurations });
+      res.json({
+        ok: reconciliation.status === 'completed',
+        spreadsheets: configurations,
+        reconciliation,
+      });
     } catch (error) {
       res.status(502).json({
         error: {

@@ -19,6 +19,8 @@ describe('GoogleSpreadsheetProvisioner', () => {
     });
 
     const result = await provisioner.create({
+      targetId: 'target-1',
+      configRevision: 'v2',
       title: 'Maestría — Cohorte 1',
       folderId: 'drive-root-1',
       sheetName: 'Sheet1',
@@ -38,6 +40,12 @@ describe('GoogleSpreadsheetProvisioner', () => {
           name: 'Maestría — Cohorte 1',
           mimeType: 'application/vnd.google-apps.spreadsheet',
           parents: ['drive-root-1'],
+          appProperties: {
+            flacsoResource: 'preinscription-spreadsheet',
+            flacsoTargetId: 'target-1',
+            flacsoTargetRevision: 'v2',
+            flacsoSheetName: 'Sheet1',
+          },
         }),
       }),
     );

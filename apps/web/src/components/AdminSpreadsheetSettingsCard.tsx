@@ -32,10 +32,13 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
     setProvisioning(true);
     setError(null);
     try {
-      await apiClient.provisionAdminSpreadsheets(csrfToken);
+      const res = await apiClient.provisionAdminSpreadsheets(csrfToken);
+      if (res.reconciliation?.status === 'blocked') {
+        setError('Algunas planillas no se pudieron sincronizar debido a permisos en Google Drive.');
+      }
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudieron crear las planillas automáticamente.');
+      setError(err instanceof ApiError ? err.message : 'No se pudieron sincronizar las planillas automáticamente.');
     } finally {
       setProvisioning(false);
     }
@@ -47,7 +50,7 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
         <div>
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><span>📊</span> Planillas por oferta</h2>
           <p className="text-xs text-gray-500 mt-1 max-w-2xl">
-            La aplicación crea una planilla independiente para cada oferta y seminario. No tenés que copiar ni ingresar IDs.
+            La aplicación descubre y sincroniza una planilla independiente para cada oferta y seminario según la jerarquía de Google Drive. No tenés que copiar ni ingresar IDs.
           </p>
         </div>
         <button
@@ -56,7 +59,7 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
           disabled={loading || provisioning}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium text-xs rounded-lg transition-colors"
         >
-          {provisioning ? 'Creando planillas...' : 'Crear planillas faltantes'}
+          {provisioning ? 'Sincronizando planillas...' : 'Sincronizar planillas'}
         </button>
       </div>
 
@@ -69,7 +72,18 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
             <div key={target.targetId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-100 px-4 py-3">
               <div>
                 <p className="text-sm font-semibold text-gray-900">{target.title}</p>
-                <p className="text-[11px] text-gray-500">{target.kind === 'seminar' ? 'Seminario' : 'Oferta académica'}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[11px] text-gray-500">{target.kind === 'seminar' ? 'Seminario' : 'Oferta académica'}</span>
+                  {target.spreadsheet?.status === 'blocked' && (
+                    <span className="px-1.5 py-0.5 bg-red-100 text-red-800 rounded text-[10px] font-medium">Bloqueada</span>
+                  )}
+                  {target.spreadsheet?.status === 'reconciled' && (
+                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-medium">Reconciliada</span>
+                  )}
+                  {target.spreadsheet?.status === 'created' && (
+                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-medium">Activa</span>
+                  )}
+                </div>
               </div>
               {target.spreadsheet ? (
                 <a
@@ -81,7 +95,7 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
                   Abrir planilla ↗
                 </a>
               ) : (
-                <span className="text-xs text-amber-700">Pendiente de creación</span>
+                <span className="text-xs text-amber-700">Pendiente de sincronización</span>
               )}
             </div>
           ))}

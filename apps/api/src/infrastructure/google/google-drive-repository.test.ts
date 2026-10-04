@@ -141,4 +141,248 @@ describe('GoogleDriveRepository', () => {
     const uploadRequest = requests.find((request) => request.url.includes('/upload/drive/v3/files'));
     expect(uploadRequest).toBeUndefined();
   });
+
+  describe('Spreadsheet Discovery and Management', () => {
+    it('finds a spreadsheet by appProperties.flacsoTargetId regardless of title changes and inspects query parameters', async () => {
+      let requestUrl = '';
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-folder-1',
+        accessTokenOrProvider: 'mock-token',
+        fetchImpl: async (input) => {
+          requestUrl = String(input);
+          return new Response(JSON.stringify({
+            files: [
+              {
+                id: 'sheet-123',
+                name: 'Título Cambiado de la Planilla',
+                parents: ['folder-cohort-1'],
+                webViewLink: 'https://docs.google.com/spreadsheets/d/sheet-123/edit',
+                appProperties: {
+                  flacsoResource: 'preinscription-spreadsheet',
+                  flacsoTargetId: 'offer-target-42',
+                  flacsoTargetRevision: 'rev-2',
+                  flacsoSheetName: 'Inscripciones',
+                },
+              },
+            ],
+          }), { status: 200 });
+        },
+      });
+
+      const result = await repository.findSpreadsheetByTargetId('root-folder-1', 'offer-target-42');
+
+      expect(result).toEqual({
+        targetId: 'offer-target-42',
+        spreadsheetId: 'sheet-123',
+        sheetName: 'Inscripciones',
+        parentFolderId: 'folder-cohort-1',
+        url: 'https://docs.google.com/spreadsheets/d/sheet-123/edit',
+      });
+
+      // Verify URL query parameters and encoding
+      expect(requestUrl).toContain('supportsAllDrives=true');
+      expect(requestUrl).toContain('includeItemsFromAllDrives=true');
+      const decodedUrl = decodeURIComponent(requestUrl);
+      expect(decodedUrl).toContain("mimeType = 'application/vnd.google-apps.spreadsheet'");
+      expect(decodedUrl).toContain('trashed = false');
+      expect(decodedUrl).toContain("key='flacsoResource' and value='preinscription-spreadsheet'");
+      expect(decodedUrl).toContain("key='flacsoTargetId' and value='offer-target-42'");
+    });
+
+    it('returns null when no spreadsheet exists for the targetId', async () => {
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-folder-1',
+        accessTokenOrProvider: 'mock-token',
+        fetchImpl: async () => new Response(JSON.stringify({ files: [] }), { status: 200 }),
+      });
+
+      const result = await repository.findSpreadsheetByTargetId('root-folder-1', 'non-existent-target');
+      expect(result).toBeNull();
+    });
+
+    it('distinguishes two targets with the same title by querying by targetId', async () => {
+      const queries: string[] = [];
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-folder-1',
+        accessTokenOrProvider: 'mock-token',
+        fetchImpl: async (input) => {
+          const url = String(input);
+          queries.push(url);
+          if (url.includes('target-a')) {
+            return new Response(JSON.stringify({
+              files: [{ id: 'sheet-a', name: 'Mismo Título', parents: ['p1'], appProperties: { flacsoResource: 'preinscription-spreadsheet', flacsoTargetId: 'target-a' } }],
+            }), { status: 200 });
+          }
+          return new Response(JSON.stringify({
+            files: [{ id: 'sheet-b', name: 'Mismo Título', parents: ['p2'], appProperties: { flacsoResource: 'preinscription-spreadsheet', flacsoTargetId: 'target-b' } }],
+          }), { status: 200 });
+        },
+      });
+
+      const resA = await repository.findSpreadsheetByTargetId('root-folder-1', 'target-a');
+      const resB = await repository.findSpreadsheetByTargetId('root-folder-1', 'target-b');
+
+      expect(resA?.spreadsheetId).toBe('sheet-a');
+      expect(resB?.spreadsheetId).toBe('sheet-b');
+      expect(decodeURIComponent(queries[0]!)).toContain("value='target-a'");
+      expect(decodeURIComponent(queries[1]!)).toContain("value='target-b'");
+    });
+
+    it('throws an error if multiple spreadsheets exist for the same target (inconsistency)', async () => {
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-folder-1',
+        accessTokenOrProvider: 'mock-token',
+        fetchImpl: async () => new Response(JSON.stringify({
+          files: [
+            { id: 'sheet-1', name: 'Planilla 1', parents: ['p1'], appProperties: { flacsoResource: 'preinscription-spreadsheet', flacsoTargetId: 'duplicate-target' } },
+            { id: 'sheet-2', name: 'Planilla 2', parents: ['p2'], appProperties: { flacsoResource: 'preinscription-spreadsheet', flacsoTargetId: 'duplicate-target' } },
+          ],
+        }), { status: 200 }),
+      });
+
+      await expect(repository.findSpreadsheetByTargetId('root-folder-1', 'duplicate-target'))
+        .rejects.toThrow(/Inconsistencia en Google Drive: se encontraron 2 planillas/);
+    });
+
+    it('ensureTargetFolder creates Ofertas académicas/<oferta>/<cohorte> directly under root and NOT Preinscripciones/Documentación', async () => {
+      const createdFolders: Array<{ name: string; parent: string }> = [];
+      let folderCounter = 0;
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-folder-1',
+        accessTokenOrProvider: 'mock-token',
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          if (req.method === 'GET' && req.url.includes('/drive/v3/files?q=')) {
+            // Folders do not exist initially
+            return new Response(JSON.stringify({ files: [] }), { status: 200 });
+          }
+          if (req.method === 'POST') {
+            folderCounter += 1;
+            const body = JSON.parse(await req.text());
+            createdFolders.push({ name: body.name, parent: body.parents[0] });
+            return new Response(JSON.stringify({ id: `f-${folderCounter}`, name: body.name }), { status: 200 });
+          }
+          return new Response(JSON.stringify({}), { status: 200 });
+        },
+      });
+
+      const academicTarget = {
+        id: 'diploma-ed',
+        kind: 'academic_offer' as const,
+        title: 'Diploma Superior en Educación y Nuevas Tecnologías',
+        offerType: 'diploma',
+        registrationOpen: true,
+        configRevision: 'v1',
+        orientations: [],
+        mentions: [],
+        offer: {
+          id: 'offer-ed',
+          name: 'Educación y Nuevas Tecnologías',
+          type: 'diploma',
+        },
+        cohort: {
+          id: 'cohort-1',
+          name: 'Cohorte 2026',
+          number: 1,
+        },
+      };
+
+      const targetFolderId = await repository.ensureTargetFolder('root-folder-1', academicTarget as any);
+
+      expect(targetFolderId).toBe('f-3');
+      expect(createdFolders).toEqual([
+        { name: 'Ofertas académicas', parent: 'root-folder-1' },
+        { name: 'Educación y Nuevas Tecnologías', parent: 'f-1' },
+        { name: 'Cohorte 2026', parent: 'f-2' },
+      ]);
+      expect(createdFolders.some((f) => f.name === 'Preinscripciones' || f.name === 'Documentación')).toBe(false);
+    });
+
+    it('moveSpreadsheet calls Drive PATCH with addParents and removeParents, and fails safely on error', async () => {
+      let patchUrl = '';
+      let patchMethod = '';
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-folder-1',
+        accessTokenOrProvider: 'mock-token',
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          patchUrl = req.url;
+          patchMethod = req.method;
+          return new Response(JSON.stringify({ id: 'sheet-1', parents: ['new-folder'] }), { status: 200 });
+        },
+      });
+
+      await repository.moveSpreadsheet('sheet-1', 'old-folder', 'new-folder');
+
+      expect(patchMethod).toBe('PATCH');
+      expect(patchUrl).toContain('/drive/v3/files/sheet-1');
+      expect(patchUrl).toContain('addParents=new-folder');
+      expect(patchUrl).toContain('removeParents=old-folder');
+      expect(patchUrl).toContain('supportsAllDrives=true');
+
+      // Failure test: permission denied (403)
+      const failingRepo = new GoogleDriveRepository({
+        folderId: 'root-folder-1',
+        accessTokenOrProvider: 'mock-token',
+        fetchImpl: async () => new Response(JSON.stringify({ error: { message: 'The user does not have sufficient permissions.' } }), { status: 403 }),
+      });
+
+      await expect(failingRepo.moveSpreadsheet('sheet-1', 'old-folder', 'new-folder'))
+        .rejects.toThrow(/Google Drive no permitió mover la planilla \(HTTP 403\)/);
+    });
+
+    it('moveToTargetFolder moves the spreadsheet only when its parent differs from the target folder', async () => {
+      const movedCalls: string[] = [];
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-folder-1',
+        accessTokenOrProvider: 'mock-token',
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          const url = req.url;
+          if (req.method === 'GET' && url.includes('/drive/v3/files?q=')) {
+            // Folders already exist
+            return new Response(JSON.stringify({ files: [{ id: 'target-folder-fixed' }] }), { status: 200 });
+          }
+          if (req.method === 'GET' && url.includes('/drive/v3/files/sheet-to-move')) {
+            return new Response(JSON.stringify({
+              id: 'sheet-to-move',
+              mimeType: 'application/vnd.google-apps.spreadsheet',
+              trashed: false,
+              parents: ['old-parent-folder'],
+              webViewLink: 'https://docs.google.com/spreadsheets/d/sheet-to-move/edit',
+              appProperties: { flacsoSheetName: 'Inscripciones' },
+            }), { status: 200 });
+          }
+          if (req.method === 'PATCH' && url.includes('/drive/v3/files/sheet-to-move')) {
+            movedCalls.push(url);
+            return new Response(JSON.stringify({ id: 'sheet-to-move', parents: ['target-folder-fixed'] }), { status: 200 });
+          }
+          return new Response(JSON.stringify({}), { status: 200 });
+        },
+      });
+
+      const academicTarget = {
+        id: 'offer-1',
+        kind: 'academic_offer' as const,
+        title: 'Maestría',
+        offerType: 'maestria',
+        registrationOpen: true,
+        configRevision: 'v1',
+        orientations: [],
+        mentions: [],
+      };
+
+      const discovery = await repository.moveToTargetFolder({
+        spreadsheetId: 'sheet-to-move',
+        target: academicTarget as any,
+        rootFolderId: 'root-folder-1',
+      });
+
+      expect(discovery.spreadsheetId).toBe('sheet-to-move');
+      expect(discovery.parentFolderId).toBe('target-folder-fixed');
+      expect(movedCalls.length).toBe(1);
+      expect(movedCalls[0]).toContain('addParents=target-folder-fixed');
+      expect(movedCalls[0]).toContain('removeParents=old-parent-folder');
+    });
+  });
 });

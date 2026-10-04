@@ -26,6 +26,8 @@ export interface GoogleDriveFolderInfo {
   canAddChildren: boolean;
 }
 
+export type { SpreadsheetDiscovery, SpreadsheetDiscoveryPort } from './spreadsheet-discovery.js';
+
 export interface GoogleDriveRepositoryPort {
   storeSubmissionFiles(command: StoreSubmissionFilesCommand): Promise<StoredDriveFile[]>;
   inspectFolder?(folderId: string): Promise<GoogleDriveFolderInfo>;

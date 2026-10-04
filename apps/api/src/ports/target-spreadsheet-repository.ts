@@ -5,6 +5,9 @@ export interface TargetSpreadsheetConfiguration {
   spreadsheetId: string;
   sheetName: string;
   url?: string;
+  rootFolderId?: string;
+  status?: 'reconciled' | 'created' | 'unchanged' | 'blocked';
+  lastDiscoveredAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }

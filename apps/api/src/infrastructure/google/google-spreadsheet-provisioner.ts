@@ -41,6 +41,12 @@ export class GoogleSpreadsheetProvisioner implements SpreadsheetProvisioner {
           name: command.title,
           mimeType: 'application/vnd.google-apps.spreadsheet',
           parents: [command.folderId],
+          appProperties: {
+            flacsoResource: 'preinscription-spreadsheet',
+            flacsoTargetId: command.targetId ?? '',
+            flacsoTargetRevision: command.configRevision ?? 'v1',
+            flacsoSheetName: command.sheetName,
+          },
         }),
         signal: AbortSignal.timeout(this.timeoutMs),
       },

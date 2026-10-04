@@ -17,6 +17,10 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [reconciliation, setReconciliation] = useState<{
+    status: 'completed' | 'blocked';
+    targets: Array<{ targetId: string; status: string; message?: string }>;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const loadSettings = async () => {
@@ -47,6 +51,7 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
     setSaving(true);
     setError(null);
     setSuccess(null);
+    setReconciliation(null);
 
     try {
       const res = await apiClient.updateGoogleDriveFolder(folderId, csrfToken);
@@ -54,7 +59,17 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
       setFolderId(res.googleDriveFolderId);
       setCurrentFolderName(res.googleDriveFolderName);
       setCanAddChildren(res.googleDriveCanAddChildren);
-      setSuccess('Carpeta de Google Drive actualizada correctamente.');
+
+      if (res.reconciliation) {
+        setReconciliation(res.reconciliation);
+        if (res.reconciliation.status === 'blocked') {
+          setError('La carpeta raíz fue actualizada, pero algunas planillas no pudieron reconciliarse y quedaron bloqueadas.');
+        } else {
+          setSuccess('Carpeta de Google Drive actualizada y planillas reconciliadas correctamente.');
+        }
+      } else {
+        setSuccess('Carpeta de Google Drive actualizada correctamente.');
+      }
       loadSettings();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al guardar la carpeta de Google Drive');
@@ -144,8 +159,28 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
           <p className="text-[11px] text-gray-500 mt-1">
             Puedes pegar el ID directo o el enlace completo del navegador. El sistema extraerá automáticamente el identificador.
           </p>
+          {currentFolderId && folderId.trim() && folderId.trim() !== currentFolderId && (
+            <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 mt-2">
+              ⚠️ Al cambiar la carpeta raíz, el sistema reubicará o reconciliará automáticamente las planillas existentes de cada oferta hacia la nueva jerarquía de Google Drive.
+            </p>
+          )}
         </div>
       </form>
+
+      {reconciliation && (
+        <div className={`mt-4 p-3 rounded-lg border text-xs ${reconciliation.status === 'completed' ? 'bg-blue-50 border-blue-200 text-blue-900' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+          <div className="font-semibold mb-1">
+            {reconciliation.status === 'completed' ? 'Resultado de reconciliación de planillas:' : 'Atención en la reconciliación de planillas:'}
+          </div>
+          <ul className="space-y-1 mt-1.5 list-disc list-inside">
+            {reconciliation.targets.map((t) => (
+              <li key={t.targetId} className={t.status === 'blocked' ? 'text-red-700 font-medium' : 'text-gray-700'}>
+                <strong>{t.targetId}</strong>: {t.status === 'blocked' ? `Bloqueada (${t.message || 'error de permisos'})` : t.status === 'reconciled' ? 'Reconciliada' : t.status === 'created' ? 'Creada' : 'Sin cambios'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {currentFolderId && (
         <div className={`mt-4 p-3 rounded-lg border text-xs ${canAddChildren ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>

@@ -1,12 +1,18 @@
+import type { AcademicTarget } from '@flacso/contracts';
 import type {
   GoogleDriveFolderInfo,
   GoogleDriveRepositoryPort,
   StoreSubmissionFilesCommand,
   StoredDriveFile,
 } from '../../ports/google-drive-repository.js';
+import type {
+  SpreadsheetDiscovery,
+  SpreadsheetDiscoveryPort,
+} from '../../ports/spreadsheet-discovery.js';
 import {
   buildDriveFolderNames,
   buildSemanticDriveFileName,
+  driveTargetDescriptor,
 } from '../../domain/google-drive-naming.js';
 
 interface GoogleDriveRepositoryOptions {
@@ -17,7 +23,8 @@ interface GoogleDriveRepositoryOptions {
   timeoutMs?: number;
 }
 
-export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
+export class GoogleDriveRepository implements GoogleDriveRepositoryPort, SpreadsheetDiscoveryPort {
+
   private readonly tokenProvider: () => Promise<string>;
   private readonly folderIdProvider: () => Promise<string>;
   private readonly fetchImpl: typeof fetch;
@@ -200,5 +207,142 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort {
     const created = await createResponse.json() as { id?: string };
     if (!created.id) throw new Error(`Google Drive no devolvió el identificador de la carpeta "${name}".`);
     return created.id;
+  }
+
+  async findSpreadsheetByTargetId(_rootFolderId: string, targetId: string): Promise<SpreadsheetDiscovery | null> {
+    const token = await this.tokenProvider();
+    const query = [
+      "mimeType = 'application/vnd.google-apps.spreadsheet'",
+      'trashed = false',
+      "appProperties has { key='flacsoResource' and value='preinscription-spreadsheet' }",
+      `appProperties has { key='flacsoTargetId' and value='${targetId.replace(/'/g, "\\'")}' }`,
+    ].join(' and ');
+    const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,parents,webViewLink,appProperties)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+    const response = await this.fetchImpl(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`Google Drive no permitió buscar la planilla del destino "${targetId}" (HTTP ${response.status}).`);
+    }
+    const payload = (await response.json()) as {
+      files?: Array<{
+        id?: string;
+        name?: string;
+        parents?: string[];
+        webViewLink?: string;
+        appProperties?: Record<string, string>;
+      }>;
+    };
+    const files = payload.files ?? [];
+    if (files.length === 0) return null;
+    if (files.length > 1) {
+      throw new Error(`Inconsistencia en Google Drive: se encontraron ${files.length} planillas para el destino "${targetId}".`);
+    }
+    const file = files[0]!;
+    return {
+      targetId,
+      spreadsheetId: file.id!,
+      sheetName: file.appProperties?.flacsoSheetName || 'Inscripciones',
+      parentFolderId: file.parents?.[0] || '',
+      url: file.webViewLink || `https://docs.google.com/spreadsheets/d/${file.id}/edit`,
+    };
+  }
+
+  async findByTargetId(rootFolderId: string, targetId: string): Promise<SpreadsheetDiscovery | null> {
+    return this.findSpreadsheetByTargetId(rootFolderId, targetId);
+  }
+
+  async ensureTargetFolder(rootFolderId: string, target: AcademicTarget): Promise<string> {
+    const token = await this.tokenProvider();
+    const descriptor = driveTargetDescriptor(target);
+    const folderNames = buildDriveFolderNames(descriptor);
+    let currentFolderId = rootFolderId;
+    for (const name of folderNames) {
+      currentFolderId = await this.ensureChildFolder(currentFolderId, name, token);
+    }
+    return currentFolderId;
+  }
+
+  async moveSpreadsheet(spreadsheetId: string, fromFolderId: string, toFolderId: string): Promise<void> {
+    const token = await this.tokenProvider();
+    let url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(spreadsheetId)}?addParents=${encodeURIComponent(toFolderId)}&supportsAllDrives=true&fields=id,parents`;
+    if (fromFolderId) {
+      url += `&removeParents=${encodeURIComponent(fromFolderId)}`;
+    }
+    const response = await this.fetchImpl(url, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`Google Drive no permitió mover la planilla (HTTP ${response.status}).`);
+    }
+  }
+
+  async moveToTargetFolder(input: {
+    spreadsheetId: string;
+    target: AcademicTarget;
+    rootFolderId: string;
+  }): Promise<SpreadsheetDiscovery> {
+    const targetFolderId = await this.ensureTargetFolder(input.rootFolderId, input.target);
+    const inspected = await this.inspectSpreadsheet(input.spreadsheetId);
+    if (!inspected) {
+      throw new Error(`No se encontró la planilla con ID "${input.spreadsheetId}" en Google Drive.`);
+    }
+    if (inspected.trashed) {
+      throw new Error(`La planilla con ID "${input.spreadsheetId}" está en la papelera de Google Drive.`);
+    }
+    const currentParent = inspected.parents?.[0] || '';
+    if (currentParent !== targetFolderId) {
+      await this.moveSpreadsheet(input.spreadsheetId, currentParent, targetFolderId);
+    }
+    return {
+      targetId: input.target.id,
+      spreadsheetId: input.spreadsheetId,
+      sheetName: inspected.appProperties?.flacsoSheetName || 'Inscripciones',
+      parentFolderId: targetFolderId,
+      url: inspected.webViewLink || `https://docs.google.com/spreadsheets/d/${input.spreadsheetId}/edit`,
+    };
+  }
+
+  async inspectSpreadsheet(spreadsheetId: string): Promise<{
+    id?: string;
+    name?: string;
+    mimeType?: string;
+    trashed?: boolean;
+    parents?: string[];
+    appProperties?: Record<string, string>;
+    webViewLink?: string;
+  } | null> {
+    const token = await this.tokenProvider();
+    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(spreadsheetId)}?fields=id,name,mimeType,trashed,parents,appProperties,webViewLink&supportsAllDrives=true`;
+    const response = await this.fetchImpl(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Google Drive no permitió consultar la planilla "${spreadsheetId}" (HTTP ${response.status}).`);
+    }
+    return (await response.json()) as any;
+  }
+
+  async setSpreadsheetAppProperties(spreadsheetId: string, properties: Record<string, string>): Promise<void> {
+    const token = await this.tokenProvider();
+    const url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(spreadsheetId)}?fields=id,appProperties&supportsAllDrives=true`;
+    const response = await this.fetchImpl(url, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ appProperties: properties }),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`Google Drive no permitió actualizar metadatos de la planilla "${spreadsheetId}" (HTTP ${response.status}).`);
+    }
   }
 }

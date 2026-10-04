@@ -250,4 +250,121 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
     expect(await targetSpreadsheetRepository.list()).toHaveLength(5);
     await new Promise<void>((resolve) => temporaryServer.close(() => resolve()));
   });
+
+  it('PUT /google-drive initiates reconciliation and reports completed status per target', async () => {
+    const targetSpreadsheetRepository = new MemoryTargetSpreadsheetRepository();
+    const targetSpreadsheetService = new TargetSpreadsheetService(
+      targetSpreadsheetRepository,
+      {
+        create: vi.fn(async ({ title, sheetName }) => ({
+          spreadsheetId: `sheet-${title.slice(0, 8)}`,
+          sheetName,
+          url: 'https://docs.google.com/spreadsheets/d/generated/edit',
+        })),
+      },
+      async () => 'new-root-folder-12345',
+    );
+    const customSettings = new MemorySystemSettingsRepository();
+    const app = createApp({
+      catalog: new FixtureAcademicCatalog(),
+      repository: new InMemorySubmissionRepository(),
+      adminSessionStore: sessionStore,
+      googleIdentityVerifier: mockVerifier,
+      systemSettingsRepository: customSettings,
+      googleDriveRepository: {
+        storeSubmissionFiles: async () => [],
+        inspectFolder: async (folderId) => ({ id: folderId, name: 'Carpeta Nueva', canAddChildren: true }),
+      },
+      targetSpreadsheetService,
+      targetSpreadsheetRepository,
+    });
+    const temporaryServer = app.listen(0);
+    await new Promise<void>((resolve) => temporaryServer.once('listening', () => resolve()));
+    const address = temporaryServer.address();
+
+    const res = await fetch(`http://localhost:${(address as { port: number }).port}/api/admin/settings/google-drive`, {
+      method: 'PUT',
+      headers: {
+        Cookie: validCookie,
+        'x-csrf-token': csrfToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ folderId: 'new-root-folder-12345' }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.googleDriveFolderId).toBe('new-root-folder-12345');
+    expect(body.reconciliation).toBeDefined();
+    expect(body.reconciliation.status).toBe('completed');
+    expect(body.reconciliation.targets.length).toBeGreaterThan(0);
+    expect(body.reconciliation.targets.every((t: any) => t.status === 'created' || t.status === 'reconciled')).toBe(true);
+
+    await new Promise<void>((resolve) => temporaryServer.close(() => resolve()));
+  });
+
+  it('PUT /google-drive reports ok: false and status: blocked when any target encounters a permission error during reconciliation', async () => {
+    const targetSpreadsheetRepository = new MemoryTargetSpreadsheetRepository();
+    const mockDiscoveryPort = {
+      findByTargetId: vi.fn().mockResolvedValue({
+        targetId: 'diploma-educacion-imagenes',
+        spreadsheetId: 'sheet-perm-locked',
+        sheetName: 'Inscripciones',
+        parentFolderId: 'old-parent',
+        url: 'https://docs.google.com/spreadsheets/d/sheet-perm-locked/edit',
+      }),
+      ensureTargetFolder: vi.fn().mockResolvedValue('target-folder'),
+      moveSpreadsheet: vi.fn().mockRejectedValue(new Error('Permission denied on Drive move')),
+    };
+    const targetSpreadsheetService = new TargetSpreadsheetService(
+      targetSpreadsheetRepository,
+      { create: vi.fn() },
+      async () => 'new-root-folder-perm',
+      mockDiscoveryPort as any,
+    );
+    const customSettings = new MemorySystemSettingsRepository();
+    const app = createApp({
+      catalog: new FixtureAcademicCatalog(),
+      repository: new InMemorySubmissionRepository(),
+      adminSessionStore: sessionStore,
+      googleIdentityVerifier: mockVerifier,
+      systemSettingsRepository: customSettings,
+      googleDriveRepository: {
+        storeSubmissionFiles: async () => [],
+        inspectFolder: async (folderId) => ({ id: folderId, name: 'Carpeta Nueva', canAddChildren: true }),
+      },
+      targetSpreadsheetService,
+      targetSpreadsheetRepository,
+    });
+    const temporaryServer = app.listen(0);
+    await new Promise<void>((resolve) => temporaryServer.once('listening', () => resolve()));
+    const address = temporaryServer.address();
+
+    const res = await fetch(`http://localhost:${(address as { port: number }).port}/api/admin/settings/google-drive`, {
+      method: 'PUT',
+      headers: {
+        Cookie: validCookie,
+        'x-csrf-token': csrfToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ folderId: 'new-root-folder-perm' }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // ok must be false because at least one target is blocked
+    expect(body.ok).toBe(false);
+    expect(body.googleDriveFolderId).toBe('new-root-folder-perm');
+    expect(body.reconciliation).toBeDefined();
+    expect(body.reconciliation.status).toBe('blocked');
+    const blockedTarget = body.reconciliation.targets.find((t: any) => t.status === 'blocked');
+    expect(blockedTarget).toBeDefined();
+    expect(blockedTarget.message).toContain('Permission denied on Drive move');
+
+    // Folder setting should still be saved so user can re-try
+    expect(await customSettings.getSetting('google_drive_folder_id')).toBe('new-root-folder-perm');
+
+    await new Promise<void>((resolve) => temporaryServer.close(() => resolve()));
+  });
 });

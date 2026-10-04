@@ -213,6 +213,16 @@ export const apiClient = {
     googleDriveFolderId: string;
     googleDriveFolderName: string;
     googleDriveCanAddChildren: boolean;
+    reconciliation?: {
+      status: 'completed' | 'blocked';
+      targets: Array<{
+        targetId: string;
+        status: 'reconciled' | 'created' | 'unchanged' | 'blocked';
+        spreadsheetId?: string;
+        code?: string;
+        message?: string;
+      }>;
+    };
   }> {
     const res = await fetch('/api/admin/settings/google-drive', {
       method: 'PUT',
@@ -234,7 +244,13 @@ export const apiClient = {
       targetId: string;
       title: string;
       kind: string;
-      spreadsheet: { spreadsheetId: string; sheetName: string; url?: string } | null;
+      spreadsheet: {
+        spreadsheetId: string;
+        sheetName: string;
+        url?: string;
+        status?: 'reconciled' | 'created' | 'unchanged' | 'blocked';
+        rootFolderId?: string;
+      } | null;
     }>;
   }> {
     const res = await fetch('/api/admin/settings/spreadsheets');
@@ -248,6 +264,16 @@ export const apiClient = {
   async provisionAdminSpreadsheets(csrfToken: string): Promise<{
     ok: boolean;
     spreadsheets: Array<{ targetId: string; spreadsheetId: string; sheetName: string; url?: string }>;
+    reconciliation?: {
+      status: 'completed' | 'blocked';
+      targets: Array<{
+        targetId: string;
+        status: 'reconciled' | 'created' | 'unchanged' | 'blocked';
+        spreadsheetId?: string;
+        code?: string;
+        message?: string;
+      }>;
+    };
   }> {
     const res = await fetch('/api/admin/settings/spreadsheets/provision', {
       method: 'POST',
