@@ -54,23 +54,33 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
           .execute();
 
         // 2. Ensure input definitions exist for submitted keys
-        const allKnownInputs = [...UNIVERSAL_INPUTS, ...Object.values(SUPPORTED_SPECIFIC_INPUTS)];
+        const profileInputs = (record.profileSnapshot as any)?.inputs as Array<{
+          key: string;
+          label: string;
+          type: string;
+          required?: boolean;
+          spreadsheetColumn?: string;
+        }> | undefined;
+
+        const allKnownInputs = [
+          ...UNIVERSAL_INPUTS,
+          ...Object.values(SUPPORTED_SPECIFIC_INPUTS),
+          ...(profileInputs ?? []),
+        ];
 
         for (const key of Object.keys(record.values)) {
           const def = allKnownInputs.find((i) => i.key === key);
-          if (def) {
-            await trx
-              .insertInto('input_definitions')
-              .values({
-                key: def.key,
-                label: def.label,
-                type: def.type,
-                required_by_default: def.required,
-                spreadsheet_column: def.spreadsheetColumn ?? def.label,
-              })
-              .onConflict((oc) => oc.column('key').doNothing())
-              .execute();
-          }
+          await trx
+            .insertInto('input_definitions')
+            .values({
+              key,
+              label: def?.label ?? key,
+              type: (def?.type as any) ?? 'text',
+              required_by_default: def?.required ?? false,
+              spreadsheet_column: def?.spreadsheetColumn ?? def?.label ?? key,
+            })
+            .onConflict((oc) => oc.column('key').doNothing())
+            .execute();
         }
 
         // 3. Insert submission

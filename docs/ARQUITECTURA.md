@@ -528,20 +528,36 @@ Cada nueva carga válida puede actualizar la última actividad.
 
 Un worker de la aplicación consultará periódicamente PostgreSQL y eliminará las sesiones expiradas junto con sus archivos del volumen temporal.
 
-## 9.5. Envío exitoso
+## 9.5. Matriz canónica de documentos
 
-Cuando el formulario se envía correctamente:
+La plataforma implementa una matriz documental canónica según el tipo de destino:
 
-1. se validan los datos;
-2. se validan los archivos;
-3. se crea/resuelve la estructura de Drive;
-4. se suben los documentos;
-5. se inserta la preinscripción en Sheets;
-6. se eliminan los archivos locales;
-7. se elimina la sesión temporal;
-8. se devuelve confirmación.
+| Documento | Clave | Tipos aplicables | Obligatoriedad | Alternativa / Regla |
+|---|---|---|---|---|
+| Documento de identidad | `identidad` | Todos | Obligatorio | Hasta 2 archivos (frente y dorso o PDF único). Máx 10 MB c/u. |
+| Curriculum Vitae | `cv` | Todos | Obligatorio | 1 archivo PDF. Máx 10 MB. |
+| Título | `titulo` | Todos | Condicional | Requiere denominación en texto (`tituloDenominacion`) y archivo adjunto (`titulo`), **o** declaración explícita de no poseer título actual (`sinTituloActual: "Si"`). Ambos estados son mutuamente excluyentes. |
+| Carta de motivación | `cartaMotivacion` | Ofertas académicas (`maestria`, `especializacion`, `diplomado`, `diploma`) | Obligatorio | No aplica en seminarios (`seminar`). |
+| Primera carta de recomendación | `cartaRecomendacion1` | Únicamente maestrías (`maestria`) | Reversible | Archivo adjunto ahora **o** marcada para entrega posterior (`cartaRecomendacion1Pendiente: "Si"`). |
+| Segunda carta de recomendación | `cartaRecomendacion2` | Únicamente maestrías (`maestria`) | Reversible | Archivo adjunto ahora **o** marcada para entrega posterior (`cartaRecomendacion2Pendiente: "Si"`). |
 
-Los temporales no deben eliminarse antes de confirmar que el flujo de persistencia terminó correctamente.
+> **Nota:** El campo y documento `escolaridad` ha sido eliminado definitivamente del modelo canónico. El sistema Django previo se conserva únicamente como referencia funcional histórica.
+
+## 9.6. Flujo de envío, idempotencia y reintentos
+
+El envío de preinscripciones sigue un orden estricto para garantizar consistencia:
+
+1. **Validación canónica:** Se normalizan identidades y se validan campos y documentos contra la definición canónica y la revisión activa de WordPress.
+2. **Registro idempotente:** El cliente envía un `clientSubmissionId`. Mediante `saveOrGet()`, la API recupera cualquier intento previo en estado `pending`/`failed`, evitando registros duplicados ante reintentos.
+3. **Persistencia en Google Drive:** Se suben los documentos definitivos a la jerarquía:
+   ```text
+   Ofertas académicas/<oferta>/<cohorte>/Preinscripciones/Documentación/
+   Seminarios/<seminario>/<edición>/Preinscripciones/Documentación/
+   ```
+   Antes de subir cada archivo, se verifica si ya existe en Drive para evitar duplicados en reintentos.
+4. **Registro en Google Sheets:** Se agrega la fila correspondiente con columnas específicas para denominación del título, declaración de ausencia de título y estados pendientes de cartas de recomendación.
+5. **Confirmación y limpieza:** Tras confirmar Drive y Sheets con éxito, la preinscripción se marca como `success` y se eliminan los archivos temporales asociados a la sesión. Un fallo en la eliminación de temporales no invalida la respuesta exitosa (201 Created) devuelta al postulante.
+6. **Retención ante fallos:** Si Drive o Sheets falla, los archivos temporales se conservan en disco y en la tabla `temporary_uploads` para posibilitar el reintento idempotente o diagnóstico técnico. Un worker en segundo plano ejecuta limpieza por TTL (30 minutos) cada 15 minutos sin bloquear el ciclo de peticiones.
 
 ---
 
@@ -1039,8 +1055,8 @@ documento
 fechaNacimiento
 orientacion
 mencion
-titulo
-escolaridad
+tituloDenominacion
+sinTituloActual
 institucion
 ocupacion
 ```
@@ -1167,8 +1183,7 @@ Ejemplo conceptual:
       { "key": "fechaNacimiento", "position": 20 },
       { "key": "orientacion", "position": 30, "required": true },
       { "key": "mencion", "position": 40 },
-      { "key": "titulo", "position": 50 },
-      { "key": "escolaridad", "position": 60 }
+      { "key": "tituloDenominacion", "position": 50 }
     ]
   }
 }

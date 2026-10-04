@@ -100,8 +100,9 @@ export async function submitPreinscription(
 
   const form = composition.value;
 
-  // 4. Validate values & revision
-  const validation = validateSubmission(form, command.values, command.configRevision, command.files);
+  // 4. Normalize identity values & validate
+  const normalizedValues = normalizeIdentityValues(command.values);
+  const validation = validateSubmission(form, normalizedValues, command.configRevision, command.files);
   if (!validation.valid) {
     if (validation.fieldErrors._form) {
       return {
@@ -121,7 +122,6 @@ export async function submitPreinscription(
   }
 
   // 5. Persist submission
-  const normalizedValues = normalizeIdentityValues(command.values);
   const saved = await repository.saveOrGet({
     clientSubmissionId: command.clientSubmissionId,
     targetId: target.id,

@@ -38,6 +38,9 @@ export function validateSubmission(
     if (input.key === 'cartaRecomendacion1Pendiente' || input.key === 'cartaRecomendacion2Pendiente') {
       continue;
     }
+    if (input.key === 'paisEmisorDocumento' && values.tipoDocumento?.trim() === 'cedula_uruguaya') {
+      continue;
+    }
 
     const rawVal = values[input.key];
     const val = rawVal !== undefined ? rawVal.trim() : '';
