@@ -35,9 +35,6 @@ export function validateSubmission(
     if (input.key === 'tituloDenominacion' || input.key === 'sinTituloActual') {
       continue;
     }
-    if (input.key === 'cartaRecomendacion1Pendiente' || input.key === 'cartaRecomendacion2Pendiente') {
-      continue;
-    }
     if (input.key === 'paisEmisorDocumento' && values.tipoDocumento?.trim() === 'cedula_uruguaya') {
       continue;
     }
@@ -144,16 +141,6 @@ export function validateSubmission(
     addError('sinTituloActual', 'La respuesta sobre posesión de título no es válida.');
   }
 
-  const rec1Pendiente = values.cartaRecomendacion1Pendiente?.trim();
-  if (rec1Pendiente && !YES_NO_VALUES.has(rec1Pendiente)) {
-    addError('cartaRecomendacion1Pendiente', 'La respuesta sobre carta de recomendación no es válida.');
-  }
-
-  const rec2Pendiente = values.cartaRecomendacion2Pendiente?.trim();
-  if (rec2Pendiente && !YES_NO_VALUES.has(rec2Pendiente)) {
-    addError('cartaRecomendacion2Pendiente', 'La respuesta sobre carta de recomendación no es válida.');
-  }
-
   const providedFileKeys = files !== undefined
     ? new Set(
         files.map((file) => (typeof file === 'string' ? file : file.fieldKey))
@@ -186,15 +173,8 @@ export function validateSubmission(
     if (doc.key === 'titulo') continue;
 
     if (doc.key === 'cartaRecomendacion1' || doc.key === 'cartaRecomendacion2') {
-      const isPending = values[`${doc.key}Pendiente`]?.trim() === 'Si';
-      if (isPending) {
-        if (providedFileKeys && providedFileKeys.has(doc.key)) {
-          addError(doc.key, 'No debes adjuntar la carta de recomendación si indicaste que la entregarás posteriormente.');
-        }
-      } else {
-        if (providedFileKeys && !providedFileKeys.has(doc.key)) {
-          addError(doc.key, `El documento ${doc.label} es obligatorio.`);
-        }
+      if (providedFileKeys && !providedFileKeys.has(doc.key)) {
+        addError(doc.key, `El documento ${doc.label} es obligatorio.`);
       }
       continue;
     }

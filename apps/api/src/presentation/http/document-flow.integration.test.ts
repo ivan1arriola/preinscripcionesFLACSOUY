@@ -266,8 +266,8 @@ describe('Document Flow Integration', () => {
     const row = appendedSpreadsheetRows[0]!;
     expect(row['Denominación del título']).toBe('Licenciatura en Sociología');
     expect(row['No posee actualmente título']).toBe('No');
-    expect(row['Carta de recomendación 1 pendiente']).toBe('No');
-    expect(row['Carta de recomendación 2 pendiente']).toBe('No');
+    expect(row['Carta de recomendación 1 pendiente']).toBeUndefined();
+    expect(row['Carta de recomendación 2 pendiente']).toBeUndefined();
   });
 
   it('Flow 3: Maestría with recommendations marked for later submission', async () => {
@@ -301,8 +301,6 @@ describe('Document Flow Integration', () => {
         orientacion: 'Género y Políticas Públicas',
         tituloDenominacion: 'Licenciatura en Psicología',
         sinTituloActual: 'No',
-        cartaRecomendacion1Pendiente: 'Si',
-        cartaRecomendacion2Pendiente: 'Si',
         tieneConvenio: 'No',
         fuente: 'Web',
         aceptaDifusion: 'Si',
@@ -312,6 +310,8 @@ describe('Document Flow Integration', () => {
         { fieldKey: 'cv', token: 'tok_fl3_cv', originalName: 'cv.pdf', mimeType: 'application/pdf', size: 1024 },
         { fieldKey: 'titulo', token: 'tok_fl3_tit', originalName: 'titulo.pdf', mimeType: 'application/pdf', size: 1024 },
         { fieldKey: 'cartaMotivacion', token: 'tok_fl3_mot', originalName: 'carta.pdf', mimeType: 'application/pdf', size: 1024 },
+        { fieldKey: 'cartaRecomendacion1', token: 'tok_fl3_rec1', originalName: 'rec1.pdf', mimeType: 'application/pdf', size: 1024 },
+        { fieldKey: 'cartaRecomendacion2', token: 'tok_fl3_rec2', originalName: 'rec2.pdf', mimeType: 'application/pdf', size: 1024 },
       ],
     };
 
@@ -328,17 +328,17 @@ describe('Document Flow Integration', () => {
     const body = await res.json();
     expect(body.submissionId).toBeDefined();
 
-    // Verify 4 files stored to Drive (recommendations omitted)
-    expect(storedDriveFiles.length).toBe(4);
-    expect(storedDriveFiles.map((f) => f.token)).toEqual(['tok_fl3_id', 'tok_fl3_cv', 'tok_fl3_tit', 'tok_fl3_mot']);
+    // Verify all 6 required files are stored to Drive
+    expect(storedDriveFiles.length).toBe(6);
+    expect(storedDriveFiles.map((f) => f.token)).toEqual(['tok_fl3_id', 'tok_fl3_cv', 'tok_fl3_tit', 'tok_fl3_mot', 'tok_fl3_rec1', 'tok_fl3_rec2']);
 
     // Verify Sheets row
     expect(appendedSpreadsheetRows.length).toBe(1);
     const row = appendedSpreadsheetRows[0]!;
     expect(row['Denominación del título']).toBe('Licenciatura en Psicología');
     expect(row['No posee actualmente título']).toBe('No');
-    expect(row['Carta de recomendación 1 pendiente']).toBe('Si');
-    expect(row['Carta de recomendación 2 pendiente']).toBe('Si');
+    expect(row['Carta de recomendación 1 pendiente']).toBeUndefined();
+    expect(row['Carta de recomendación 2 pendiente']).toBeUndefined();
   });
 
   it('Flow 4: Seminar with title absence declaration and no motivation/recommendation', async () => {

@@ -279,8 +279,8 @@ describe('PreinscriptionWizard Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 4: Documentos - must include the two recommendation letters
-    expect(screen.getByRole('heading', { name: /Primera carta de recomendación/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Segunda carta de recomendación/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Primera carta de recomendación/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Segunda carta de recomendación/i)).toBeInTheDocument();
 
     // Trying to advance without uploading recommendation letters should fail
     const dummyFile = new File(['dummy content'], 'doc.pdf', { type: 'application/pdf' });
@@ -298,11 +298,12 @@ describe('PreinscriptionWizard Component', () => {
     expect(screen.getByText(/El documento Primera carta de recomendación es obligatorio/i)).toBeInTheDocument();
     expect(screen.getByText(/El documento Segunda carta de recomendación es obligatorio/i)).toBeInTheDocument();
 
-    // Now select "Adjuntar posteriormente" on both recommendation letters
-    const deferOptions = screen.getAllByRole('radio', { name: /Adjuntar posteriormente/i });
-    expect(deferOptions).toHaveLength(2);
-    fireEvent.click(deferOptions[0]!);
-    fireEvent.click(deferOptions[1]!);
+    fireEvent.change(screen.getByLabelText(/Primera carta de recomendación/i), { target: { files: [dummyFile] } });
+    fireEvent.change(screen.getByLabelText(/Segunda carta de recomendación/i), { target: { files: [dummyFile] } });
+    await waitFor(() => {
+      expect(screen.getAllByText('cartaRecomendacion1.pdf').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('cartaRecomendacion2.pdf').length).toBeGreaterThan(0);
+    });
 
     // Should now allow advancing to Step 5
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));

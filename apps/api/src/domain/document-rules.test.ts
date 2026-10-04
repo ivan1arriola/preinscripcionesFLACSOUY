@@ -80,7 +80,7 @@ describe('Document Rules Domain Specification', () => {
     expect(inputKeys).toContain('tituloDenominacion');
   });
 
-  it('composes maestria documents with deferrable recommendation letters', () => {
+  it('composes maestria documents with mandatory recommendation letters', () => {
     const result = getCanonicalFormDefinition(maestriaTarget);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -98,22 +98,12 @@ describe('Document Rules Domain Specification', () => {
     expect(form.recommendationLettersCount).toBe(2);
 
     const rec1 = form.documents.find((d) => d.key === 'cartaRecomendacion1');
-    expect(rec1?.canDefer).toBe(true);
-    expect(rec1?.alternative).toEqual({
-      kind: 'defer',
-      valueKey: 'cartaRecomendacion1Pendiente',
-      activeValue: 'Si',
-      label: 'Adjuntar posteriormente',
-    });
+    expect(rec1?.canDefer).toBe(false);
+    expect(rec1?.alternative).toBeUndefined();
 
     const rec2 = form.documents.find((d) => d.key === 'cartaRecomendacion2');
-    expect(rec2?.canDefer).toBe(true);
-    expect(rec2?.alternative).toEqual({
-      kind: 'defer',
-      valueKey: 'cartaRecomendacion2Pendiente',
-      activeValue: 'Si',
-      label: 'Adjuntar posteriormente',
-    });
+    expect(rec2?.canDefer).toBe(false);
+    expect(rec2?.alternative).toBeUndefined();
   });
 
   describe('titleAbsenceToggleClearsCompanionAndRejectsFiles', () => {
@@ -301,21 +291,20 @@ describe('Document Rules Domain Specification', () => {
       expect(validation.fieldErrors).toEqual({});
     });
 
-    it('accepts both recommendation letters deferred', () => {
+    it('rejects missing recommendation letters', () => {
       const form = getMaestriaForm();
       const values = {
         ...validBaseValues,
-        cartaRecomendacion1Pendiente: 'Si',
-        cartaRecomendacion2Pendiente: 'Si',
       };
       const files = [...baseFiles];
 
       const validation = validateSubmission(form, values, form.effectiveRevision, files);
-      expect(validation.valid).toBe(true);
-      expect(validation.fieldErrors).toEqual({});
+      expect(validation.valid).toBe(false);
+      expect(validation.fieldErrors.cartaRecomendacion1).toBeDefined();
+      expect(validation.fieldErrors.cartaRecomendacion2).toBeDefined();
     });
 
-    it('rejects when letter is marked pending but file is also attached', () => {
+    it('ignores obsolete deferral values when a letter is attached', () => {
       const form = getMaestriaForm();
       const values = {
         ...validBaseValues,
@@ -329,8 +318,8 @@ describe('Document Rules Domain Specification', () => {
       ];
 
       const validation = validateSubmission(form, values, form.effectiveRevision, files);
-      expect(validation.valid).toBe(false);
-      expect(validation.fieldErrors.cartaRecomendacion1).toBeDefined();
+      expect(validation.valid).toBe(true);
+      expect(validation.fieldErrors.cartaRecomendacion1Pendiente).toBeUndefined();
     });
 
     it('rejects when letter is not marked pending and file is missing', () => {

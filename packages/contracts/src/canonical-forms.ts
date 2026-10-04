@@ -121,35 +121,23 @@ export const MAESTRIA_EXTRA_DOCUMENTS: DocumentDefinition[] = [
     key: 'cartaRecomendacion1',
     label: 'Primera carta de recomendación',
     required: true,
-    canDefer: true,
+    canDefer: false,
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
     acceptedMimeTypes: ['application/pdf'],
     stepId: 'documentos',
     position: 5,
-    alternative: {
-      kind: 'defer',
-      valueKey: 'cartaRecomendacion1Pendiente',
-      activeValue: 'Si',
-      label: 'Adjuntar posteriormente',
-    },
   },
   {
     key: 'cartaRecomendacion2',
     label: 'Segunda carta de recomendación',
     required: true,
-    canDefer: true,
+    canDefer: false,
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
     acceptedMimeTypes: ['application/pdf'],
     stepId: 'documentos',
     position: 6,
-    alternative: {
-      kind: 'defer',
-      valueKey: 'cartaRecomendacion2Pendiente',
-      activeValue: 'Si',
-      label: 'Adjuntar posteriormente',
-    },
   },
 ];
 
@@ -229,27 +217,6 @@ export function getCanonicalFormDefinition(
         optionsSource: 'wordpress.menciones',
         condition: 'has_mentions',
         spreadsheetColumn: 'Mención',
-      });
-    }
-
-    if (base.stepId === 'declaracion' && inputs.every((i) => i.key !== 'cartaRecomendacion1Pendiente') && offerType === 'maestria') {
-      inputs.push({
-        key: 'cartaRecomendacion1Pendiente',
-        label: 'Carta de recomendación 1 pendiente',
-        type: 'checkbox',
-        required: false,
-        position: position++,
-        stepId: 'documentos',
-        spreadsheetColumn: 'Carta de recomendación 1 pendiente',
-      });
-      inputs.push({
-        key: 'cartaRecomendacion2Pendiente',
-        label: 'Carta de recomendación 2 pendiente',
-        type: 'checkbox',
-        required: false,
-        position: position++,
-        stepId: 'documentos',
-        spreadsheetColumn: 'Carta de recomendación 2 pendiente',
       });
     }
 

@@ -63,7 +63,7 @@ describe('Canonical Forms Specification', () => {
     expect(inputKeys).not.toContain('domicilio');
   });
 
-  it('adds 2 mandatory recommendation letters for maestria that can be deferred', () => {
+  it('adds 2 mandatory recommendation letters for maestria without deferral', () => {
     const maestriaTarget: AcademicTarget = {
       ...baseTarget,
       id: 'maestria-genero',
@@ -88,14 +88,14 @@ describe('Canonical Forms Specification', () => {
     const rec1 = form.documents.find((d) => d.key === 'cartaRecomendacion1');
     const rec2 = form.documents.find((d) => d.key === 'cartaRecomendacion2');
     expect(rec1?.required).toBe(true);
-    expect(rec1?.canDefer).toBe(true);
+    expect(rec1?.canDefer).toBe(false);
     expect(rec2?.required).toBe(true);
-    expect(rec2?.canDefer).toBe(true);
+    expect(rec2?.canDefer).toBe(false);
     expect(form.recommendationLettersCount).toBe(2);
 
     const inputKeys = form.inputs.map((i) => i.key);
-    expect(inputKeys).toContain('cartaRecomendacion1Pendiente');
-    expect(inputKeys).toContain('cartaRecomendacion2Pendiente');
+    expect(inputKeys).not.toContain('cartaRecomendacion1Pendiente');
+    expect(inputKeys).not.toContain('cartaRecomendacion2Pendiente');
   });
 
   it('canonicalDocumentsForSeminarExcludeLetters: seminar form excludes motivation and recommendations', () => {
