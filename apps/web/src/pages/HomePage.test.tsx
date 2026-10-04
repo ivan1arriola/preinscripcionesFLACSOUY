@@ -75,15 +75,14 @@ describe('HomePage Component', () => {
       expect(screen.getByText('DAVIA Cohorte 11')).toBeInTheDocument();
       expect(screen.getByText('Maestría en Género Cohorte 8')).toBeInTheDocument();
       expect(screen.getByText('Oferta Incompatible')).toBeInTheDocument();
-      expect(screen.getByText('Seminario de Investigación Cualitativa')).toBeInTheDocument();
     });
 
+    expect(screen.getByRole('tab', { name: /Oferta académica/i })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: /Seminarios/i })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByRole('heading', { name: 'Oferta académica' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Seminarios' })).toBeInTheDocument();
     expect(screen.getByText('3 propuestas')).toBeInTheDocument();
-    expect(screen.getAllByText('1 propuesta')).toHaveLength(5);
 
-    expect(screen.getAllByText('Abierta')).toHaveLength(2);
+    expect(screen.getByText('Abierta')).toBeInTheDocument();
     expect(screen.getByText('Cerrada')).toBeInTheDocument();
     expect(screen.getByText('Incompatible')).toBeInTheDocument();
     expect(screen.getByText(/campo_desconocido/i)).toBeInTheDocument();
@@ -91,9 +90,13 @@ describe('HomePage Component', () => {
     const openBtn = screen.getAllByRole('button', { name: /Completar preinscripción/i })[0]!;
     fireEvent.click(openBtn);
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'davia-c11' }));
+
+    fireEvent.click(screen.getByRole('tab', { name: /Seminarios/i }));
+    expect(screen.getByRole('heading', { name: 'Seminarios' })).toBeInTheDocument();
+    expect(screen.getByText('Seminario de Investigación Cualitativa')).toBeInTheDocument();
   });
 
-  it('groups academic offers by type and keeps each section collapsed until opened', async () => {
+  it('keeps one academic category open at a time', async () => {
     vi.mocked(apiClient.listTargets).mockResolvedValue(mockTargets);
 
     render(<HomePage onSelectTarget={vi.fn()} />);
@@ -103,10 +106,27 @@ describe('HomePage Component', () => {
     expect(screen.getByTestId('offer-group-maestria')).not.toHaveAttribute('open');
     expect(screen.getByTestId('offer-group-especializacion')).not.toHaveAttribute('open');
     expect(screen.getByTestId('offer-group-diploma')).not.toHaveAttribute('open');
-    expect(screen.getByTestId('offer-group-seminarios')).not.toHaveAttribute('open');
 
     fireEvent.click(screen.getByText('Diplomas'));
     expect(screen.getByTestId('offer-group-diploma')).toHaveAttribute('open');
+
+    fireEvent.click(screen.getByText('Maestrías'));
+    expect(screen.getByTestId('offer-group-maestria')).toHaveAttribute('open');
+    expect(screen.getByTestId('offer-group-diploma')).not.toHaveAttribute('open');
+  });
+
+  it('filters the active catalogue tab by proposal title', async () => {
+    vi.mocked(apiClient.listTargets).mockResolvedValue(mockTargets);
+
+    render(<HomePage onSelectTarget={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole('searchbox', { name: /Buscar propuesta/i })).toBeInTheDocument());
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /Buscar propuesta/i }), { target: { value: 'DAVIA' } });
+
+    expect(screen.getByTestId('offer-group-diploma')).toBeInTheDocument();
+    expect(screen.queryByTestId('offer-group-maestria')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('offer-group-especializacion')).not.toBeInTheDocument();
   });
 
   it('does not duplicate seminar cards for historical editions under the same permalink', async () => {
@@ -143,11 +163,10 @@ describe('HomePage Component', () => {
 
     render(<HomePage onSelectTarget={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Seminarios' })).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Seminarios/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('tab', { name: /Seminarios/i }));
+    expect(screen.getByRole('heading', { name: 'Seminarios' })).toBeInTheDocument();
 
-    expect(screen.getAllByText('1 propuesta')).toHaveLength(2);
     expect(screen.getByText('Seminario Cualitativo Edición 2')).toBeInTheDocument();
     expect(screen.queryByText('Seminario Cualitativo Edición 1')).not.toBeInTheDocument();
   });

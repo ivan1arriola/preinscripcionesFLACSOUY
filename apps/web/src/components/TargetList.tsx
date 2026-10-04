@@ -8,7 +8,7 @@ interface TargetListProps {
 
 export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget }) => {
   return (
-    <div className="space-y-4">
+    <div className="target-list">
       {targets.map((target) => {
         const isOperational = target.status === 'operational';
         const isClosed = target.status === 'closed';
@@ -20,7 +20,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
             data-testid={`target-card-${target.id}`}
             className="target-list-card border rounded-lg p-5 bg-white shadow-sm hover:shadow transition"
           >
-            <div className="flex items-start justify-between">
+            <div className="target-list-card-main flex items-start justify-between">
               <div>
                 <span className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
                   {target.kind === 'academic_offer' ? 'Oferta Académica' : 'Seminario'}
@@ -58,7 +58,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
               </div>
             )}
 
-            <div className="mt-4 flex items-center justify-between">
+            <div className="target-list-card-actions mt-4 flex items-center justify-between">
               {isIncompatible ? (
                 <button
                   type="button"
@@ -71,7 +71,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
                 <button
                   type="button"
                   onClick={() => onSelectTarget(target)}
-                  className="target-card-primary-action px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 font-medium"
+                  className="target-card-primary-action text-sm rounded bg-blue-600 text-white hover:bg-blue-700 font-medium"
                 >
                   {isOperational ? 'Completar preinscripción' : 'Ver información del destino'}
                 </button>

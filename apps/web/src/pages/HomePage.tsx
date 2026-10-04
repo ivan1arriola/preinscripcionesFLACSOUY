@@ -77,6 +77,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
   const [targets, setTargets] = useState<DiagnosticTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'academic' | 'seminars'>('academic');
+  const [query, setQuery] = useState('');
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -120,13 +123,35 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
   const academicOffers = targets.filter((target) => target.kind === 'academic_offer');
   const rawSeminars = targets.filter((target) => target.kind === 'seminar');
   const seminars = groupSeminarsByPermalink(rawSeminars);
+  const normalizedQuery = query.trim().toLocaleLowerCase('es-UY');
+  const matchesQuery = (target: DiagnosticTarget) =>
+    !normalizedQuery || target.title.toLocaleLowerCase('es-UY').includes(normalizedQuery);
+  const visibleAcademicOffers = academicOffers.filter(matchesQuery);
+  const visibleSeminars = seminars.filter(matchesQuery);
+
+  const selectTab = (tab: 'academic' | 'seminars') => {
+    setActiveTab(tab);
+    setQuery('');
+    setOpenGroup(null);
+  };
 
   const renderGroup = (key: string, title: string, groupTargets: DiagnosticTarget[]) => {
     if (groupTargets.length === 0) return null;
 
     return (
-      <details key={key} data-testid={`offer-group-${key}`} className="catalog-group group rounded-xl border border-gray-200 bg-white shadow-sm">
-        <summary className="catalog-group-summary flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold text-gray-900 marker:content-none">
+      <details
+        key={key}
+        open={openGroup === key}
+        data-testid={`offer-group-${key}`}
+        className="catalog-group group rounded-xl border border-gray-200 bg-white shadow-sm"
+      >
+        <summary
+          className="catalog-group-summary flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold text-gray-900 marker:content-none"
+          onClick={(event) => {
+            event.preventDefault();
+            setOpenGroup((current) => (current === key ? null : key));
+          }}
+        >
           <span className="flex items-center gap-3">
             <span className="catalog-group-chevron text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span>
             {title}
@@ -168,9 +193,49 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
         </p>
       </div>
 
-      <div className="space-y-10">
-        {renderSection('Oferta académica', 'Carreras, maestrías, especializaciones, diplomas y diplomados.', academicOffers, 'academic-offers-heading', 'academic')}
-        {renderSection('Seminarios', 'Propuestas de formación breve y actualización.', seminars, 'seminars-heading', 'seminarios')}
+      <div className="catalog-controls">
+        <div className="catalog-tabs" role="tablist" aria-label="Tipo de propuesta">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'academic'}
+            className={activeTab === 'academic' ? 'catalog-tab catalog-tab-active' : 'catalog-tab'}
+            onClick={() => selectTab('academic')}
+          >
+            Oferta académica <span>{academicOffers.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'seminars'}
+            className={activeTab === 'seminars' ? 'catalog-tab catalog-tab-active' : 'catalog-tab'}
+            onClick={() => selectTab('seminars')}
+          >
+            Seminarios <span>{seminars.length}</span>
+          </button>
+        </div>
+        <label className="catalog-search">
+          <span className="sr-only">Buscar propuesta</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpenGroup(null);
+            }}
+            placeholder={activeTab === 'academic' ? 'Buscar una propuesta académica' : 'Buscar un seminario'}
+            aria-label="Buscar propuesta"
+          />
+        </label>
+      </div>
+
+      <div className="catalog-panel" role="tabpanel">
+        {activeTab === 'academic'
+          ? renderSection('Oferta académica', 'Carreras, maestrías, especializaciones, diplomas y diplomados.', visibleAcademicOffers, 'academic-offers-heading', 'academic')
+          : renderSection('Seminarios', 'Propuestas de formación breve y actualización.', visibleSeminars, 'seminars-heading', 'seminarios')}
+        {(activeTab === 'academic' ? visibleAcademicOffers : visibleSeminars).length === 0 && (
+          <p className="catalog-empty">No encontramos propuestas para esa búsqueda.</p>
+        )}
       </div>
     </div>
   );

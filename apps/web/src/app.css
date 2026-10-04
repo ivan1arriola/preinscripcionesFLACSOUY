@@ -168,7 +168,7 @@ input:focus, select:focus { border-color: #84adf7; box-shadow: 0 0 0 3px rgba(23
 .choice-card:hover { border-color: #84adf7; background: #f8fbff; }
 .choice-card:has(input:checked) { border-color: #175cd3; background: #eff8ff; color: #1849a9; box-shadow: 0 0 0 2px rgba(23, 92, 211, .1); }
 .choice-card input { width: 1rem; height: 1rem; margin: 0; padding: 0; box-shadow: none; accent-color: #175cd3; }
-.phone-input { display: grid; grid-template-columns: minmax(8rem, 9.5rem) minmax(0, 1fr); gap: .5rem; position: relative; }
+.phone-input { display: grid; grid-template-columns: minmax(11rem, .9fr) minmax(0, 1.5fr); gap: .5rem; position: relative; }
 .phone-country-control { position: relative; display: flex; align-items: stretch; }
 .phone-country-trigger { display: flex; align-items: center; gap: .45rem; width: 100%; padding: .65rem .75rem; border: 1px solid #d0d5dd; border-radius: .5rem; background: #fff; color: #344054; font-size: .875rem; font-weight: 600; pointer-events: none; box-sizing: border-box; }
 .phone-flag { width: 1.35rem; height: .9rem; border-radius: 2px; flex-shrink: 0; box-shadow: 0 0 1px rgba(0, 0, 0, .2); }
@@ -187,22 +187,33 @@ textarea { min-height: 6.75rem; resize: vertical; }
 /* Application frame */
 .app-shell { background: linear-gradient(180deg, #f8fafc 0, #f4f7fb 38rem); }
 .app-header { background: rgba(255, 255, 255, .94); border-bottom: 1px solid #e4eaf2; box-shadow: 0 1px 2px rgba(13, 35, 69, .03); }
-.app-header-content { min-height: 6.75rem; }
+.app-header-content { max-width: 72rem !important; min-height: 6.75rem; }
 .app-brand { border: 0; background: transparent; padding: .25rem; margin: -.25rem; border-radius: .75rem; text-align: left; }
 .app-brand:focus-visible { outline: 3px solid rgba(28, 94, 184, .22); outline-offset: 4px; }
 .app-brand-mark { background: linear-gradient(145deg, #2866d7, #164cae); box-shadow: 0 7px 16px rgba(22, 76, 174, .2); }
 .app-header-action { border: 1px solid #d5ddea; border-radius: .625rem; padding: .55rem .8rem; color: #37506f; background: #fff; font-size: .8125rem; font-weight: 600; transition: border-color .18s ease, background .18s ease, color .18s ease; }
 .app-header-action:hover { border-color: #93aed8; color: #123b80; background: #f7faff; }
-.app-main { padding-top: 3.5rem; padding-bottom: 4rem; }
+.app-main { max-width: 72rem !important; padding-top: 3.5rem; padding-bottom: 4rem; }
 .app-footer { border-color: #e4eaf2; color: #71809a; }
 
 /* Public catalogue */
-.home-page { max-width: 61rem; margin: 0 auto; }
+.home-page { max-width: 70rem; margin: 0 auto; }
 .home-hero { max-width: 42rem; margin-bottom: 3.25rem; }
 .home-eyebrow, .target-page-eyebrow, .admin-login-eyebrow { display: inline-block; margin-bottom: .75rem; color: #1b5dc9; font-size: .75rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
 .home-hero h2 { margin: 0; font-size: clamp(2rem, 4vw, 2.85rem); line-height: 1.08; letter-spacing: -.045em; color: #102547; }
 .home-hero p { max-width: 38rem; margin-top: 1rem; font-size: 1.075rem; line-height: 1.65; color: #536783; }
 .catalog-section + .catalog-section { margin-top: 3.5rem; }
+.catalog-controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; padding: .45rem; border: 1px solid #dfe7f1; border-radius: .95rem; background: #fff; box-shadow: 0 4px 14px rgba(16, 51, 100, .045); }
+.catalog-tabs { display: inline-flex; gap: .25rem; }
+.catalog-tab { border: 0; border-radius: .65rem; padding: .7rem .85rem; background: transparent; color: #61738c; font-size: .9rem; font-weight: 700; transition: background .18s ease, color .18s ease; }
+.catalog-tab span { margin-left: .3rem; color: inherit; font-size: .76rem; font-weight: 600; opacity: .75; }
+.catalog-tab:hover { background: #f1f5fb; color: #264f8f; }
+.catalog-tab-active { background: #eaf2ff; color: #174d9e; }
+.catalog-search { display: block; width: min(100%, 20rem); }
+.catalog-search input { margin: 0; padding: .62rem .8rem; border: 0; background: #f5f8fc; box-shadow: none; font-size: .875rem; }
+.catalog-search input:focus { background: #fff; box-shadow: 0 0 0 3px rgba(23, 92, 211, .12); }
+.catalog-panel { min-height: 20rem; }
+.catalog-empty { padding: 1.5rem; border: 1px dashed #bed0e9; border-radius: .85rem; color: #61738c; text-align: center; }
 .catalog-section-heading { padding-bottom: 1.25rem; border-color: #dfe7f1; }
 .catalog-section-heading h3 { font-size: 1.4rem; letter-spacing: -.025em; color: #132949; }
 .catalog-section-heading p { margin-top: .55rem; color: #61738c; }
@@ -211,16 +222,16 @@ textarea { min-height: 6.75rem; resize: vertical; }
 .catalog-group-summary { min-height: 4.7rem; padding: 1.1rem 1.25rem; }
 .catalog-group-chevron { width: 1.3rem; height: 1.3rem; display: inline-grid; place-items: center; border-radius: 50%; color: #285fae; background: #edf4ff; font-size: 1.45rem; line-height: 1; transform: rotate(0deg); }
 .catalog-group[open] .catalog-group-chevron { transform: rotate(90deg); }
-.target-list-card { border-color: #e0e7ef; border-radius: .8rem; box-shadow: none; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
-.target-list-card:hover { transform: translateY(-2px); border-color: #aec6e7; box-shadow: 0 10px 24px rgba(16, 51, 100, .1); }
-.target-list-card h3 { line-height: 1.35; letter-spacing: -.015em; }
+.target-list { display: grid; gap: .7rem; }
+.target-list-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem 1.25rem; padding: 1rem 1.1rem; border-color: #e0e7ef; border-radius: .75rem; box-shadow: none; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.target-list-card:hover { transform: translateY(-1px); border-color: #aec6e7; box-shadow: 0 7px 18px rgba(16, 51, 100, .075); }
+.target-list-card-main { min-width: 0; }
+.target-list-card h3 { margin-top: .25rem; font-size: 1rem; line-height: 1.35; letter-spacing: -.015em; }
+.target-list-card-actions { grid-column: 2; grid-row: 1; align-self: center; margin: 0; }
+.target-card-primary-action { padding: .55rem .78rem; white-space: nowrap; }
 .target-card-primary-action, .wizard-primary-action, .wizard-submit-action { border-radius: .625rem; box-shadow: 0 5px 12px rgba(23, 92, 211, .18); transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
 .target-card-primary-action:hover, .wizard-primary-action:hover, .wizard-submit-action:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(23, 92, 211, .23); }
 .target-card-secondary-action { font-weight: 600; text-underline-offset: 3px; }
-.wizard-submit-action { background: linear-gradient(145deg, #175cd3, #164cae); color: #fff; border: 1px solid #164cae; }
-.wizard-submit-action:hover:not(:disabled) { background: linear-gradient(145deg, #164cae, #133f8e); }
-.wizard-submit-action:focus-visible { outline: 3px solid rgba(23, 92, 211, .3); outline-offset: 2px; }
-.wizard-submit-action:disabled { background: #94a3b8; border-color: #94a3b8; color: #fff; box-shadow: none; cursor: not-allowed; transform: none; }
 
 /* Target and form journey */
 .target-page { max-width: 48rem; }
@@ -271,9 +282,14 @@ input:hover, select:hover, textarea:hover { border-color: #aebfd5; }
   .home-hero h2 { font-size: 1.95rem; }
   .home-hero p { font-size: .98rem; }
   .catalog-section + .catalog-section { margin-top: 2.5rem; }
+  .catalog-controls { align-items: stretch; flex-direction: column; padding: .35rem; }
+  .catalog-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .catalog-tab { padding: .7rem .45rem; font-size: .8rem; }
+  .catalog-search { width: 100%; }
   .catalog-group-summary { padding: 1rem; }
-  .target-list-card { padding: 1.1rem; }
-  .target-list-card > div:first-child, .target-list-card > div:last-child { gap: .85rem; align-items: flex-start; flex-direction: column; }
+  .target-list-card { display: block; padding: 1rem; }
+  .target-list-card-main { gap: .75rem; }
+  .target-list-card-actions { margin-top: .85rem; }
   .target-card-primary-action { width: 100%; }
   .target-card-secondary-action { padding: .3rem 0; }
   .target-page-heading { padding-top: .9rem; }

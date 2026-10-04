@@ -18,6 +18,45 @@ Copiar en el servidor:
 - `google-service-account.json` a `/opt/flacso/preinscripcionesFLACSOUY/.secrets/google-service-account.json`.
 - `google-oauth-web-client.json` a `/opt/flacso/preinscripcionesFLACSOUY/.secrets/google-oauth-web-client.json`.
 
+`APP_SETTINGS_ENCRYPTION_KEY` debe existir en `.env.production` antes de
+activar las notificaciones SES. Es la misma variable de entorno que se usa en
+local, pero el valor de producción debe ser diferente y no debe copiarse desde
+la PC. Generar y guardar la clave directamente en el servidor con permisos
+restrictivos (cadena hexadecimal de 64 caracteres para AES-256-GCM):
+```bash
+openssl rand -hex 32
+```
+
+### Configuración y Operación de Amazon SES
+
+1. **Credenciales y Política IAM recomendada:**
+   Crear un usuario IAM o rol con permisos mínimos para envío de correo:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "ses:SendEmail"
+         ],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
+   Las credenciales (`AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`) se configuran cifradas desde el panel administrativo (`/admin/perfiles` pestaña `✉️ Notificaciones SES`), nunca en texto plano en la base ni en `.env`.
+
+2. **Modo Sandbox e Identidades Verificadas:**
+   - En cuentas nuevas de AWS SES (modo Sandbox), solo se puede enviar correos **desde** y **hacia** identidades verificadas (dominios o correos individuales).
+   - Para producción, solicitar la salida de Sandbox en la consola de AWS SES para permitir envíos a cualquier postulante.
+   - Verificar el dominio remitente (ej. `flacso.edu.uy`) mediante registros DNS (DKIM / SPF / DMARC).
+
+3. **Reintentos y Observabilidad:**
+   - Los fallos transitorios se reintentan automáticamente con backoff exponencial (1m, 5m, 30m, 2h).
+   - Los registros en estado `failed` pueden ser reintentados manualmente desde la interfaz de administración.
+   - Los registros en estado `unknown` (desconexión o timeout antes de confirmar entrega) requieren confirmación explícita (`force: true`) debido al riesgo de entrega duplicada al postulante si SES ya despachó el mensaje.
+
 No se configura ningún `GOOGLE_SHEETS_ID` en `.env.production`: la aplicación
 crea una planilla independiente por oferta o seminario y la guarda dentro de la
 carpeta raíz configurada en el panel administrativo. La cuenta de servicio debe
