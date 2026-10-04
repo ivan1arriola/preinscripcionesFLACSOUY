@@ -1,6 +1,5 @@
 import type { FormDefinition } from '@flacso/contracts';
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
-import type { FormProfileRepository } from '../ports/form-profile-repository.js';
 import { getCanonicalFormDefinition } from '../domain/canonical-forms.js';
 import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
 
@@ -10,7 +9,6 @@ export type GetTargetFormResult =
 
 export async function getTargetForm(
   catalog: AcademicCatalog,
-  _profileRepository?: FormProfileRepository,
   targetId: string = '',
 ): Promise<GetTargetFormResult> {
   const target = await catalog.getTarget(targetId);

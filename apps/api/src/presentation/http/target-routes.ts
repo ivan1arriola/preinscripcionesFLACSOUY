@@ -1,12 +1,10 @@
 import { Router } from 'express';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
-import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
 import { discoverTargets } from '../../application/discover-targets.js';
 import { getTargetForm } from '../../application/get-target-form.js';
 
 export function createTargetRoutes(
   catalog: AcademicCatalog,
-  profileRepository: FormProfileRepository,
 ): Router {
   const router = Router();
 
@@ -21,7 +19,7 @@ export function createTargetRoutes(
 
   router.get('/:id', async (req, res, next) => {
     try {
-      const result = await getTargetForm(catalog, profileRepository, req.params.id);
+      const result = await getTargetForm(catalog, req.params.id);
 
       if (!result.ok) {
         if (result.code === 'NOT_FOUND') {

@@ -1,7 +1,6 @@
 import { createApp } from './presentation/http/app.js';
 import { FixtureAcademicCatalog } from './infrastructure/fixtures/fixture-academic-catalog.js';
 import { PostgresSubmissionRepository } from './infrastructure/database/postgres-submission-repository.js';
-import { PostgresFormProfileRepository } from './infrastructure/database/postgres-form-profile-repository.js';
 import { PostgresSystemSettingsRepository } from './infrastructure/database/postgres-system-settings-repository.js';
 import { createKyselyDb } from './infrastructure/database/kysely.js';
 import { runMigrations } from './infrastructure/database/migrate.js';
@@ -30,7 +29,6 @@ import { loadEmailConfig } from './infrastructure/email/email-config.js';
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
 
-const formProfileRepository = new PostgresFormProfileRepository(db);
 const systemSettingsRepository = new PostgresSystemSettingsRepository(db);
 const encryptedSettingsService = new EncryptedSettingsService(
   systemSettingsRepository,
@@ -183,7 +181,6 @@ const app = createApp({
   spreadsheetRepository: googleSheetsRepository,
   targetSpreadsheetService,
   targetSpreadsheetRepository,
-  formProfileRepository,
   googleIdentityVerifier,
   adminSessionStore,
   systemSettingsRepository,

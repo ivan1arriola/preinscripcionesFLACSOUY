@@ -3,19 +3,14 @@ import type { AcademicTarget } from '@flacso/contracts';
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import { FixtureAcademicCatalog } from '../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../infrastructure/database/in-memory-submission-repository.js';
-import { MemoryFormProfileRepository } from '../infrastructure/fixtures/memory-form-profile-repository.js';
-import { getDefaultProfileDefinition } from '../domain/form-profiles.js';
 import { getTargetForm } from './get-target-form.js';
 import { submitPreinscription } from './submit-preinscription.js';
 
 describe('submitPreinscription Use Case', () => {
   const catalog = new FixtureAcademicCatalog();
-  const profileRepo = new MemoryFormProfileRepository({
-    diploma: { ...getDefaultProfileDefinition('diploma'), documents: [] },
-  });
 
   async function currentRevision(targetId = 'davia-c11') {
-    const result = await getTargetForm(catalog, profileRepo, targetId);
+    const result = await getTargetForm(catalog, targetId);
     if (!result.ok) throw new Error(result.message);
     return result.form.effectiveRevision;
   }
@@ -68,7 +63,7 @@ describe('submitPreinscription Use Case', () => {
       Object.entries(validValues).reverse()
     );
 
-    const result = await submitPreinscription(catalog, repo, profileRepo, {
+    const result = await submitPreinscription(catalog, repo, {
       targetId: 'davia-c11',
       configRevision: await currentRevision(),
       values: reorderedValues,
@@ -97,7 +92,7 @@ describe('submitPreinscription Use Case', () => {
     const oldRevision = await currentRevision();
 
     // First submission with current revision
-    const firstResult = await submitPreinscription(catalog, repo, profileRepo, {
+    const firstResult = await submitPreinscription(catalog, repo, {
       targetId: 'davia-c11',
       configRevision: oldRevision,
       values: validValues,
@@ -107,7 +102,7 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
 
     // Second submission using outdated revision must be rejected
-    const secondResult = await submitPreinscription(catalog, repo, profileRepo, {
+    const secondResult = await submitPreinscription(catalog, repo, {
       targetId: 'davia-c11',
       configRevision: 'outdated-wp-rev:canonical-v1',
       values: validValues,
@@ -125,7 +120,7 @@ describe('submitPreinscription Use Case', () => {
   it('rejects a closed target and does not persist', async () => {
     const repo = new InMemorySubmissionRepository();
 
-    const result = await submitPreinscription(catalog, repo, profileRepo, {
+    const result = await submitPreinscription(catalog, repo, {
       targetId: 'mg-c8', // closed in fixture
       configRevision: 'mg-c8-v1',
       values: {
@@ -164,7 +159,7 @@ describe('submitPreinscription Use Case', () => {
   it('rejects a submission with an outdated configRevision (stale form)', async () => {
     const repo = new InMemorySubmissionRepository();
 
-    const result = await submitPreinscription(catalog, repo, profileRepo, {
+    const result = await submitPreinscription(catalog, repo, {
       targetId: 'davia-c11',
       configRevision: 'outdated-revision-99',
       values: validValues,
@@ -186,7 +181,7 @@ describe('submitPreinscription Use Case', () => {
       mencion: 'mencion-inexistente',
     };
 
-    const result = await submitPreinscription(catalog, repo, profileRepo, {
+    const result = await submitPreinscription(catalog, repo, {
       targetId: 'davia-c11',
       configRevision: await currentRevision(),
       values: invalidValues,
@@ -204,7 +199,7 @@ describe('submitPreinscription Use Case', () => {
   it('returns NOT_FOUND for unknown targetId', async () => {
     const repo = new InMemorySubmissionRepository();
 
-    const result = await submitPreinscription(catalog, repo, profileRepo, {
+    const result = await submitPreinscription(catalog, repo, {
       targetId: 'target-fantasma',
       configRevision: 'v1',
       values: validValues,
@@ -218,10 +213,6 @@ describe('submitPreinscription Use Case', () => {
   });
 
   describe('seminar submission availability checks', () => {
-    const seminarProfileRepo = new MemoryFormProfileRepository({
-      seminar: { ...getDefaultProfileDefinition('seminar'), documents: [] },
-    });
-
     const createSeminarTarget = (id: string, editionId: number, open: boolean, availability?: 'open' | 'closed' | 'conflict'): AcademicTarget => ({
       id,
       kind: 'seminar',
@@ -245,7 +236,7 @@ describe('submitPreinscription Use Case', () => {
         revalidateTargets: async () => [createSeminarTarget('sem-closed', 1, false, 'closed')],
       };
 
-      const result = await submitPreinscription(mockCatalog, repo, seminarProfileRepo, {
+      const result = await submitPreinscription(mockCatalog, repo, {
         targetId: 'sem-closed',
         configRevision: 'rev-sem',
         values: validValues,
@@ -271,7 +262,7 @@ describe('submitPreinscription Use Case', () => {
         revalidateTargets: async () => targets,
       };
 
-      const result = await submitPreinscription(mockCatalog, repo, seminarProfileRepo, {
+      const result = await submitPreinscription(mockCatalog, repo, {
         targetId: 'sem-open-1',
         configRevision: 'rev-sem',
         values: validValues,
@@ -298,7 +289,7 @@ describe('submitPreinscription Use Case', () => {
         revalidateTargets: async () => [createSeminarTarget('sem-dyn', 1, false, 'closed')],
       };
 
-      const result = await submitPreinscription(mockCatalog, repo, seminarProfileRepo, {
+      const result = await submitPreinscription(mockCatalog, repo, {
         targetId: 'sem-dyn',
         configRevision: 'rev-sem',
         values: validValues,
@@ -324,10 +315,10 @@ describe('submitPreinscription Use Case', () => {
         revalidateTargets: async () => targets,
       };
 
-      const formRes = await getTargetForm(mockCatalog, seminarProfileRepo, 'sem-current');
+      const formRes = await getTargetForm(mockCatalog, 'sem-current');
       if (!formRes.ok) throw new Error(formRes.message);
 
-      const result = await submitPreinscription(mockCatalog, repo, seminarProfileRepo, {
+      const result = await submitPreinscription(mockCatalog, repo, {
         targetId: 'sem-current',
         configRevision: formRes.form.effectiveRevision,
         values: { ...validValues, orientacion: '', mencion: '' },
@@ -360,10 +351,10 @@ describe('submitPreinscription Use Case', () => {
 
     it('rejects maestria submission when recommendation letters are missing', async () => {
       const repo = new InMemorySubmissionRepository();
-      const formRes = await getTargetForm(mockCatalog, undefined, 'maestria-test');
+      const formRes = await getTargetForm(mockCatalog, 'maestria-test');
       if (!formRes.ok) throw new Error(formRes.message);
 
-      const result = await submitPreinscription(mockCatalog, repo, undefined, {
+      const result = await submitPreinscription(mockCatalog, repo, {
         targetId: 'maestria-test',
         configRevision: formRes.form.effectiveRevision,
         values: { ...validValues, orientacion: '', mencion: '' },
@@ -380,7 +371,7 @@ describe('submitPreinscription Use Case', () => {
 
     it('persists maestria submission when both recommendation letters are provided', async () => {
       const repo = new InMemorySubmissionRepository();
-      const formRes = await getTargetForm(mockCatalog, undefined, 'maestria-test');
+      const formRes = await getTargetForm(mockCatalog, 'maestria-test');
       if (!formRes.ok) throw new Error(formRes.message);
 
       const maestriaFiles = [
@@ -389,7 +380,7 @@ describe('submitPreinscription Use Case', () => {
         { fieldKey: 'cartaRecomendacion2', token: 'tok_rec2', originalName: 'rec2.pdf', mimeType: 'application/pdf', size: 1024 },
       ];
 
-      const result = await submitPreinscription(mockCatalog, repo, undefined, {
+      const result = await submitPreinscription(mockCatalog, repo, {
         targetId: 'maestria-test',
         configRevision: formRes.form.effectiveRevision,
         values: { ...validValues, orientacion: '', mencion: '' },
@@ -402,4 +393,3 @@ describe('submitPreinscription Use Case', () => {
     });
   });
 });
-

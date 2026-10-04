@@ -3,14 +3,12 @@ import type { Server } from 'node:http';
 import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
-import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
 import { getDefaultProfileDefinition } from '../../domain/form-profiles.js';
 
 describe('Admin Profile HTTP Routes', () => {
   let server: Server;
   let baseUrl: string;
-  let profileRepo: MemoryFormProfileRepository;
   let sessionCookie: string;
   let csrfToken: string;
 
@@ -26,12 +24,10 @@ describe('Admin Profile HTTP Routes', () => {
   beforeAll(async () => {
     const catalog = new FixtureAcademicCatalog();
     const repository = new InMemorySubmissionRepository();
-    profileRepo = new MemoryFormProfileRepository();
 
     const app = createApp({
       catalog,
       repository,
-      formProfileRepository: profileRepo,
       googleIdentityVerifier: mockVerifier,
     });
 
@@ -61,19 +57,19 @@ describe('Admin Profile HTTP Routes', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  it('rejects unauthenticated requests with 401', async () => {
+  it('returns 404 for all removed profile endpoints', async () => {
     const res = await fetch(`${baseUrl}/api/admin/profiles`);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
 
     const postRes = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ definition: getDefaultProfileDefinition('diploma') }),
     });
-    expect(postRes.status).toBe(401);
+    expect(postRes.status).toBe(404);
   });
 
-  it('rejects mutation requests without valid CSRF header with 403', async () => {
+  it('does not expose removed profile mutations', async () => {
     const res = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
       method: 'POST',
       headers: {
@@ -83,37 +79,24 @@ describe('Admin Profile HTTP Routes', () => {
       },
       body: JSON.stringify({ definition: getDefaultProfileDefinition('diploma') }),
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
-  it('GET /api/admin/profiles lists all profiles', async () => {
+  it('GET /api/admin/profiles is removed from the operational API', async () => {
     const res = await fetch(`${baseUrl}/api/admin/profiles`, {
       headers: { Cookie: sessionCookie },
     });
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.profiles).toHaveLength(5);
-    const types = data.profiles.map((p: any) => p.type);
-    expect(types).toContain('maestria');
-    expect(types).toContain('especializacion');
-    expect(types).toContain('diplomado');
-    expect(types).toContain('diploma');
-    expect(types).toContain('seminar');
+    expect(res.status).toBe(404);
   });
 
-  it('GET /api/admin/profiles/:type returns profile with active version and history', async () => {
+  it('GET /api/admin/profiles/:type is removed from the operational API', async () => {
     const res = await fetch(`${baseUrl}/api/admin/profiles/diploma`, {
       headers: { Cookie: sessionCookie },
     });
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.profile.type).toBe('diploma');
-    expect(data.activeVersion).toBeDefined();
-    expect(data.activeVersion.versionNumber).toBe(1);
-    expect(data.versions).toHaveLength(1);
+    expect(res.status).toBe(404);
   });
 
-  it('POST /api/admin/profiles/:type/versions returns 410 with PROFILES_DISABLED', async () => {
+  it('POST /api/admin/profiles/:type/versions returns 404', async () => {
     const res = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
       method: 'POST',
       headers: {
@@ -125,13 +108,10 @@ describe('Admin Profile HTTP Routes', () => {
         definition: getDefaultProfileDefinition('diploma'),
       }),
     });
-    expect(res.status).toBe(410);
-    const data = await res.json();
-    expect(data.error.code).toBe('PROFILES_DISABLED');
-    expect(data.error.message).toContain('ya no está disponible');
+    expect(res.status).toBe(404);
   });
 
-  it('POST /api/admin/profiles/:type/activate/:versionId returns 410 with PROFILES_DISABLED', async () => {
+  it('POST /api/admin/profiles/:type/activate/:versionId returns 404', async () => {
     const res = await fetch(
       `${baseUrl}/api/admin/profiles/diploma/activate/ver_diploma_v1`,
       {
@@ -142,10 +122,6 @@ describe('Admin Profile HTTP Routes', () => {
         },
       }
     );
-    expect(res.status).toBe(410);
-    const data = await res.json();
-    expect(data.error.code).toBe('PROFILES_DISABLED');
-    expect(data.error.message).toContain('ya no está disponible');
+    expect(res.status).toBe(404);
   });
 });
-

@@ -3,13 +3,11 @@ import type { Server } from 'node:http';
 import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
-import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
 
 describe('Admin Auth HTTP Routes', () => {
   let server: Server;
   let baseUrl: string;
-  let profileRepo: MemoryFormProfileRepository;
 
   const mockVerifier: GoogleIdentityVerifierPort = {
     verify: async ({ code }) => {
@@ -48,12 +46,9 @@ describe('Admin Auth HTTP Routes', () => {
   beforeAll(async () => {
     const catalog = new FixtureAcademicCatalog();
     const repository = new InMemorySubmissionRepository();
-    profileRepo = new MemoryFormProfileRepository();
-
     const app = createApp({
       catalog,
       repository,
-      formProfileRepository: profileRepo,
       googleIdentityVerifier: mockVerifier,
     });
 

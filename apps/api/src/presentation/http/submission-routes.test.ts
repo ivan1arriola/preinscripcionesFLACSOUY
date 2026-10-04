@@ -3,7 +3,6 @@ import type { Server } from 'node:http';
 import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
-import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 import { getTargetForm } from '../../application/get-target-form.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
@@ -58,8 +57,7 @@ describe('Submission HTTP Routes', () => {
   beforeAll(async () => {
     const catalog = new FixtureAcademicCatalog();
     repository = new InMemorySubmissionRepository();
-    const profileRepo = new MemoryFormProfileRepository();
-    const formResult = await getTargetForm(catalog, profileRepo, 'davia-c11');
+    const formResult = await getTargetForm(catalog, 'davia-c11');
     if (!formResult.ok) throw new Error(formResult.message);
     validPayload.configRevision = formResult.form.effectiveRevision;
     const storage: TemporaryFileStoragePort = {
@@ -84,7 +82,6 @@ describe('Submission HTTP Routes', () => {
     const app = createApp({
       catalog,
       repository,
-      formProfileRepository: profileRepo,
       temporaryFileStorage: storage,
       googleDriveRepository: drive,
       emailNotificationRepository: notificationRepository,
@@ -218,7 +215,6 @@ describe('Submission HTTP Routes', () => {
     it('executes in strict order: saveOrGet, Drive, Sheets, markProcessing(success), and ensureForSubmission', async () => {
       const order: string[] = [];
       const catalog = new FixtureAcademicCatalog();
-      const profileRepo = new MemoryFormProfileRepository();
       const testRepo = new InMemorySubmissionRepository();
       const originalSaveOrGet = testRepo.saveOrGet.bind(testRepo);
       testRepo.saveOrGet = async (cmd) => {
@@ -280,7 +276,6 @@ describe('Submission HTTP Routes', () => {
       const app = createApp({
         catalog,
         repository: testRepo,
-        formProfileRepository: profileRepo,
         temporaryFileStorage: storage,
         googleDriveRepository: drive,
         spreadsheetRepository: spreadsheetRepo,
@@ -335,7 +330,6 @@ describe('Submission HTTP Routes', () => {
 
     it('does not enqueue notifications when Drive fails', async () => {
       const catalog = new FixtureAcademicCatalog();
-      const profileRepo = new MemoryFormProfileRepository();
       const testRepo = new InMemorySubmissionRepository();
       const notifRepo = new InMemoryEmailNotificationRepository();
       const ensureSpy = vi.spyOn(notifRepo, 'ensureForSubmission');
@@ -354,7 +348,6 @@ describe('Submission HTTP Routes', () => {
       const app = createApp({
         catalog,
         repository: testRepo,
-        formProfileRepository: profileRepo,
         temporaryFileStorage: storage,
         googleDriveRepository: drive,
         emailNotificationRepository: notifRepo,
@@ -381,7 +374,6 @@ describe('Submission HTTP Routes', () => {
 
     it('does not enqueue notifications when Sheets fails', async () => {
       const catalog = new FixtureAcademicCatalog();
-      const profileRepo = new MemoryFormProfileRepository();
       const testRepo = new InMemorySubmissionRepository();
       const notifRepo = new InMemoryEmailNotificationRepository();
       const ensureSpy = vi.spyOn(notifRepo, 'ensureForSubmission');
@@ -404,7 +396,6 @@ describe('Submission HTTP Routes', () => {
       const app = createApp({
         catalog,
         repository: testRepo,
-        formProfileRepository: profileRepo,
         temporaryFileStorage: storage,
         googleDriveRepository: drive,
         spreadsheetRepository: {
@@ -439,7 +430,6 @@ describe('Submission HTTP Routes', () => {
 
     it('does not block or fail HTTP 201 response if outbox enqueuing throws an unexpected error', async () => {
       const catalog = new FixtureAcademicCatalog();
-      const profileRepo = new MemoryFormProfileRepository();
       const testRepo = new InMemorySubmissionRepository();
       const notifRepo = new InMemoryEmailNotificationRepository();
       notifRepo.ensureForSubmission = async () => {
@@ -464,7 +454,6 @@ describe('Submission HTTP Routes', () => {
       const app = createApp({
         catalog,
         repository: testRepo,
-        formProfileRepository: profileRepo,
         temporaryFileStorage: storage,
         googleDriveRepository: drive,
         emailNotificationRepository: notifRepo,

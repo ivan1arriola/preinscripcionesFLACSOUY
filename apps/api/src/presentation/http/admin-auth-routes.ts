@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
-import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
 import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
 import type { AdminUser } from '../../domain/form-profiles.js';
 import {
@@ -19,7 +18,6 @@ const GoogleAuthPayloadSchema = z.object({
 });
 
 export function createAdminAuthRoutes(
-  profileRepository: FormProfileRepository,
   verifier: GoogleIdentityVerifierPort,
   sessionStore: AdminSessionStore
 ): Router {
@@ -88,27 +86,16 @@ export function createAdminAuthRoutes(
         return;
       }
 
-      let admin = await profileRepository.getAdminByEmail(identity.email);
-      let adminUser: AdminUser;
-      if (admin) {
-        adminUser = await profileRepository.recordAdminLogin(
-          admin.id,
-          identity.sub,
-          identity.name,
-          identity.picture
-        );
-      } else {
-        adminUser = {
-          id: 'admin_flacso_web',
-          googleSubject: identity.sub,
-          email: identity.email,
-          name: identity.name,
-          pictureUrl: identity.picture,
-          role: 'admin',
-          createdAt: new Date(),
-          lastLoginAt: new Date(),
-        };
-      }
+      const adminUser: AdminUser = {
+        id: 'admin_flacso_web',
+        googleSubject: identity.sub,
+        email: identity.email,
+        name: identity.name,
+        pictureUrl: identity.picture,
+        role: 'admin',
+        createdAt: new Date(),
+        lastLoginAt: new Date(),
+      };
 
       const session = await sessionStore.createSession(adminUser);
 

@@ -9,8 +9,6 @@ import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import { createUploadRoutes } from './upload-routes.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
-import type { FormProfileRepository } from '../../ports/form-profile-repository.js';
-import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 
 import cookieParser from 'cookie-parser';
 import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
@@ -22,7 +20,6 @@ import {
   createAdminAuthRoutes,
   createAdminMeRoute,
 } from './admin-auth-routes.js';
-import { createAdminProfileRoutes } from './admin-profile-routes.js';
 import type { SystemSettingsRepository } from '../../ports/system-settings-repository.js';
 import { MemorySystemSettingsRepository } from '../../infrastructure/fixtures/memory-system-settings-repository.js';
 import { createAdminSettingsRoutes } from './admin-settings-routes.js';
@@ -43,7 +40,6 @@ export interface AppDependencies {
   spreadsheetRepository?: SpreadsheetRepository;
   targetSpreadsheetService?: TargetSpreadsheetService;
   targetSpreadsheetRepository?: TargetSpreadsheetRepository;
-  formProfileRepository?: FormProfileRepository;
   googleIdentityVerifier?: GoogleIdentityVerifierPort;
   adminSessionStore?: AdminSessionStore;
   systemSettingsRepository?: SystemSettingsRepository;
@@ -82,17 +78,15 @@ export function createApp(dependencies: AppDependencies): Express {
   });
 
   // Target routes and nested submission routes
-  const profileRepo = dependencies.formProfileRepository ?? new MemoryFormProfileRepository();
   const settingsRepo = dependencies.systemSettingsRepository ?? new MemorySystemSettingsRepository();
   const encryptedSettingsService =
     dependencies.encryptedSettingsService ??
     new EncryptedSettingsService(settingsRepo, process.env.APP_SETTINGS_ENCRYPTION_KEY);
 
-  const targetRoutes = createTargetRoutes(dependencies.catalog, profileRepo);
+  const targetRoutes = createTargetRoutes(dependencies.catalog);
   const submissionRoutes = createSubmissionRoutes(
     dependencies.catalog,
     dependencies.repository,
-    profileRepo,
     dependencies.temporaryFileStorage && dependencies.googleDriveRepository
       ? { storage: dependencies.temporaryFileStorage, drive: dependencies.googleDriveRepository }
       : undefined,
@@ -126,10 +120,9 @@ export function createApp(dependencies: AppDependencies): Express {
   // Admin session and routes
   const sessionStore = dependencies.adminSessionStore ?? new MemoryAdminSessionStore();
   if (dependencies.googleIdentityVerifier) {
-    app.use('/api/admin/auth', createAdminAuthRoutes(profileRepo, dependencies.googleIdentityVerifier, sessionStore));
+    app.use('/api/admin/auth', createAdminAuthRoutes(dependencies.googleIdentityVerifier, sessionStore));
   }
   app.use('/api/admin', createAdminMeRoute(sessionStore));
-  app.use('/api/admin/profiles', createAdminProfileRoutes(profileRepo, sessionStore));
 
   app.use('/api/admin/settings', createAdminSettingsRoutes(
     settingsRepo,

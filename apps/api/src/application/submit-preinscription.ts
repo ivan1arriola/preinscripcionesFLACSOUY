@@ -1,6 +1,5 @@
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../ports/submission-repository.js';
-import type { FormProfileRepository } from '../ports/form-profile-repository.js';
 import { getCanonicalFormDefinition, CANONICAL_SCHEMA_VERSION } from '../domain/canonical-forms.js';
 import { validateSubmission } from '../domain/form-validation.js';
 import { normalizeIdentityValues } from '../domain/identity-validation.js';
@@ -40,8 +39,7 @@ export type SubmitPreinscriptionResult =
 export async function submitPreinscription(
   catalog: AcademicCatalog,
   repository: SubmissionRepository,
-  _profileRepository?: FormProfileRepository,
-  command: SubmitPreinscriptionCommand = {} as SubmitPreinscriptionCommand
+  command: SubmitPreinscriptionCommand = {} as SubmitPreinscriptionCommand,
 ): Promise<SubmitPreinscriptionResult> {
   // 1. Re-query and revalidate the academic catalog during submission
   const target = await catalog.revalidateTarget(command.targetId);

@@ -1,16 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import type { AcademicTarget } from '@flacso/contracts';
-import { MemoryFormProfileRepository } from '../infrastructure/fixtures/memory-form-profile-repository.js';
-import { getDefaultProfileDefinition } from '../domain/form-profiles.js';
 import { getTargetForm } from './get-target-form.js';
 
 describe('getTargetForm Use Case', () => {
-  const profileRepo = new MemoryFormProfileRepository({
-    seminar: { ...getDefaultProfileDefinition('seminar'), documents: [] },
-    diploma: { ...getDefaultProfileDefinition('diploma'), documents: [] },
-  });
-
   const createMockCatalog = (targets: AcademicTarget[]): AcademicCatalog => ({
     listTargets: async () => targets,
     getTarget: async (id: string) => targets.find((t) => t.id === id) ?? null,
@@ -44,7 +37,7 @@ describe('getTargetForm Use Case', () => {
       mentions: [],
     };
     const catalog = createMockCatalog([offer]);
-    const result = await getTargetForm(catalog, profileRepo, 'offer-closed');
+    const result = await getTargetForm(catalog, 'offer-closed');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe('CLOSED');
@@ -57,7 +50,7 @@ describe('getTargetForm Use Case', () => {
       baseSeminar('sem-2', 2, true, 'open'),
     ];
     const catalog = createMockCatalog(targets);
-    const result = await getTargetForm(catalog, profileRepo, 'sem-1');
+    const result = await getTargetForm(catalog, 'sem-1');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe('CLOSED');
@@ -70,7 +63,7 @@ describe('getTargetForm Use Case', () => {
       baseSeminar('sem-2', 2, true, 'open'),
     ];
     const catalog = createMockCatalog(targets);
-    const result = await getTargetForm(catalog, profileRepo, 'sem-1');
+    const result = await getTargetForm(catalog, 'sem-1');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe('CLOSED');
@@ -83,7 +76,7 @@ describe('getTargetForm Use Case', () => {
       baseSeminar('sem-2', 2, true, 'open'),
     ];
     const catalog = createMockCatalog(targets);
-    const result = await getTargetForm(catalog, profileRepo, 'sem-2');
+    const result = await getTargetForm(catalog, 'sem-2');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.form.targetId).toBe('sem-2');
@@ -105,7 +98,7 @@ describe('getTargetForm Use Case', () => {
       mentions: [],
     };
     const catalog = createMockCatalog([maestriaOffer]);
-    const result = await getTargetForm(catalog, undefined, 'maestria-test');
+    const result = await getTargetForm(catalog, 'maestria-test');
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.form.profileVersionId).toBe('canonical-v1');

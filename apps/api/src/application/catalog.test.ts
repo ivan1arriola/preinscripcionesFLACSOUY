@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { FixtureAcademicCatalog } from '../infrastructure/fixtures/fixture-academic-catalog.js';
-import { MemoryFormProfileRepository } from '../infrastructure/fixtures/memory-form-profile-repository.js';
 import { discoverTargets } from './discover-targets.js';
 import { getTargetForm } from './get-target-form.js';
 
 describe('Catalog Application Use Cases & Fixture Adapter', () => {
   const catalog = new FixtureAcademicCatalog();
-  const profileRepo = new MemoryFormProfileRepository();
 
   it('lists and discovers targets with correct diagnostics', async () => {
     const targets = await discoverTargets(catalog);
@@ -35,7 +33,7 @@ describe('Catalog Application Use Cases & Fixture Adapter', () => {
   });
 
   it('retrieves and composes form for an open valid target', async () => {
-    const result = await getTargetForm(catalog, profileRepo, 'davia-c11');
+    const result = await getTargetForm(catalog, 'davia-c11');
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -51,7 +49,7 @@ describe('Catalog Application Use Cases & Fixture Adapter', () => {
   });
 
   it('returns NOT_FOUND for a nonexistent target', async () => {
-    const result = await getTargetForm(catalog, profileRepo, 'no-existe');
+    const result = await getTargetForm(catalog, 'no-existe');
     expect(result.ok).toBe(false);
     if (result.ok) return;
 
@@ -59,7 +57,7 @@ describe('Catalog Application Use Cases & Fixture Adapter', () => {
   });
 
   it('returns INCOMPATIBLE_FORM for a target with unsupported doctorado', async () => {
-    const result = await getTargetForm(catalog, profileRepo, 'oferta-incompatible');
+    const result = await getTargetForm(catalog, 'oferta-incompatible');
     expect(result.ok).toBe(false);
     if (result.ok) return;
 

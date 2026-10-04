@@ -3,7 +3,6 @@ import type { Server } from 'node:http';
 import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
-import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 import { getTargetForm } from '../../application/get-target-form.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
@@ -92,7 +91,6 @@ describe('Document Flow Integration', () => {
   beforeAll(async () => {
     catalog = new FixtureAcademicCatalog();
     repository = new InMemorySubmissionRepository();
-    const profileRepo = new MemoryFormProfileRepository();
 
     storedDriveFiles = [];
     appendedSpreadsheetRows = [];
@@ -100,7 +98,6 @@ describe('Document Flow Integration', () => {
     const app = createApp({
       catalog,
       repository,
-      formProfileRepository: profileRepo,
       temporaryFileStorage: dummyFileStorage,
       googleDriveRepository: dummyDriveRepo,
       spreadsheetRepository: dummySpreadsheetRepo,
@@ -128,7 +125,7 @@ describe('Document Flow Integration', () => {
     appendedSpreadsheetRows = [];
 
     const targetId = 'davia-c11';
-    const formResult = await getTargetForm(catalog, new MemoryFormProfileRepository(), targetId);
+    const formResult = await getTargetForm(catalog, targetId);
     if (!formResult.ok) throw new Error(formResult.message);
 
     const payload = {
@@ -198,7 +195,7 @@ describe('Document Flow Integration', () => {
     appendedSpreadsheetRows = [];
 
     const targetId = 'maestria-genero-c9';
-    const formResult = await getTargetForm(catalog, new MemoryFormProfileRepository(), targetId);
+    const formResult = await getTargetForm(catalog, targetId);
     if (!formResult.ok) throw new Error(formResult.message);
 
     const payload = {
@@ -278,7 +275,7 @@ describe('Document Flow Integration', () => {
     appendedSpreadsheetRows = [];
 
     const targetId = 'maestria-genero-c9';
-    const formResult = await getTargetForm(catalog, new MemoryFormProfileRepository(), targetId);
+    const formResult = await getTargetForm(catalog, targetId);
     if (!formResult.ok) throw new Error(formResult.message);
 
     const payload = {
@@ -349,7 +346,7 @@ describe('Document Flow Integration', () => {
     appendedSpreadsheetRows = [];
 
     const targetId = 'seminario-metodologia-ed3';
-    const formResult = await getTargetForm(catalog, new MemoryFormProfileRepository(), targetId);
+    const formResult = await getTargetForm(catalog, targetId);
     if (!formResult.ok) throw new Error(formResult.message);
 
     const payload = {

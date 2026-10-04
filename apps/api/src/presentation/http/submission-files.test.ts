@@ -8,7 +8,6 @@ import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-reposit
 import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
 import { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
-import { MemoryFormProfileRepository } from '../../infrastructure/fixtures/memory-form-profile-repository.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
 import { SpreadsheetSchemaRepairError } from '../../infrastructure/google/google-sheets-repository.js';
 
@@ -69,7 +68,6 @@ const testFiles = [
 ];
 
 async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: SpreadsheetRepository) {
-  const profileRepo = new MemoryFormProfileRepository();
   const effectiveRevision = `${target.configRevision}:canonical-v1`;
 
   const catalog: AcademicCatalog = {
@@ -103,7 +101,6 @@ async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: Spreadsheet
   app.use('/submissions', createSubmissionRoutes(
     catalog,
     repository,
-    profileRepo,
     { storage, drive },
     spreadsheet && targetSpreadsheetService ? { repository: spreadsheet, targetSpreadsheetService } : undefined,
   ));
