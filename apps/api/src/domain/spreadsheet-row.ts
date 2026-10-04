@@ -101,3 +101,24 @@ export function resolveAdditiveHeaders(
     missingColumnsAdded,
   };
 }
+
+export function buildSpreadsheetRowUrl(
+  spreadsheetId: string,
+  sheetId: number,
+  updatedRange?: string
+): string {
+  const base = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/edit#gid=${sheetId}`;
+  if (!updatedRange || typeof updatedRange !== 'string') {
+    return base;
+  }
+
+  const exclamationIdx = updatedRange.lastIndexOf('!');
+  const cellRange = exclamationIdx >= 0 ? updatedRange.substring(exclamationIdx + 1).trim() : updatedRange.trim();
+
+  if (/^[A-Za-z]+[0-9]+(?::[A-Za-z]+[0-9]+)?$/.test(cellRange)) {
+    return `${base}&range=${cellRange}`;
+  }
+
+  return base;
+}
+

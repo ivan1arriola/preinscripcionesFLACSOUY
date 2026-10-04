@@ -3,7 +3,7 @@ import {
   GoogleSheetsRepository,
   IncompatibleSpreadsheetError,
 } from './google-sheets-repository.js';
-import type { SheetsClient } from './sheets-client.js';
+import { type SheetsClient, buildSpreadsheetRowUrl } from './sheets-client.js';
 
 describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
   it('reads headers from the first row of the configured sheet', async () => {
@@ -48,10 +48,44 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
 
     expect(result.updatedRange).toBe('Respuestas!A5:E5');
     expect(result.updatedRows).toBe(1);
+    expect(result.sheetName).toBe('Respuestas');
+    expect(result.sheetId).toBe(0);
+    expect(result.rowUrl).toBe('https://docs.google.com/spreadsheets/d/sheet_123/edit#gid=0&range=A5:E5');
 
     expect(mockClient.appendValues).toHaveBeenCalledWith('sheet_123', 'Respuestas!A:A', [
       ['2026-10-02 12:00:00', '', 'Lucía', 'Pérez', '3.210.987-6'],
     ]);
+  });
+
+  it('resolves real sheetId from getSheetMetadata and constructs accurate direct row URL', async () => {
+    const mockClient: SheetsClient = {
+      getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]),
+      updateValues: vi.fn(),
+      appendValues: vi.fn().mockResolvedValue({
+        updatedRange: "'Inscripciones 2026'!A12:B12",
+        updatedRows: 1,
+      }),
+      getSheetMetadata: vi.fn().mockResolvedValue({
+        sheetId: 987654321,
+        title: 'Inscripciones 2026',
+        index: 1,
+      }),
+    };
+
+    const repo = new GoogleSheetsRepository(mockClient);
+
+    const result = await repo.appendByHeaders(
+      'sheet_custom_id',
+      { Nombre: 'Juan', Documento: '1234' },
+      ['Nombre', 'Documento'],
+      'Inscripciones 2026'
+    );
+
+    expect(result.sheetId).toBe(987654321);
+    expect(result.sheetName).toBe('Inscripciones 2026');
+    expect(result.rowUrl).toBe(
+      'https://docs.google.com/spreadsheets/d/sheet_custom_id/edit#gid=987654321&range=A12:B12'
+    );
   });
 
   it('repairs missing required columns additively preserving existing order and manual columns, then appends the complete row', async () => {
@@ -150,5 +184,63 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(diag.sheetFound).toBe(false);
     expect(diag.headerDiagnostic.valid).toBe(false);
     expect(diag.error).toContain('Permission denied');
+  });
+
+  describe('buildSpreadsheetRowUrl', () => {
+    it('constructs direct row URL for sheets with normal names, names with spaces, and cell ranges', () => {
+      expect(buildSpreadsheetRowUrl('sheet_123', 0, 'Inscripciones!A5:Z5')).toBe(
+        'https://docs.google.com/spreadsheets/d/sheet_123/edit#gid=0&range=A5:Z5'
+      );
+
+      expect(buildSpreadsheetRowUrl('sheet_abc', 45678, "'Inscripciones 2026'!A2:Z2")).toBe(
+        'https://docs.google.com/spreadsheets/d/sheet_abc/edit#gid=45678&range=A2:Z2'
+      );
+
+      expect(buildSpreadsheetRowUrl('sheet_xyz', 99, 'A10:E10')).toBe(
+        'https://docs.google.com/spreadsheets/d/sheet_xyz/edit#gid=99&range=A10:E10'
+      );
+    });
+
+    it('falls back to spreadsheet sheet URL when range is unexpected or invalid', () => {
+      expect(buildSpreadsheetRowUrl('sheet_123', 101, 'invalid-range-format')).toBe(
+        'https://docs.google.com/spreadsheets/d/sheet_123/edit#gid=101'
+      );
+
+      expect(buildSpreadsheetRowUrl('sheet_123', 101, undefined)).toBe(
+        'https://docs.google.com/spreadsheets/d/sheet_123/edit#gid=101'
+      );
+    });
+  });
+
+  it('appendByHeaders resolves sheetId from metadata and returns rowUrl in AppendResult', async () => {
+    const mockClient: SheetsClient = {
+      getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]),
+      updateValues: vi.fn(),
+      appendValues: vi.fn().mockResolvedValue({
+        updatedRange: "'Inscripciones'!A7:B7",
+        updatedRows: 1,
+      }),
+      getSheetMetadata: vi.fn().mockResolvedValue({
+        sheetId: 78910,
+        title: 'Inscripciones',
+        index: 1,
+      }),
+    };
+
+    const repo = new GoogleSheetsRepository(mockClient);
+    const result = await repo.appendByHeaders(
+      'sheet_meta_1',
+      { Nombre: 'María', Documento: '4.567.890-1' },
+      ['Nombre', 'Documento'],
+      'Inscripciones'
+    );
+
+    expect(result.spreadsheetId).toBe('sheet_meta_1');
+    expect(result.sheetName).toBe('Inscripciones');
+    expect(result.sheetId).toBe(78910);
+    expect(result.updatedRange).toBe("'Inscripciones'!A7:B7");
+    expect(result.rowUrl).toBe('https://docs.google.com/spreadsheets/d/sheet_meta_1/edit#gid=78910&range=A7:B7');
+    expect(result.updatedRows).toBe(1);
+    expect(mockClient.getSheetMetadata).toHaveBeenCalledWith('sheet_meta_1', 'Inscripciones');
   });
 });

@@ -4,6 +4,7 @@ import type {
   GoogleDriveRepositoryPort,
   StoreSubmissionFilesCommand,
   StoredDriveFile,
+  StoredDriveFiles,
 } from '../../ports/google-drive-repository.js';
 import type {
   SpreadsheetDiscovery,
@@ -78,7 +79,7 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
     };
   }
 
-  async storeSubmissionFiles(command: StoreSubmissionFilesCommand): Promise<StoredDriveFile[]> {
+  async storeSubmissionFiles(command: StoreSubmissionFilesCommand): Promise<StoredDriveFiles> {
     const token = await this.tokenProvider();
     const folderId = await this.folderIdProvider();
     let uploadFolderId = folderId;
@@ -141,7 +142,13 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
       if (!payload.id) throw new Error('Google Drive no devolvió el identificador del archivo');
       result.push({ token: file.token, driveFileId: payload.id });
     }
-    return result;
+
+    const documentsFolderUrl = `https://drive.google.com/drive/folders/${uploadFolderId}`;
+    return {
+      files: result,
+      documentsFolderId: uploadFolderId,
+      documentsFolderUrl,
+    };
   }
 
   private async findExistingFile(

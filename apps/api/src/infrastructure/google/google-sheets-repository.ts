@@ -8,7 +8,7 @@ import {
   resolveAdditiveHeaders,
   validateSpreadsheetHeaders,
 } from '../../domain/spreadsheet-row.js';
-import type { SheetsClient } from './sheets-client.js';
+import { type SheetsClient, buildSpreadsheetRowUrl } from './sheets-client.js';
 
 export class IncompatibleSpreadsheetError extends Error {
   constructor(message: string, public readonly missingColumns: string[]) {
@@ -71,9 +71,26 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
     const range = `${sheetName}!A:A`;
     const res = await this.client.appendValues(spreadsheetId, range, [buildResult.row]);
 
+    let sheetId = 0;
+    if (this.client.getSheetMetadata) {
+      try {
+        const meta = await this.client.getSheetMetadata(spreadsheetId, sheetName);
+        if (meta && typeof meta.sheetId === 'number') {
+          sheetId = meta.sheetId;
+        }
+      } catch {
+        // Fallback to 0 if metadata cannot be queried
+      }
+    }
+
+    const rowUrl = buildSpreadsheetRowUrl(spreadsheetId, sheetId, res.updatedRange);
+
     return {
       spreadsheetId,
+      sheetName,
+      sheetId,
       updatedRange: res.updatedRange,
+      rowUrl,
       updatedRows: res.updatedRows,
     };
   }

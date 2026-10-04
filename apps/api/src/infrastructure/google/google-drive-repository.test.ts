@@ -18,7 +18,7 @@ describe('GoogleDriveRepository', () => {
       files: [{ token: 'tmp-token', originalName: 'cv.pdf', mimeType: 'application/pdf', data: Buffer.from('pdf') }],
     });
 
-    expect(result).toEqual([{ token: 'tmp-token', driveFileId: 'drive-file-1' }]);
+    expect(result.files).toEqual([{ token: 'tmp-token', driveFileId: 'drive-file-1' }]);
     const uploadRequest = requests.find((r) => r.url.includes('upload/drive/v3/files'));
     expect(uploadRequest).toBeDefined();
     expect(await uploadRequest?.text()).toContain('tmp-token');
@@ -135,7 +135,7 @@ describe('GoogleDriveRepository', () => {
     });
 
     // Should return existing file ID
-    expect(result).toEqual([{ token: 'tmp-token', driveFileId: 'existing-drive-file-99' }]);
+    expect(result.files).toEqual([{ token: 'tmp-token', driveFileId: 'existing-drive-file-99' }]);
 
     // Should NOT have made an upload request
     const uploadRequest = requests.find((request) => request.url.includes('/upload/drive/v3/files'));
@@ -383,6 +383,73 @@ describe('GoogleDriveRepository', () => {
       expect(movedCalls.length).toBe(1);
       expect(movedCalls[0]).toContain('addParents=target-folder-fixed');
       expect(movedCalls[0]).toContain('removeParents=old-parent-folder');
+    });
+  });
+
+  describe('documentsFolderId and documentsFolderUrl return', () => {
+    it('returns documentsFolderId and documentsFolderUrl on storeSubmissionFiles', async () => {
+      const repository = new GoogleDriveRepository({
+        folderId: 'folder-root',
+        accessTokenOrProvider: 'token',
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          if (req.url.includes('/files?q=')) {
+            return new Response(JSON.stringify({ files: [] }), { status: 200 });
+          }
+          if (req.method === 'POST' && req.url.includes('/drive/v3/files?fields=')) {
+            return new Response(JSON.stringify({ id: 'folder-docs-created' }), { status: 200 });
+          }
+          return new Response(JSON.stringify({ id: 'drive-file-99', name: 'doc.pdf' }), { status: 200 });
+        },
+      });
+
+      const result = await repository.storeSubmissionFiles({
+        submissionId: 'sub_123',
+        target: {
+          targetId: 'offer-1',
+          kind: 'academic_offer',
+          offerName: 'Diploma',
+          cohortName: 'Cohorte I',
+        },
+        files: [{ token: 'tok_1', originalName: 'doc.pdf', mimeType: 'application/pdf', data: Buffer.from('pdf') }],
+      });
+
+      expect(result.files).toHaveLength(1);
+      expect(result.documentsFolderId).toBeDefined();
+      expect(result.documentsFolderUrl).toContain('https://drive.google.com/drive/folders/');
+      expect(result.documentsFolderUrl).toContain(result.documentsFolderId);
+    });
+
+    it('resolves documentsFolderId and documentsFolderUrl even when files list is empty', async () => {
+      const repository = new GoogleDriveRepository({
+        folderId: 'folder-root',
+        accessTokenOrProvider: 'token',
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          if (req.url.includes('/files?q=')) {
+            return new Response(JSON.stringify({ files: [] }), { status: 200 });
+          }
+          if (req.method === 'POST' && req.url.includes('/drive/v3/files?fields=')) {
+            return new Response(JSON.stringify({ id: 'folder-empty-target-docs' }), { status: 200 });
+          }
+          return new Response(JSON.stringify({}), { status: 200 });
+        },
+      });
+
+      const result = await repository.storeSubmissionFiles({
+        submissionId: 'sub_empty_files',
+        target: {
+          targetId: 'offer-1',
+          kind: 'academic_offer',
+          offerName: 'Diploma',
+          cohortName: 'Cohorte I',
+        },
+        files: [],
+      });
+
+      expect(result.files).toHaveLength(0);
+      expect(result.documentsFolderId).toBe('folder-empty-target-docs');
+      expect(result.documentsFolderUrl).toBe('https://drive.google.com/drive/folders/folder-empty-target-docs');
     });
   });
 });

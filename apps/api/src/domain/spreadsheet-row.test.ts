@@ -3,6 +3,7 @@ import {
   buildSpreadsheetRow,
   validateSpreadsheetHeaders,
   resolveAdditiveHeaders,
+  buildSpreadsheetRowUrl,
   type RowBuildResult,
 } from './spreadsheet-row.js';
 
@@ -109,6 +110,23 @@ describe('Spreadsheet Row Builder & Header Resolution (Pure Domain)', () => {
 
       expect(result.updatedHeaders).toEqual(['Nombre', 'Apellido', 'Documento']);
       expect(result.missingColumnsAdded).toEqual([]);
+    });
+  });
+
+  describe('buildSpreadsheetRowUrl', () => {
+    it('constructs direct row URL from standard updatedRange with exclamation mark', () => {
+      const url = buildSpreadsheetRowUrl('sheet_123', 0, 'Inscripciones!A5:Z5');
+      expect(url).toBe('https://docs.google.com/spreadsheets/d/sheet_123/edit#gid=0&range=A5:Z5');
+    });
+
+    it('handles sheet names with spaces and quotes in updatedRange', () => {
+      const url = buildSpreadsheetRowUrl('sheet_456', 987654, "'Inscripciones 2026'!A15:AC15");
+      expect(url).toBe('https://docs.google.com/spreadsheets/d/sheet_456/edit#gid=987654&range=A15:AC15');
+    });
+
+    it('falls back to spreadsheet edit URL with gid if updatedRange is missing or malformed', () => {
+      expect(buildSpreadsheetRowUrl('sheet_789', 42)).toBe('https://docs.google.com/spreadsheets/d/sheet_789/edit#gid=42');
+      expect(buildSpreadsheetRowUrl('sheet_789', 42, 'invalid range format')).toBe('https://docs.google.com/spreadsheets/d/sheet_789/edit#gid=42');
     });
   });
 });

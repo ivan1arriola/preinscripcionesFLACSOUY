@@ -20,6 +20,12 @@ export interface StoredDriveFile {
   driveFileId: string;
 }
 
+export interface StoredDriveFiles {
+  files: StoredDriveFile[];
+  documentsFolderId: string;
+  documentsFolderUrl: string;
+}
+
 export interface GoogleDriveFolderInfo {
   id: string;
   name: string;
@@ -29,6 +35,6 @@ export interface GoogleDriveFolderInfo {
 export type { SpreadsheetDiscovery, SpreadsheetDiscoveryPort } from './spreadsheet-discovery.js';
 
 export interface GoogleDriveRepositoryPort {
-  storeSubmissionFiles(command: StoreSubmissionFilesCommand): Promise<StoredDriveFile[]>;
+  storeSubmissionFiles(command: StoreSubmissionFilesCommand): Promise<StoredDriveFiles>;
   inspectFolder?(folderId: string): Promise<GoogleDriveFolderInfo>;
 }
