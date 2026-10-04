@@ -189,10 +189,11 @@ describe('PostgresEmailNotificationRepository (Integration with PostgreSQL)', ()
     expect(current?.status).toBe('failed');
     expect(current?.lastError).toBe('Account Suspended');
 
-    // 4. Reset for manual retry
-    await repository.resetForManualRetry(job.id, new Date('2026-10-04T17:20:00Z'));
+    // 4. Reset for manual retry with updated email
+    await repository.resetForManualRetry(job.id, new Date('2026-10-04T17:20:00Z'), 'corrected-postgres@example.com');
     current = await repository.findById(job.id);
     expect(current?.status).toBe('pending');
+    expect(current?.recipientEmail).toBe('corrected-postgres@example.com');
     expect(current?.availableAt).toEqual(new Date('2026-10-04T17:20:00Z'));
 
     // 5. Mark unknown
@@ -200,6 +201,11 @@ describe('PostgresEmailNotificationRepository (Integration with PostgreSQL)', ()
     current = await repository.findById(job.id);
     expect(current?.status).toBe('unknown');
     expect(current?.lastError).toBe('Network timeout awaiting SES response');
+
+    // 6. getCounts
+    const counts = await repository.getCounts();
+    expect(counts.total).toBeGreaterThanOrEqual(1);
+    expect(counts.unknown).toBeGreaterThanOrEqual(1);
   });
 
   it('lists missing notifications for successful submissions', async () => {

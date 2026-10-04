@@ -30,7 +30,9 @@ import type { TargetSpreadsheetService } from '../../application/target-spreadsh
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 import { EncryptedSettingsService } from '../../infrastructure/security/encrypted-settings.js';
 import type { EmailNotificationRepository } from '../../ports/email-notification-repository.js';
-import { loadEmailConfig } from '../../infrastructure/email/email-config.js';
+import type { EmailNotificationDispatcher } from '../../application/email-notification-dispatcher.js';
+import { loadEmailConfig, type SesCredentialsConfig } from '../../infrastructure/email/email-config.js';
+import type { EmailProvider } from '../../infrastructure/email/ses-client.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -47,6 +49,8 @@ export interface AppDependencies {
   systemSettingsRepository?: SystemSettingsRepository;
   encryptedSettingsService?: EncryptedSettingsService;
   emailNotificationRepository?: EmailNotificationRepository;
+  emailNotificationDispatcher?: EmailNotificationDispatcher;
+  emailProviderFactory?: (config: SesCredentialsConfig) => EmailProvider;
   getMasterEmails?: () => Promise<string[]> | string[];
   serviceAccountEmail?: string;
 }
@@ -138,6 +142,9 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.targetSpreadsheetService,
     dependencies.targetSpreadsheetRepository,
     encryptedSettingsService,
+    dependencies.emailNotificationRepository,
+    dependencies.emailNotificationDispatcher,
+    dependencies.emailProviderFactory,
   ));
 
   // Central error handler

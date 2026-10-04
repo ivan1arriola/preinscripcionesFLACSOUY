@@ -144,24 +144,6 @@ try {
 
 const adminSessionStore = new PostgresAdminSessionStore(db, getAdminSessionTtlMs());
 
-const app = createApp({
-  catalog,
-  repository,
-  temporaryFileStorage,
-  googleDriveRepository,
-  spreadsheetRepository: googleSheetsRepository,
-  targetSpreadsheetService,
-  targetSpreadsheetRepository,
-  formProfileRepository,
-  googleIdentityVerifier,
-  adminSessionStore,
-  systemSettingsRepository,
-  encryptedSettingsService,
-  emailNotificationRepository,
-  serviceAccountEmail: googleCreds.clientEmail,
-  checkDatabase: checkDb,
-});
-
 const notificationDispatcher = new EmailNotificationDispatcher({
   repository: emailNotificationRepository,
   getProvider: async () => {
@@ -192,6 +174,25 @@ const notificationDispatcher = new EmailNotificationDispatcher({
 if (process.env.NODE_ENV !== 'test') {
   notificationDispatcher.start(30_000);
 }
+
+const app = createApp({
+  catalog,
+  repository,
+  temporaryFileStorage,
+  googleDriveRepository,
+  spreadsheetRepository: googleSheetsRepository,
+  targetSpreadsheetService,
+  targetSpreadsheetRepository,
+  formProfileRepository,
+  googleIdentityVerifier,
+  adminSessionStore,
+  systemSettingsRepository,
+  encryptedSettingsService,
+  emailNotificationRepository,
+  emailNotificationDispatcher: notificationDispatcher,
+  serviceAccountEmail: googleCreds.clientEmail,
+  checkDatabase: checkDb,
+});
 
 const cleanupInterval = setInterval(async () => {
   try {

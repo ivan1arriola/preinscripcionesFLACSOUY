@@ -285,4 +285,173 @@ export const apiClient = {
     }
     return res.json();
   },
+
+  async getAdminEmailSettings(): Promise<AdminEmailSettings> {
+    const res = await fetch('/api/admin/settings/email');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'EMAIL_SETTINGS_ERROR', err.error?.message || 'Error al obtener configuración de correo');
+    }
+    return res.json();
+  },
+
+  async updateAdminEmailSettings(
+    input: UpdateAdminEmailSettingsInput,
+    csrfToken: string
+  ): Promise<AdminEmailSettings> {
+    const res = await fetch('/api/admin/settings/email', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+      },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'UPDATE_EMAIL_SETTINGS_ERROR', err.error?.message || 'Error al actualizar configuración de correo');
+    }
+    return res.json();
+  },
+
+  async sendTestAdminEmail(
+    recipientEmail: string,
+    csrfToken: string
+  ): Promise<{ ok: boolean; providerMessageId: string; recipient: string }> {
+    const res = await fetch('/api/admin/settings/email/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+      },
+      body: JSON.stringify({ recipientEmail }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'SEND_TEST_EMAIL_ERROR', err.error?.message || 'Error al enviar correo de prueba');
+    }
+    return res.json();
+  },
+
+  async getAdminNotifications(filter?: { status?: string; limit?: number; offset?: number }): Promise<{
+    ok: boolean;
+    counts: AdminNotificationCounts;
+    notifications: AdminNotificationRecord[];
+  }> {
+    const params = new URLSearchParams();
+    if (filter?.status) params.set('status', filter.status);
+    if (filter?.limit) params.set('limit', String(filter.limit));
+    if (filter?.offset) params.set('offset', String(filter.offset));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`/api/admin/settings/notifications${query}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'NOTIFICATIONS_ERROR', err.error?.message || 'Error al consultar notificaciones');
+    }
+    return res.json();
+  },
+
+  async retryAdminNotification(
+    id: string,
+    csrfToken: string,
+    force?: boolean
+  ): Promise<{ ok: boolean; message: string }> {
+    const res = await fetch(`/api/admin/settings/notifications/${encodeURIComponent(id)}/retry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+      },
+      body: JSON.stringify({ force }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'RETRY_NOTIFICATION_ERROR', err.error?.message || 'Error al reintentar notificación');
+    }
+    return res.json();
+  },
+
+  async dispatchAdminNotifications(csrfToken: string): Promise<{
+    ok: boolean;
+    claimed: number;
+    processed: number;
+    sent: number;
+    failed: number;
+    failedPermanent: number;
+    failedRetryable: number;
+    unknown: number;
+  }> {
+    const res = await fetch('/api/admin/settings/notifications/dispatch', {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': csrfToken,
+      },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'DISPATCH_ERROR', err.error?.message || 'Error al procesar la cola');
+    }
+    return res.json();
+  },
 };
+
+export interface AdminEmailSettings {
+  enabled: boolean;
+  configured: boolean;
+  region: string | null;
+  fromEmailMasked: string | null;
+  replyToEmailMasked: string | null;
+  accessKeyIdMasked: string | null;
+  configurationSet: string | null;
+  ses: {
+    configured: boolean;
+    hasAccessKey: boolean;
+    hasSecretKey: boolean;
+    hasSessionToken: boolean;
+    region: string | null;
+    fromEmail: string | null;
+    replyToEmail: string | null;
+    configurationSet: string | null;
+  };
+  masterEmails: string[];
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+export interface UpdateAdminEmailSettingsInput {
+  enabled?: boolean;
+  masterEmails?: string[];
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  awsSessionToken?: string | null;
+  region?: string;
+  fromEmail?: string;
+  replyToEmail?: string | null;
+  configurationSet?: string | null;
+}
+
+export interface AdminNotificationRecord {
+  id: string;
+  submissionId: string;
+  audience: 'applicant' | 'target' | 'master';
+  recipientEmail: string;
+  targetId: string;
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'unknown';
+  attemptCount: number;
+  providerMessageId: string | null;
+  lastError: string | null;
+  availableAt: string;
+  lockedUntil: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminNotificationCounts {
+  pending: number;
+  processing: number;
+  sent: number;
+  failed: number;
+  unknown: number;
+  total: number;
+}

@@ -36,6 +36,15 @@ export interface EmailNotificationFilter {
   offset?: number;
 }
 
+export interface EmailNotificationCounts {
+  pending: number;
+  processing: number;
+  sent: number;
+  failed: number;
+  unknown: number;
+  total: number;
+}
+
 export interface EmailNotificationRepository {
   ensureForSubmission(input: EnsureEmailNotificationsInput): Promise<EmailNotificationRecord[]>;
   claimPending(limit: number, now: Date, leaseDurationMs?: number): Promise<EmailNotificationRecord[]>;
@@ -46,5 +55,7 @@ export interface EmailNotificationRepository {
   listMissingForSuccessfulSubmissions(limit: number): Promise<string[]>;
   listNotifications?(filter?: EmailNotificationFilter): Promise<EmailNotificationRecord[]>;
   findById?(id: string): Promise<EmailNotificationRecord | null>;
-  resetForManualRetry?(id: string, now: Date): Promise<void>;
+  resetForManualRetry?(id: string, now: Date, updatedEmail?: string): Promise<void>;
+  getCounts?(): Promise<EmailNotificationCounts>;
 }
+

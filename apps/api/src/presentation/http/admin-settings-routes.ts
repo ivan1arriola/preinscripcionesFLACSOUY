@@ -12,11 +12,15 @@ import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import { canProvisionTargetSpreadsheet, type TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 import type { EncryptedSettingsService } from '../../infrastructure/security/encrypted-settings.js';
+import type { EmailNotificationRepository } from '../../ports/email-notification-repository.js';
+import type { EmailNotificationDispatcher } from '../../application/email-notification-dispatcher.js';
 import {
+  loadEmailConfig,
   maskEmail,
   maskString,
   parseMasterEmails,
   serializeMasterEmails,
+  type SesCredentialsConfig,
   SETTING_EMAIL_NOTIFICATIONS_ENABLED,
   SETTING_NOTIFICATION_MASTER_EMAILS,
   SETTING_SES_AWS_ACCESS_KEY_ID,
@@ -27,9 +31,22 @@ import {
   SETTING_SES_REPLY_TO_EMAIL,
   SETTING_SES_CONFIGURATION_SET,
 } from '../../infrastructure/email/email-config.js';
+import { type EmailProvider, SesEmailProvider } from '../../infrastructure/email/ses-client.js';
 
 const UpdateDriveFolderSchema = z.object({
   folderId: z.string().min(1, 'La carpeta de Google Drive es requerida'),
+});
+
+const SendTestEmailSchema = z.object({
+  recipientEmail: z.string().email('Dirección de correo destinatario inválida').optional(),
+  to: z.string().email('Dirección de correo destinatario inválida').optional(),
+}).refine((data) => data.recipientEmail || data.to, {
+  message: 'Debe especificar recipientEmail o to con un correo válido',
+});
+
+const RetryNotificationSchema = z.object({
+  force: z.boolean().optional(),
+  recipientEmail: z.string().email('Dirección de correo destinatario inválida').optional(),
 });
 
 const UpdateEmailSettingsSchema = z.object({
@@ -64,6 +81,9 @@ export function createAdminSettingsRoutes(
   targetSpreadsheetService?: TargetSpreadsheetService,
   targetSpreadsheetRepository?: TargetSpreadsheetRepository,
   encryptedSettingsService?: EncryptedSettingsService,
+  emailNotificationRepository?: EmailNotificationRepository,
+  dispatcher?: EmailNotificationDispatcher,
+  emailProviderFactory?: (config: SesCredentialsConfig) => EmailProvider,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -401,6 +421,218 @@ export function createAdminSettingsRoutes(
         error: {
           code: 'ENCRYPTION_ERROR',
           message: error instanceof Error ? error.message : 'Error al guardar la configuración de correo.',
+        },
+      });
+    }
+  });
+
+  router.post('/email/test', async (req: RequestWithAdminSession, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({
+        error: { code: 'ENCRYPTION_UNAVAILABLE', message: 'Servicio de configuración cifrada no disponible.' },
+      });
+      return;
+    }
+
+    const parsed = SendTestEmailSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'Datos inválidos',
+          issues: parsed.error.issues,
+        },
+      });
+      return;
+    }
+
+    const recipient = (parsed.data.recipientEmail || parsed.data.to)!.trim();
+
+    try {
+      const config = await loadEmailConfig(encryptedSettingsService);
+      if (!config.ses) {
+        res.status(400).json({
+          error: {
+            code: 'SES_NOT_CONFIGURED',
+            message: 'Amazon SES no está completamente configurado (falta Access Key, Secret Key, Región o Remitente).',
+          },
+        });
+        return;
+      }
+
+      const provider = emailProviderFactory ? emailProviderFactory(config.ses) : new SesEmailProvider(config.ses);
+      const result = await provider.send({
+        to: [recipient],
+        subject: 'Prueba de configuración de Amazon SES - FLACSO Uruguay',
+        text: 'Este es un mensaje de prueba enviado desde el panel de administración de FLACSO Uruguay para verificar la conectividad con Amazon SES.',
+        html: '<p>Este es un mensaje de prueba enviado desde el panel de administración de <strong>FLACSO Uruguay</strong> para verificar la conectividad con Amazon SES.</p>',
+        replyTo: config.ses.replyToEmail ? [config.ses.replyToEmail] : undefined,
+        tags: { purpose: 'test_notification' },
+      });
+
+      res.json({
+        ok: true,
+        providerMessageId: result.providerMessageId,
+        recipient,
+      });
+    } catch (error) {
+      res.status(502).json({
+        error: {
+          code: 'SES_SEND_ERROR',
+          message: error instanceof Error ? error.message : 'Error al enviar correo de prueba vía Amazon SES.',
+        },
+      });
+    }
+  });
+
+  router.get('/notifications', async (req, res) => {
+    if (!emailNotificationRepository) {
+      res.status(503).json({
+        error: { code: 'NOTIFICATIONS_UNAVAILABLE', message: 'Repositorio de notificaciones no disponible.' },
+      });
+      return;
+    }
+
+    const statusParam = req.query.status as string | undefined;
+    const limitParam = req.query.limit ? Math.min(Number(req.query.limit), 100) : 50;
+    const offsetParam = req.query.offset ? Math.max(Number(req.query.offset), 0) : 0;
+
+    let counts = { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 };
+    if (emailNotificationRepository.getCounts) {
+      counts = await emailNotificationRepository.getCounts();
+    } else if (emailNotificationRepository.listNotifications) {
+      const all = await emailNotificationRepository.listNotifications({ limit: 1000 });
+      for (const item of all) {
+        if (item.status in counts) {
+          counts[item.status as keyof typeof counts]++;
+          counts.total++;
+        }
+      }
+    }
+
+    const validStatuses = ['pending', 'processing', 'sent', 'failed', 'unknown'];
+    const statusFilter = statusParam && validStatuses.includes(statusParam) ? (statusParam as any) : undefined;
+
+    const list = emailNotificationRepository.listNotifications
+      ? await emailNotificationRepository.listNotifications({
+          status: statusFilter,
+          limit: limitParam,
+          offset: offsetParam,
+        })
+      : [];
+
+    res.json({
+      ok: true,
+      counts,
+      notifications: list.map((item) => ({
+        id: item.id,
+        submissionId: item.submissionId,
+        audience: item.audience,
+        recipientEmail: item.recipientEmail,
+        targetId: item.targetId,
+        status: item.status,
+        attemptCount: item.attemptCount,
+        providerMessageId: item.providerMessageId ?? null,
+        lastError: item.lastError ?? null,
+        availableAt: item.availableAt,
+        lockedUntil: item.lockedUntil ?? null,
+        sentAt: item.sentAt ?? null,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      })),
+    });
+  });
+
+  router.post('/notifications/:id/retry', async (req: RequestWithAdminSession, res) => {
+    if (!emailNotificationRepository) {
+      res.status(503).json({
+        error: { code: 'NOTIFICATIONS_UNAVAILABLE', message: 'Repositorio de notificaciones no disponible.' },
+      });
+      return;
+    }
+
+    const id = String(req.params.id);
+    if (!id) {
+      res.status(400).json({ error: { code: 'INVALID_ID', message: 'ID inválido' } });
+      return;
+    }
+    const parsed = RetryNotificationSchema.safeParse(req.body ?? {});
+    const force = parsed.success ? Boolean(parsed.data.force) : false;
+
+    const notification = emailNotificationRepository.findById
+      ? await emailNotificationRepository.findById(id)
+      : null;
+
+    if (!notification) {
+      res.status(404).json({
+        error: { code: 'NOTIFICATION_NOT_FOUND', message: 'Notificación no encontrada.' },
+      });
+      return;
+    }
+
+    if (notification.status === 'sent') {
+      res.status(400).json({
+        error: { code: 'INVALID_STATUS', message: 'No se puede reintentar una notificación ya enviada exitosamente.' },
+      });
+      return;
+    }
+
+    if (notification.status === 'processing') {
+      res.status(400).json({
+        error: { code: 'INVALID_STATUS', message: 'La notificación ya se encuentra en procesamiento.' },
+      });
+      return;
+    }
+
+    if (notification.status === 'unknown' && !force) {
+      res.status(400).json({
+        error: {
+          code: 'UNKNOWN_STATUS_REQUIRES_CONFIRMATION',
+          message:
+            'El envío anterior quedó en estado desconocido y podría haber sido entregado. Confirme el reintento explícitamente para evitar duplicados.',
+        },
+      });
+      return;
+    }
+
+    const recipientEmail = parsed.success && parsed.data.recipientEmail ? parsed.data.recipientEmail.trim().toLowerCase() : undefined;
+
+    if (emailNotificationRepository.resetForManualRetry) {
+      await emailNotificationRepository.resetForManualRetry(id, new Date(), recipientEmail);
+    }
+
+    res.json({
+      ok: true,
+      message: 'Notificación reencolada para nuevo intento.',
+      recipientEmail: recipientEmail ?? notification.recipientEmail,
+    });
+  });
+
+  router.post('/notifications/dispatch', async (_req, res) => {
+    if (!dispatcher) {
+      res.status(503).json({
+        error: { code: 'DISPATCHER_UNAVAILABLE', message: 'Dispatcher de notificaciones no configurado.' },
+      });
+      return;
+    }
+
+    try {
+      const result = await dispatcher.processPendingBatch();
+      res.json({
+        ok: true,
+        claimed: result.claimed,
+        processed: result.processed,
+        sent: result.sent,
+        failed: result.failed,
+        failedPermanent: result.failedPermanent,
+        failedRetryable: result.failedRetryable,
+        unknown: result.unknown,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: {
+          code: 'DISPATCH_ERROR',
+          message: error instanceof Error ? error.message : 'Error al procesar la cola de notificaciones.',
         },
       });
     }

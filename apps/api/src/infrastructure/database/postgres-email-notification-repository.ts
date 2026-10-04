@@ -6,6 +6,7 @@ import type {
   EmailNotificationRecord,
   EnsureEmailNotificationsInput,
   EmailNotificationFilter,
+  EmailNotificationCounts,
 } from '../../ports/email-notification-repository.js';
 
 function mapRow(row: Selectable<EmailNotificationsTable>): EmailNotificationRecord {
@@ -244,17 +245,41 @@ export class PostgresEmailNotificationRepository implements EmailNotificationRep
     return row ? mapRow(row) : null;
   }
 
-  async resetForManualRetry(id: string, now: Date): Promise<void> {
+  async resetForManualRetry(id: string, now: Date, updatedEmail?: string): Promise<void> {
+    const updateValues: Record<string, unknown> = {
+      status: 'pending',
+      available_at: now,
+      locked_until: null,
+      updated_at: now,
+    };
+    if (updatedEmail) {
+      updateValues.recipient_email = updatedEmail;
+    }
+
     await this.db
       .updateTable('email_notifications')
-      .set({
-        status: 'pending',
-        available_at: now,
-        locked_until: null,
-        updated_at: now,
-      })
+      .set(updateValues)
       .where('id', '=', id)
       .where('status', 'in', ['failed', 'unknown'])
       .execute();
+  }
+
+  async getCounts(): Promise<EmailNotificationCounts> {
+    const rows = await this.db
+      .selectFrom('email_notifications')
+      .select(['status', (eb) => eb.fn.count('id').as('count')])
+      .groupBy('status')
+      .execute();
+
+    const counts = { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 };
+    for (const row of rows) {
+      const s = row.status as keyof typeof counts;
+      const c = Number(row.count);
+      if (s in counts) {
+        counts[s] = c;
+        counts.total += c;
+      }
+    }
+    return counts;
   }
 }

@@ -4,6 +4,7 @@ import type {
   EmailNotificationRecord,
   EnsureEmailNotificationsInput,
   EmailNotificationFilter,
+  EmailNotificationCounts,
 } from '../../ports/email-notification-repository.js';
 
 export class InMemoryEmailNotificationRepository implements EmailNotificationRepository {
@@ -151,7 +152,7 @@ export class InMemoryEmailNotificationRepository implements EmailNotificationRep
     return record ? { ...record } : null;
   }
 
-  async resetForManualRetry(id: string, now: Date): Promise<void> {
+  async resetForManualRetry(id: string, now: Date, updatedEmail?: string): Promise<void> {
     const record = this.records.get(id);
     if (!record) return;
 
@@ -160,6 +161,20 @@ export class InMemoryEmailNotificationRepository implements EmailNotificationRep
       record.availableAt = now;
       record.lockedUntil = undefined;
       record.updatedAt = now;
+      if (updatedEmail) {
+        record.recipientEmail = updatedEmail;
+      }
     }
+  }
+
+  async getCounts(): Promise<EmailNotificationCounts> {
+    const counts: EmailNotificationCounts = { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 };
+    for (const record of this.records.values()) {
+      if (record.status in counts) {
+        counts[record.status as keyof EmailNotificationCounts]++;
+        counts.total++;
+      }
+    }
+    return counts;
   }
 }

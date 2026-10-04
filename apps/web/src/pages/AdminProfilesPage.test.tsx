@@ -12,6 +12,31 @@ vi.mock('../api/client.js', async () => {
       adminLogout: vi.fn(),
       getDriveStatus: vi.fn().mockResolvedValue({ operational: true, activeFolderId: 'folder-1' }),
       getTargetSpreadsheetStatus: vi.fn().mockResolvedValue({ totalTargets: 0, configuredTargets: 0, items: [] }),
+      getAdminEmailSettings: vi.fn().mockResolvedValue({
+        enabled: true,
+        configured: true,
+        region: 'us-east-1',
+        fromEmailMasked: 'pr***s@flacso.edu.uy',
+        replyToEmailMasked: null,
+        accessKeyIdMasked: 'AK***LE',
+        configurationSet: null,
+        ses: {
+          configured: true,
+          hasAccessKey: true,
+          hasSecretKey: true,
+          hasSessionToken: false,
+          region: 'us-east-1',
+          fromEmail: 'pr***s@flacso.edu.uy',
+          replyToEmail: null,
+          configurationSet: null,
+        },
+        masterEmails: [],
+      }),
+      getAdminNotifications: vi.fn().mockResolvedValue({
+        ok: true,
+        counts: { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 },
+        notifications: [],
+      }),
     },
   };
 });
@@ -25,6 +50,33 @@ describe('AdminProfilesPage Component', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(apiClient.getDriveStatus).mockResolvedValue({ operational: true, activeFolderId: 'folder-1' } as any);
+    vi.mocked(apiClient.getTargetSpreadsheetStatus).mockResolvedValue({ totalTargets: 0, configuredTargets: 0, items: [] } as any);
+    vi.mocked(apiClient.getAdminEmailSettings).mockResolvedValue({
+      enabled: true,
+      configured: true,
+      region: 'us-east-1',
+      fromEmailMasked: 'pr***s@flacso.edu.uy',
+      replyToEmailMasked: null,
+      accessKeyIdMasked: 'AK***LE',
+      configurationSet: null,
+      ses: {
+        configured: true,
+        hasAccessKey: true,
+        hasSecretKey: true,
+        hasSessionToken: false,
+        region: 'us-east-1',
+        fromEmail: 'pr***s@flacso.edu.uy',
+        replyToEmail: null,
+        configurationSet: null,
+      },
+      masterEmails: [],
+    });
+    vi.mocked(apiClient.getAdminNotifications).mockResolvedValue({
+      ok: true,
+      counts: { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 },
+      notifications: [],
+    });
   });
 
   it('triggers onRequireLogin when user is not authenticated (401)', async () => {
@@ -68,6 +120,10 @@ describe('AdminProfilesPage Component', () => {
     // Switch to Spreadsheets section
     const sheetsTab = screen.getByRole('tab', { name: /Planillas por oferta/i });
     fireEvent.click(sheetsTab);
+
+    // Switch to Notifications section
+    const notifsTab = screen.getByRole('tab', { name: /Notificaciones SES/i });
+    fireEvent.click(notifsTab);
 
     // Switch back to Canonical Profiles section
     const profilesTab = screen.getByRole('tab', { name: /Formularios Canónicos/i });

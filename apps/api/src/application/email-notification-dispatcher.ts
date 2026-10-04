@@ -95,6 +95,10 @@ export class EmailNotificationDispatcher {
     return this.dispatchPending(now);
   }
 
+  async processPendingBatch(now: Date = new Date()): Promise<DispatchBatchResult> {
+    return this.dispatchPending(now);
+  }
+
   async dispatchPending(now: Date = new Date()): Promise<DispatchBatchResult> {
     const provider = this.provider ?? (this.getProvider ? await this.getProvider() : null);
     if (!provider) {

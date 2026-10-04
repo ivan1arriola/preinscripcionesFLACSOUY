@@ -135,10 +135,11 @@ describe('InMemoryEmailNotificationRepository', () => {
     expect(failed?.lastError).toBe('InvalidParameterException');
     expect(failed?.lockedUntil).toBeUndefined();
 
-    // 4. Reset for manual retry
-    await repo.resetForManualRetry(job.id, new Date('2026-10-04T12:10:00Z'));
+    // 4. Reset for manual retry with updated email
+    await repo.resetForManualRetry(job.id, new Date('2026-10-04T12:10:00Z'), 'corrected@example.com');
     const reset = await repo.findById(job.id);
     expect(reset?.status).toBe('pending');
+    expect(reset?.recipientEmail).toBe('corrected@example.com');
     expect(reset?.availableAt).toEqual(new Date('2026-10-04T12:10:00Z'));
 
     // 5. Mark unknown
@@ -146,5 +147,12 @@ describe('InMemoryEmailNotificationRepository', () => {
     const unknown = await repo.findById(job.id);
     expect(unknown?.status).toBe('unknown');
     expect(unknown?.lastError).toBe('Timeout without confirmation');
+
+    // 6. Verify getCounts
+    const counts = await repo.getCounts();
+    expect(counts.total).toBe(1);
+    expect(counts.unknown).toBe(1);
+    expect(counts.pending).toBe(0);
+    expect(counts.sent).toBe(0);
   });
 });
