@@ -9,7 +9,7 @@ const inputs: InputDefinition[] = [
   { key: 'paisEmisorDocumento', label: 'País emisor del documento', type: 'text', required: true, position: 3 },
   { key: 'celular', label: 'Celular', type: 'tel', required: true, position: 4 },
   { key: 'tieneConvenio', label: '¿Te corresponde algún convenio?', type: 'select', required: true, position: 5 },
-  { key: 'aceptaDifusion', label: '¿Autorizás la difusión de tu nombre y foto?', type: 'select', required: true, position: 6 },
+  { key: 'aceptaDifusion', label: '¿Autorizás la difusión de imagen por parte de FLACSO Uruguay?', type: 'select', required: true, position: 6 },
 ];
 
 describe('UniversalFields identity and contact controls', () => {

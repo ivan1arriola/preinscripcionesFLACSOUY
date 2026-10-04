@@ -53,7 +53,7 @@ export const CANONICAL_BASE_INPUTS: Array<Omit<InputDefinition, 'position'>> = [
   { key: 'tieneConvenio', label: '¿Te corresponde algún convenio?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: '¿Te corresponde algún convenio?' },
   { key: 'convenioWordpressId', label: '¿Cuál convenio te corresponde?', type: 'text', required: false, stepId: 'declaracion', spreadsheetColumn: 'Convenio' },
   { key: 'fuente', label: '¿Cómo conociste esta propuesta?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: 'Cómo conociste la propuesta' },
-  { key: 'aceptaDifusion', label: '¿Autorizás la difusión de tu nombre y foto para esta propuesta?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: 'Autoriza difusión' },
+  { key: 'aceptaDifusion', label: '¿Autorizás la difusión de imagen por parte de FLACSO Uruguay?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: 'Autoriza difusión' },
 ];
 
 export const CANONICAL_CORE_DOCUMENTS: DocumentDefinition[] = [

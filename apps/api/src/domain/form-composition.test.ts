@@ -37,6 +37,17 @@ describe('composeForm with Form Profiles', () => {
     mentions: ['Tecnología', 'Gestión'],
   };
 
+  it('exposes the exact institutional image diffusion label and does not contain obsolete wording', () => {
+    const result = composeForm(baseTarget, mockEffectiveProfile('diploma'));
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('Form composition failed');
+    const input = result.value.inputs.find((i) => i.key === 'aceptaDifusion');
+    expect(input).toBeDefined();
+    expect(input?.label).toBe('¿Autorizás la difusión de imagen por parte de FLACSO Uruguay?');
+    expect(input?.label).not.toContain('nombre y foto');
+    expect(input?.spreadsheetColumn).toBe('Autoriza difusión');
+  });
+
   it('composes forms for all five recognized types using their respective profiles', () => {
     const types = ['maestria', 'especializacion', 'diplomado', 'diploma', 'seminar'] as const;
 

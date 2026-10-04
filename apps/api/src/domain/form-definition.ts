@@ -22,7 +22,7 @@ export const UNIVERSAL_INPUTS: InputDefinition[] = [
   ['tieneConvenio', '¿Te corresponde algún convenio?', 'select', true, '¿Te corresponde algún convenio?'],
   ['convenioWordpressId', '¿Cuál convenio te corresponde?', 'text', false, 'Convenio'],
   ['fuente', '¿Cómo conociste esta propuesta?', 'select', true, 'Cómo conociste la propuesta'],
-  ['aceptaDifusion', '¿Autorizás la difusión de tu nombre y foto para esta propuesta?', 'select', true, 'Autoriza difusión'],
+  ['aceptaDifusion', '¿Autorizás la difusión de imagen por parte de FLACSO Uruguay?', 'select', true, 'Autoriza difusión'],
   ['estudios', 'Estudios cursados', 'textarea', true, 'Estudios cursados'],
   ['posgradoFlacso', '¿Cursaste algún posgrado en FLACSO?', 'select', true, '¿Cursó posgrado en FLACSO?'],
   ['posgradoCual', '¿Cuál posgrado?', 'text', false, 'Cuál posgrado'],
