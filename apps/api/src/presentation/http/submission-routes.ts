@@ -10,6 +10,7 @@ import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.j
 import type { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 
 const submissionSchema = z.object({
+  clientSubmissionId: z.string().optional(),
   configRevision: z.string({ required_error: 'La revisión de configuración es obligatoria.' }),
   values: z.record(z.string(), {
     required_error: 'Los valores del formulario son obligatorios.',
@@ -56,6 +57,7 @@ export function createSubmissionRoutes(
       }
 
       const result = await submitPreinscription(catalog, repository, profileRepository, {
+        clientSubmissionId: parsed.data.clientSubmissionId,
         targetId,
         configRevision: parsed.data.configRevision,
         values: parsed.data.values,
@@ -111,14 +113,16 @@ export function createSubmissionRoutes(
       }
 
       const files = parsed.data.files ?? [];
-      let storedDriveFiles: Array<{ token: string }> = [];
+      let storedDriveFiles: Array<{ token: string; driveFileId?: string }> = [];
       if (files.length > 0) {
         if (!fileDependencies) {
+          await repository.markProcessing(result.submissionId, 'failed', 'La carga de documentación no está disponible en este momento.');
           res.status(503).json({ error: { code: 'FILE_PROCESSING_UNAVAILABLE', message: 'La carga de documentación no está disponible en este momento.' } });
           return;
         }
         const sessionId = req.header('x-preinscription-session')?.trim();
         if (!sessionId) {
+          await repository.markProcessing(result.submissionId, 'failed', 'La sesión de preinscripción es obligatoria para enviar archivos.');
           res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'La sesión de preinscripción es obligatoria para enviar archivos.' } });
           return;
         }
@@ -135,8 +139,18 @@ export function createSubmissionRoutes(
             values: parsed.data.values,
           });
           storedDriveFiles = stored;
+          for (const file of stored) {
+            if (file.driveFileId) {
+              await repository.markFileStored(file.token, file.driveFileId);
+            }
+          }
         } catch (error) {
-          res.status(502).json({ error: { code: 'FILE_PROCESSING_ERROR', message: error instanceof Error ? error.message : 'No se pudo guardar la documentación.' } });
+          const message = error instanceof Error ? error.message : 'No se pudo guardar la documentación.';
+          for (const file of files) {
+            await repository.markFileFailed(file.token, message);
+          }
+          await repository.markProcessing(result.submissionId, 'failed', message);
+          res.status(502).json({ error: { code: 'FILE_PROCESSING_ERROR', message } });
           return;
         }
       }
@@ -145,6 +159,7 @@ export function createSubmissionRoutes(
         try {
           const target = await catalog.revalidateTarget(targetId);
           if (!target) {
+            await repository.markProcessing(result.submissionId, 'failed', 'No se encontró el destino académico para crear su planilla.');
             res.status(404).json({ error: { code: 'NOT_FOUND', message: 'No se encontró el destino académico para crear su planilla.' } });
             return;
           }
@@ -156,21 +171,24 @@ export function createSubmissionRoutes(
             spreadsheet.sheetName,
           );
         } catch (error) {
-          res.status(502).json({ error: { code: 'SPREADSHEET_PROCESSING_ERROR', message: error instanceof Error ? error.message : 'No se pudo crear o guardar la planilla de la preinscripción.' } });
+          const message = error instanceof Error ? error.message : 'No se pudo crear o guardar la planilla de la preinscripción.';
+          await repository.markProcessing(result.submissionId, 'failed', message);
+          res.status(502).json({ error: { code: 'SPREADSHEET_PROCESSING_ERROR', message } });
           return;
         }
       }
 
+      await repository.markProcessing(result.submissionId, 'success');
+
       if (files.length > 0) {
         const sessionId = req.header('x-preinscription-session')?.trim();
         if (sessionId && fileDependencies) {
-          try {
-            for (const file of storedDriveFiles) {
+          for (const file of storedDriveFiles) {
+            try {
               await fileDependencies.storage.remove(file.token, sessionId);
+            } catch (cleanupError) {
+              console.error('[Uploads] Error al limpiar archivo temporal:', cleanupError);
             }
-          } catch (error) {
-            res.status(502).json({ error: { code: 'FILE_PROCESSING_ERROR', message: error instanceof Error ? error.message : 'No se pudo limpiar la documentación temporal.' } });
-            return;
           }
         }
       }

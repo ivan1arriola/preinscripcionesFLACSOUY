@@ -41,8 +41,8 @@ describe('Submission HTTP Routes', () => {
       posgradoCual: '',
       orientacion: 'Educación',
       mencion: 'Tecnología Educativa',
-      titulo: 'Profesora de Historia',
-      escolaridad: 'Escolaridad completa',
+      tituloDenominacion: 'Profesora de Historia',
+      sinTituloActual: 'No',
       institucion: 'Universidad de la República',
     },
     files: [

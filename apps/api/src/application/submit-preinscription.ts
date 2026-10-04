@@ -9,6 +9,7 @@ import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import type { SubmissionFileToken } from '@flacso/contracts';
 
 export interface SubmitPreinscriptionCommand {
+  clientSubmissionId?: string;
   targetId: string;
   configRevision: string;
   values: Record<string, string>;
@@ -121,7 +122,8 @@ export async function submitPreinscription(
 
   // 5. Persist submission
   const normalizedValues = normalizeIdentityValues(command.values);
-  const saved = await repository.save({
+  const saved = await repository.saveOrGet({
+    clientSubmissionId: command.clientSubmissionId,
     targetId: target.id,
     configRevision: form.effectiveRevision,
     targetTitle: target.title,

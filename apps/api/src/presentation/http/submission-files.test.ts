@@ -55,9 +55,8 @@ const values = {
   aceptaDifusion: 'No',
   estudios: 'Licenciatura',
   posgradoFlacso: 'No',
-  posgradoCual: '',
-  titulo: 'Licenciatura',
-  escolaridad: 'Completa',
+  tituloDenominacion: 'Licenciatura',
+  sinTituloActual: 'No',
   institucion: 'UdelaR',
 };
 
@@ -218,4 +217,26 @@ describe('Submission file orchestration', () => {
     } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
 
+  it('does not fail submission if cleanup fails after Drive and Sheets succeed', async () => {
+    const drive: GoogleDriveRepositoryPort = {
+      storeSubmissionFiles: async () => testFiles.map((f, i) => ({ token: f.token, driveFileId: `drive-${i + 1}` })),
+    };
+    const spreadsheet: SpreadsheetRepository = {
+      readHeaders: async () => [],
+      appendByHeaders: async () => ({ spreadsheetId: 'sheet-1', updatedRange: 'Inscripciones!A2:Z2', updatedRows: 1 }),
+      diagnose: async () => ({ spreadsheetId: 'sheet-1', accessible: true, sheetFound: true, headerDiagnostic: { valid: true, foundColumns: [], missingColumns: [], extraColumns: [] } }),
+    };
+    const { app, storage, effectiveRevision } = await setup(drive, spreadsheet);
+    storage.remove = async () => { throw new Error('Disco de uploads bloqueado'); };
+    const server = app.listen(0);
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('server address missing');
+    try {
+      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
+        body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
+      });
+      expect(response.status).toBe(201);
+    } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
+  });
 });
