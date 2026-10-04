@@ -279,7 +279,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
           </div>
         )}
 
-        <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+        <div className="wizard-navigation flex justify-between items-center pt-4 border-t border-gray-200">
           <button
             type="button"
             onClick={handleBack}
@@ -287,7 +287,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
             className={`px-4 py-2 text-sm font-medium rounded-md border ${
               currentStepIndex === 0
                 ? 'invisible'
-                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                : 'wizard-secondary-action border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             ← Anterior
@@ -298,7 +298,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
               type="button"
               onClick={handleNext}
               disabled={isSubmitting || !form.registrationOpen}
-              className="px-6 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
+              className="wizard-primary-action px-6 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
             >
               Siguiente →
             </button>
@@ -307,7 +307,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
               type="button"
               onClick={handleFinalSubmit}
               disabled={isSubmitting || !form.registrationOpen}
-              className="px-6 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 shadow-sm transition-colors"
+              className="wizard-submit-action px-6 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 shadow-sm transition-colors"
             >
               {isSubmitting ? 'Enviando preinscripción…' : 'Confirmar y Enviar'}
             </button>

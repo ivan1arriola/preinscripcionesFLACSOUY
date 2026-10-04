@@ -22,5 +22,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
+    // The wizard exercises a full multi-step upload flow and can exceed Vitest's
+    // 5s default when web and API suites run concurrently in CI.
+    testTimeout: 15_000,
   },
 });

@@ -127,18 +127,19 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="target-page space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center">
         <button
           type="button"
           onClick={onBack}
-          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+          className="target-back-link text-sm text-blue-600 hover:underline flex items-center gap-1"
         >
           &larr; Volver al listado
         </button>
       </div>
 
-      <div>
+      <div className="target-page-heading">
+        <span className="target-page-eyebrow">Preinscripción</span>
         <h2 className="text-2xl font-bold text-gray-900">{form.title}</h2>
         <p className="text-gray-600 text-sm mt-1">
           Complete los campos solicitados a continuación para registrar su preinscripción.

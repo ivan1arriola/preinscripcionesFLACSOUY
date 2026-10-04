@@ -132,14 +132,19 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="app-shell min-h-screen bg-gray-50 flex flex-col">
+      <header className="app-header">
+        <div className="app-header-content max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div
-            className="flex items-center space-x-3 cursor-pointer"
+            className="app-brand flex items-center space-x-3 cursor-pointer"
             onClick={handleGoHome}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') handleGoHome();
+            }}
           >
-            <div className="w-8 h-8 rounded bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
+            <div className="app-brand-mark w-8 h-8 rounded bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
               F
             </div>
             <div>
@@ -153,7 +158,7 @@ export function App() {
               <button
                 type="button"
                 onClick={handleGoHome}
-                className="text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded px-2.5 py-1.5"
+                className="app-header-action"
               >
                 Volver al inicio
               </button>
@@ -164,7 +169,7 @@ export function App() {
                   window.history.pushState({}, '', '/admin/perfiles');
                   setPath('/admin/perfiles/');
                 }}
-                className="text-xs text-gray-600 hover:text-gray-900 border border-gray-300 rounded px-2.5 py-1.5"
+                className="app-header-action"
               >
                 Administración
               </button>
@@ -173,7 +178,7 @@ export function App() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
+      <main className="app-main flex-1 max-w-5xl w-full mx-auto px-4 py-8">
         {isAdminPath(path) ? (
           isAdminChecking ? (
             <div className="text-center py-12">
@@ -212,7 +217,7 @@ export function App() {
         )}
       </main>
 
-      <footer className="bg-white border-t mt-auto py-4 text-center text-xs text-gray-500">
+      <footer className="app-footer bg-white border-t mt-auto py-4 text-center text-xs text-gray-500">
         &copy; {new Date().getFullYear()} FLACSO Uruguay &middot; Plataforma de Preinscripciones
       </footer>
     </div>

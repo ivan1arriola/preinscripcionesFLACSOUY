@@ -18,7 +18,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
           <div
             key={target.id}
             data-testid={`target-card-${target.id}`}
-            className="border rounded-lg p-5 bg-white shadow-sm hover:shadow transition"
+            className="target-list-card border rounded-lg p-5 bg-white shadow-sm hover:shadow transition"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -71,7 +71,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
                 <button
                   type="button"
                   onClick={() => onSelectTarget(target)}
-                  className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 font-medium"
+                  className="target-card-primary-action px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 font-medium"
                 >
                   {isOperational ? 'Completar preinscripción' : 'Ver información del destino'}
                 </button>
@@ -82,7 +82,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
                   href={target.urls.public}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-sm text-blue-600 hover:underline"
+                  className="target-card-secondary-action text-sm text-blue-600 hover:underline"
                 >
                   Ver programa en web &rarr;
                 </a>

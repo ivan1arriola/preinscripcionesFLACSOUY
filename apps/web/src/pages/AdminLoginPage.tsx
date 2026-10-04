@@ -51,29 +51,33 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
   };
 
   return (
-    <div className="max-w-md mx-auto my-12 bg-white p-8 rounded-xl shadow-md border border-gray-100 text-center">
-      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-blue-700">
-        🔐
-      </div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Acceso Administrativo</h1>
-      <p className="text-sm text-gray-600 mb-6">
-        Acceso exclusivo institucional (@flacso.edu.uy) para la gestión de perfiles de formulario.
-      </p>
-
-      {error && (
-        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm text-left">
-          <strong>Acceso denegado:</strong> {error}
+    <section className="admin-login-page" aria-labelledby="admin-login-title">
+      <div className="admin-login-card">
+        <span className="admin-login-eyebrow">Área institucional</span>
+        <div className="admin-login-lock" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="5" y="10" width="14" height="10" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
         </div>
-      )}
+        <h1 id="admin-login-title" className="admin-login-title">Acceso Administrativo</h1>
+        <p className="admin-login-intro">
+        Acceso exclusivo institucional (@flacso.edu.uy) para la gestión de perfiles de formulario.
+        </p>
 
-      <div className="space-y-4">
+        {error && (
+          <div className="admin-login-error" role="alert">
+            <strong>Acceso denegado:</strong> {error}
+          </div>
+        )}
+
         <button
           type="button"
           onClick={handleGoogleLogin}
           disabled={loading}
-          className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+          className="google-sign-in-button"
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
+          <svg className="google-sign-in-mark" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
             <path
               fill="#4285F4"
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -94,10 +98,10 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
           {loading ? 'Verificando autorización…' : 'Iniciar sesión con Google (FLACSO)'}
         </button>
 
-        <p className="text-xs text-gray-500 mt-4">
+        <p className="admin-login-note">
           Solo cuentas institucionales autorizadas (<code>web@flacso.edu.uy</code>) tienen acceso de edición.
         </p>
       </div>
-    </div>
+    </section>
   );
 };

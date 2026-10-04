@@ -125,10 +125,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
     if (groupTargets.length === 0) return null;
 
     return (
-      <details key={key} data-testid={`offer-group-${key}`} className="group rounded-xl border border-gray-200 bg-white shadow-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold text-gray-900 marker:content-none">
+      <details key={key} data-testid={`offer-group-${key}`} className="catalog-group group rounded-xl border border-gray-200 bg-white shadow-sm">
+        <summary className="catalog-group-summary flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-semibold text-gray-900 marker:content-none">
           <span className="flex items-center gap-3">
-            <span className="text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span>
+            <span className="catalog-group-chevron text-gray-400 transition-transform group-open:rotate-90" aria-hidden="true">›</span>
             {title}
           </span>
           <span className="text-sm font-normal text-gray-500">{groupTargets.length} propuesta{groupTargets.length === 1 ? '' : 's'}</span>
@@ -141,8 +141,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
   };
 
   const renderSection = (title: string, description: string, sectionTargets: DiagnosticTarget[], sectionId: string, groupId: string) => (
-    <section aria-labelledby={sectionId} className="space-y-4">
-      <div className="border-b border-gray-200 pb-3">
+    <section aria-labelledby={sectionId} className="catalog-section space-y-4">
+      <div className="catalog-section-heading border-b border-gray-200 pb-3">
         <div className="flex items-baseline justify-between gap-4">
           <h3 id={sectionId} className="text-xl font-bold text-gray-900">{title}</h3>
           <span className="text-sm text-gray-500">{sectionTargets.length} propuesta{sectionTargets.length === 1 ? '' : 's'}</span>
@@ -159,8 +159,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
   );
 
   return (
-    <div>
-      <div className="mb-6">
+    <div className="home-page">
+      <div className="home-hero mb-6">
+        <span className="home-eyebrow">Formación FLACSO Uruguay</span>
         <h2 className="text-2xl font-bold text-gray-900">Preinscripciones FLACSO Uruguay</h2>
         <p className="text-gray-600 mt-1">
           Seleccione una propuesta académica o seminario para iniciar su preinscripción.
