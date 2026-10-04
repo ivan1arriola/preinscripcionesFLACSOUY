@@ -100,7 +100,7 @@ export async function submitPreinscription(
   const form = composition.value;
 
   // 4. Validate values & revision
-  const validation = validateSubmission(form, command.values, command.configRevision);
+  const validation = validateSubmission(form, command.values, command.configRevision, command.files);
   if (!validation.valid) {
     if (validation.fieldErrors._form) {
       return {
@@ -117,18 +117,6 @@ export async function submitPreinscription(
       message: 'Existen errores de validación en los campos enviados.',
       fieldErrors: validation.fieldErrors,
     };
-  }
-
-  const providedFileFields = new Set((command.files ?? []).map((file) => file.fieldKey));
-  for (const document of form.documents ?? []) {
-    if (document.required && !providedFileFields.has(document.key) && !document.canDefer) {
-      return {
-        ok: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Faltan documentos obligatorios para completar la preinscripción.',
-        fieldErrors: { [document.key]: [`El documento ${document.label} es obligatorio.`] },
-      };
-    }
   }
 
   // 5. Persist submission

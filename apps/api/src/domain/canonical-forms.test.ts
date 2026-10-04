@@ -53,13 +53,15 @@ describe('Canonical Forms Specification', () => {
     expect(form.documents.every((d) => d.canDefer === false)).toBe(true);
     expect(form.recommendationLettersCount).toBe(0);
 
-    // Inputs check: includes ciudadResidencia, excludes full street domicilio
+    // Inputs check: includes ciudadResidencia and tituloDenominacion, excludes escolaridad and full street domicilio
     const inputKeys = form.inputs.map((i) => i.key);
     expect(inputKeys).toContain('ciudadResidencia');
+    expect(inputKeys).toContain('tituloDenominacion');
+    expect(inputKeys).not.toContain('escolaridad');
     expect(inputKeys).not.toContain('domicilio');
   });
 
-  it('adds 2 mandatory recommendation letters for maestria', () => {
+  it('adds 2 mandatory recommendation letters for maestria that can be deferred', () => {
     const maestriaTarget: AcademicTarget = {
       ...baseTarget,
       id: 'maestria-genero',
@@ -81,9 +83,41 @@ describe('Canonical Forms Specification', () => {
       'cartaRecomendacion1',
       'cartaRecomendacion2',
     ]);
-    expect(form.documents.find((d) => d.key === 'cartaRecomendacion1')?.required).toBe(true);
-    expect(form.documents.find((d) => d.key === 'cartaRecomendacion2')?.required).toBe(true);
+    const rec1 = form.documents.find((d) => d.key === 'cartaRecomendacion1');
+    const rec2 = form.documents.find((d) => d.key === 'cartaRecomendacion2');
+    expect(rec1?.required).toBe(true);
+    expect(rec1?.canDefer).toBe(true);
+    expect(rec2?.required).toBe(true);
+    expect(rec2?.canDefer).toBe(true);
     expect(form.recommendationLettersCount).toBe(2);
+
+    const inputKeys = form.inputs.map((i) => i.key);
+    expect(inputKeys).toContain('cartaRecomendacion1Pendiente');
+    expect(inputKeys).toContain('cartaRecomendacion2Pendiente');
+  });
+
+  it('canonicalDocumentsForSeminarExcludeLetters: seminar form excludes motivation and recommendations', () => {
+    const seminarTarget: AcademicTarget = {
+      id: 'seminar-test',
+      kind: 'seminar',
+      title: 'Seminario Internacional',
+      registrationOpen: true,
+      configRevision: 'sem-100',
+      orientations: [],
+      mentions: [],
+    };
+
+    const result = getCanonicalFormDefinition(seminarTarget);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const form = result.value;
+    const docKeys = form.documents.map((d) => d.key);
+    expect(docKeys).toEqual(['identidad', 'cv', 'titulo']);
+    expect(docKeys).not.toContain('cartaMotivacion');
+    expect(docKeys).not.toContain('cartaRecomendacion1');
+    expect(docKeys).not.toContain('cartaRecomendacion2');
+    expect(form.recommendationLettersCount).toBe(0);
   });
 
   it('includes orientations and mentions only when present in WordPress target', () => {

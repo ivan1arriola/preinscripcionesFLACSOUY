@@ -53,8 +53,10 @@ describe('submitPreinscription Use Case', () => {
     posgradoCual: '',
     orientacion: 'Educación',
     mencion: 'Tecnología Educativa',
-    titulo: 'Licenciada en Ciencias de la Educación',
-    escolaridad: 'Escolaridad completa',
+    sinTituloActual: 'No',
+    tituloDenominacion: 'Licenciada en Ciencias de la Educación',
+    cartaRecomendacion1Pendiente: 'No',
+    cartaRecomendacion2Pendiente: 'No',
     institucion: 'Universidad de la República',
   };
 

@@ -8,6 +8,13 @@ export interface FormStepDefinition {
   description?: string;
 }
 
+export interface DocumentAlternative {
+  kind: 'absence' | 'defer';
+  valueKey: string;
+  activeValue: 'Si';
+  label: string;
+}
+
 export interface DocumentDefinition {
   key: string;
   label: string;
@@ -18,6 +25,8 @@ export interface DocumentDefinition {
   maxBytes?: number;
   acceptedMimeTypes?: string[];
   canDefer?: boolean;
+  companionInputKey?: string;
+  alternative?: DocumentAlternative;
 }
 
 export interface RegistrationWindow {

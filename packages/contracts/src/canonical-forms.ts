@@ -43,9 +43,11 @@ export const CANONICAL_BASE_INPUTS: Array<Omit<InputDefinition, 'position'>> = [
   { key: 'estudios', label: 'Estudios cursados', type: 'textarea', required: true, stepId: 'academico', spreadsheetColumn: 'Estudios cursados' },
   { key: 'posgradoFlacso', label: '¿Cursaste algún posgrado en FLACSO?', type: 'select', required: true, stepId: 'academico', spreadsheetColumn: '¿Cursó posgrado en FLACSO?' },
   { key: 'posgradoCual', label: '¿Cuál posgrado?', type: 'text', required: false, stepId: 'academico', spreadsheetColumn: 'Cuál posgrado' },
-  { key: 'titulo', label: 'Título', type: 'text', required: true, stepId: 'academico', spreadsheetColumn: 'Título' },
-  { key: 'escolaridad', label: 'Escolaridad', type: 'text', required: true, stepId: 'academico', spreadsheetColumn: 'Escolaridad' },
   { key: 'institucion', label: 'Institución', type: 'text', required: false, stepId: 'academico', spreadsheetColumn: 'Institución' },
+
+  // Step 4: Documentación requerida
+  { key: 'tituloDenominacion', label: 'Denominación del título', type: 'text', required: false, stepId: 'documentos', spreadsheetColumn: 'Denominación del título' },
+  { key: 'sinTituloActual', label: 'No poseo actualmente título', type: 'checkbox', required: false, stepId: 'documentos', spreadsheetColumn: 'No posee actualmente título' },
 
   // Step 5: Convenios y declaraciones
   { key: 'tieneConvenio', label: '¿Te corresponde algún convenio?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: '¿Te corresponde algún convenio?' },
@@ -54,7 +56,7 @@ export const CANONICAL_BASE_INPUTS: Array<Omit<InputDefinition, 'position'>> = [
   { key: 'aceptaDifusion', label: '¿Autorizás la difusión de tu nombre y foto para esta propuesta?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: 'Autoriza difusión' },
 ];
 
-export const CANONICAL_BASE_DOCUMENTS: DocumentDefinition[] = [
+export const CANONICAL_CORE_DOCUMENTS: DocumentDefinition[] = [
   {
     key: 'identidad',
     label: 'Documento de identidad',
@@ -79,7 +81,7 @@ export const CANONICAL_BASE_DOCUMENTS: DocumentDefinition[] = [
   },
   {
     key: 'titulo',
-    label: 'Título',
+    label: 'Título de grado o terciario',
     required: true,
     canDefer: false,
     maxFiles: 1,
@@ -87,18 +89,31 @@ export const CANONICAL_BASE_DOCUMENTS: DocumentDefinition[] = [
     acceptedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
     stepId: 'documentos',
     position: 3,
+    companionInputKey: 'tituloDenominacion',
+    alternative: {
+      kind: 'absence',
+      valueKey: 'sinTituloActual',
+      activeValue: 'Si',
+      label: 'No poseo actualmente título',
+    },
   },
-  {
-    key: 'cartaMotivacion',
-    label: 'Carta de motivación',
-    required: true,
-    canDefer: false,
-    maxFiles: 1,
-    maxBytes: 10 * 1024 * 1024,
-    acceptedMimeTypes: ['application/pdf'],
-    stepId: 'documentos',
-    position: 4,
-  },
+];
+
+export const MOTIVATION_DOCUMENT: DocumentDefinition = {
+  key: 'cartaMotivacion',
+  label: 'Carta de motivación',
+  required: true,
+  canDefer: false,
+  maxFiles: 1,
+  maxBytes: 10 * 1024 * 1024,
+  acceptedMimeTypes: ['application/pdf'],
+  stepId: 'documentos',
+  position: 4,
+};
+
+export const CANONICAL_BASE_DOCUMENTS: DocumentDefinition[] = [
+  ...CANONICAL_CORE_DOCUMENTS,
+  MOTIVATION_DOCUMENT,
 ];
 
 export const MAESTRIA_EXTRA_DOCUMENTS: DocumentDefinition[] = [
@@ -106,23 +121,35 @@ export const MAESTRIA_EXTRA_DOCUMENTS: DocumentDefinition[] = [
     key: 'cartaRecomendacion1',
     label: 'Primera carta de recomendación',
     required: true,
-    canDefer: false,
+    canDefer: true,
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
     acceptedMimeTypes: ['application/pdf'],
     stepId: 'documentos',
     position: 5,
+    alternative: {
+      kind: 'defer',
+      valueKey: 'cartaRecomendacion1Pendiente',
+      activeValue: 'Si',
+      label: 'Adjuntar posteriormente',
+    },
   },
   {
     key: 'cartaRecomendacion2',
     label: 'Segunda carta de recomendación',
     required: true,
-    canDefer: false,
+    canDefer: true,
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
     acceptedMimeTypes: ['application/pdf'],
     stepId: 'documentos',
     position: 6,
+    alternative: {
+      kind: 'defer',
+      valueKey: 'cartaRecomendacion2Pendiente',
+      activeValue: 'Si',
+      label: 'Adjuntar posteriormente',
+    },
   },
 ];
 
@@ -205,6 +232,27 @@ export function getCanonicalFormDefinition(
       });
     }
 
+    if (base.stepId === 'declaracion' && inputs.every((i) => i.key !== 'cartaRecomendacion1Pendiente') && offerType === 'maestria') {
+      inputs.push({
+        key: 'cartaRecomendacion1Pendiente',
+        label: 'Carta de recomendación 1 pendiente',
+        type: 'checkbox',
+        required: false,
+        position: position++,
+        stepId: 'documentos',
+        spreadsheetColumn: 'Carta de recomendación 1 pendiente',
+      });
+      inputs.push({
+        key: 'cartaRecomendacion2Pendiente',
+        label: 'Carta de recomendación 2 pendiente',
+        type: 'checkbox',
+        required: false,
+        position: position++,
+        stepId: 'documentos',
+        spreadsheetColumn: 'Carta de recomendación 2 pendiente',
+      });
+    }
+
     inputs.push({
       ...base,
       position: position++,
@@ -212,10 +260,18 @@ export function getCanonicalFormDefinition(
   }
 
   // Compose documents
+  const isSeminar = target.kind === 'seminar' || offerType === 'seminar';
   const isMaestria = offerType === 'maestria';
-  const documents: DocumentDefinition[] = isMaestria
+  const rawDocuments: DocumentDefinition[] = isSeminar
+    ? [...CANONICAL_CORE_DOCUMENTS]
+    : isMaestria
     ? [...CANONICAL_BASE_DOCUMENTS, ...MAESTRIA_EXTRA_DOCUMENTS]
     : [...CANONICAL_BASE_DOCUMENTS];
+
+  const documents: DocumentDefinition[] = rawDocuments.map((doc, idx) => ({
+    ...doc,
+    position: idx + 1,
+  }));
 
   return {
     ok: true,

@@ -1,4 +1,4 @@
-import type { FormDefinition, ValidationResult } from '@flacso/contracts';
+import type { FormDefinition, SubmissionFileToken, ValidationResult } from '@flacso/contracts';
 import { isValidUruguayanCedula, normalizePhoneToE164 } from './identity-validation.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -12,7 +12,8 @@ const YES_NO_VALUES = new Set(['Si', 'No']);
 export function validateSubmission(
   form: FormDefinition,
   values: Record<string, string>,
-  submittedRevision?: string
+  submittedRevision?: string,
+  files?: SubmissionFileToken[] | string[]
 ): ValidationResult {
   const fieldErrors: Record<string, string[]> = {};
 
@@ -31,6 +32,13 @@ export function validateSubmission(
 
   // 2. Validate input fields
   for (const input of form.inputs) {
+    if (input.key === 'tituloDenominacion' || input.key === 'sinTituloActual') {
+      continue;
+    }
+    if (input.key === 'cartaRecomendacion1Pendiente' || input.key === 'cartaRecomendacion2Pendiente') {
+      continue;
+    }
+
     const rawVal = values[input.key];
     const val = rawVal !== undefined ? rawVal.trim() : '';
 
@@ -126,6 +134,71 @@ export function validateSubmission(
   }
   if (posgradoFlacso === 'Si' && !values.posgradoCual?.trim()) {
     addError('posgradoCual', 'Indicá cuál posgrado cursaste en FLACSO.');
+  }
+
+  const sinTituloActual = values.sinTituloActual?.trim();
+  if (sinTituloActual && !YES_NO_VALUES.has(sinTituloActual)) {
+    addError('sinTituloActual', 'La respuesta sobre posesión de título no es válida.');
+  }
+
+  const rec1Pendiente = values.cartaRecomendacion1Pendiente?.trim();
+  if (rec1Pendiente && !YES_NO_VALUES.has(rec1Pendiente)) {
+    addError('cartaRecomendacion1Pendiente', 'La respuesta sobre carta de recomendación no es válida.');
+  }
+
+  const rec2Pendiente = values.cartaRecomendacion2Pendiente?.trim();
+  if (rec2Pendiente && !YES_NO_VALUES.has(rec2Pendiente)) {
+    addError('cartaRecomendacion2Pendiente', 'La respuesta sobre carta de recomendación no es válida.');
+  }
+
+  const providedFileKeys = files !== undefined
+    ? new Set(
+        files.map((file) => (typeof file === 'string' ? file : file.fieldKey))
+      )
+    : undefined;
+
+  const hasTituloDoc = (form.documents ?? []).some((d) => d.key === 'titulo');
+  if (hasTituloDoc) {
+    const isSinTitulo = sinTituloActual === 'Si';
+    const tituloDenominacion = values.tituloDenominacion?.trim() ?? '';
+
+    if (isSinTitulo) {
+      if (tituloDenominacion.length > 0) {
+        addError('tituloDenominacion', 'No debes ingresar denominación si declaraste no poseer título.');
+      }
+      if (providedFileKeys && providedFileKeys.has('titulo')) {
+        addError('titulo', 'No debes adjuntar el título si declaraste no poseer título.');
+      }
+    } else {
+      if (tituloDenominacion.length === 0) {
+        addError('tituloDenominacion', 'El campo Denominación del título es obligatorio.');
+      }
+      if (providedFileKeys && !providedFileKeys.has('titulo')) {
+        addError('titulo', 'El documento Título de grado o terciario es obligatorio.');
+      }
+    }
+  }
+
+  for (const doc of form.documents ?? []) {
+    if (doc.key === 'titulo') continue;
+
+    if (doc.key === 'cartaRecomendacion1' || doc.key === 'cartaRecomendacion2') {
+      const isPending = values[`${doc.key}Pendiente`]?.trim() === 'Si';
+      if (isPending) {
+        if (providedFileKeys && providedFileKeys.has(doc.key)) {
+          addError(doc.key, 'No debes adjuntar la carta de recomendación si indicaste que la entregarás posteriormente.');
+        }
+      } else {
+        if (providedFileKeys && !providedFileKeys.has(doc.key)) {
+          addError(doc.key, `El documento ${doc.label} es obligatorio.`);
+        }
+      }
+      continue;
+    }
+
+    if (providedFileKeys && doc.required && !doc.canDefer && !providedFileKeys.has(doc.key)) {
+      addError(doc.key, `El documento ${doc.label} es obligatorio.`);
+    }
   }
 
   const valid = Object.keys(fieldErrors).length === 0;
