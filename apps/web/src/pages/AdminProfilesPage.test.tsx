@@ -10,8 +10,15 @@ vi.mock('../api/client.js', async () => {
     apiClient: {
       getAdminMe: vi.fn(),
       adminLogout: vi.fn(),
-      getDriveStatus: vi.fn().mockResolvedValue({ operational: true, activeFolderId: 'folder-1' }),
-      getTargetSpreadsheetStatus: vi.fn().mockResolvedValue({ totalTargets: 0, configuredTargets: 0, items: [] }),
+      getAdminSettings: vi.fn().mockResolvedValue({
+        googleDriveFolderId: 'folder-1',
+        googleDriveFolderName: 'Preinscripciones',
+        googleDriveCanAddChildren: true,
+        serviceAccountEmail: 'pre@flacso.iam.gserviceaccount.com',
+        updatedAt: null,
+        updatedBy: null,
+      }),
+      getAdminSpreadsheets: vi.fn().mockResolvedValue({ targets: [] }),
       getAdminEmailSettings: vi.fn().mockResolvedValue({
         enabled: true,
         configured: true,
@@ -50,8 +57,15 @@ describe('AdminProfilesPage Component', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(apiClient.getDriveStatus).mockResolvedValue({ operational: true, activeFolderId: 'folder-1' } as any);
-    vi.mocked(apiClient.getTargetSpreadsheetStatus).mockResolvedValue({ totalTargets: 0, configuredTargets: 0, items: [] } as any);
+    vi.mocked(apiClient.getAdminSettings).mockResolvedValue({
+      googleDriveFolderId: 'folder-1',
+      googleDriveFolderName: 'Preinscripciones',
+      googleDriveCanAddChildren: true,
+      serviceAccountEmail: 'pre@flacso.iam.gserviceaccount.com',
+      updatedAt: null,
+      updatedBy: null,
+    });
+    vi.mocked(apiClient.getAdminSpreadsheets).mockResolvedValue({ targets: [] });
     vi.mocked(apiClient.getAdminEmailSettings).mockResolvedValue({
       enabled: true,
       configured: true,
