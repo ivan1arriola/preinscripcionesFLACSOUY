@@ -152,6 +152,7 @@ describe('WordPress Client & Contract Adapter', () => {
       json: async () => [
         { id: 42, title: { rendered: 'Convenio Universidad de la República' } },
         { id: 67, title: { rendered: 'Convenio ANEP' } },
+        { id: 89, title: { rendered: 'Antígona &#8211; Asociación Civil' } },
       ],
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -161,6 +162,7 @@ describe('WordPress Client & Contract Adapter', () => {
     await expect(client.getAgreements()).resolves.toEqual([
       { id: '42', label: 'Convenio Universidad de la República' },
       { id: '67', label: 'Convenio ANEP' },
+      { id: '89', label: 'Antígona – Asociación Civil' },
     ]);
     expect(fetchMock).toHaveBeenCalledWith(
       'https://flacso.edu.uy/wp-json/wp/v2/convenio?per_page=100&_fields=id,title',

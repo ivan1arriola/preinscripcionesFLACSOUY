@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { decodeHtmlEntities } from './html-entities.js';
 
 export class WordPressClientError extends Error {
   constructor(message: string, public readonly statusCode?: number) {
@@ -167,7 +168,7 @@ export class WordPressClient {
     }
 
     return parsed.data
-      .map((agreement) => ({ id: String(agreement.id), label: agreement.title.rendered.trim() }))
+      .map((agreement) => ({ id: String(agreement.id), label: decodeHtmlEntities(agreement.title.rendered).trim() }))
       .filter((agreement) => agreement.label.length > 0);
   }
 }
