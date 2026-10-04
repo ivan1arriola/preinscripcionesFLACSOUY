@@ -19,6 +19,8 @@ import { loadAllGoogleCredentials } from './infrastructure/google/google-credent
 import { GoogleIdentityVerifier } from './infrastructure/auth/google-oidc.js';
 import { PostgresTargetSpreadsheetRepository } from './infrastructure/database/postgres-target-spreadsheet-repository.js';
 import { TargetSpreadsheetService } from './application/target-spreadsheet-service.js';
+import { PostgresAdminSessionStore } from './infrastructure/database/postgres-admin-session-store.js';
+import { getAdminSessionTtlMs } from './application/admin-session.js';
 
 
 const port = Number(process.env.PORT || 3000);
@@ -130,6 +132,8 @@ try {
   console.warn('Could not run migrations on startup (database might be initializing or degraded):', err);
 }
 
+const adminSessionStore = new PostgresAdminSessionStore(db, getAdminSessionTtlMs());
+
 const app = createApp({
   catalog,
   repository,
@@ -140,6 +144,7 @@ const app = createApp({
   targetSpreadsheetRepository,
   formProfileRepository,
   googleIdentityVerifier,
+  adminSessionStore,
   systemSettingsRepository,
   serviceAccountEmail: googleCreds.clientEmail,
   checkDatabase: checkDb,

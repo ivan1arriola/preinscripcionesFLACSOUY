@@ -10,9 +10,21 @@ export const getAllowedAdminEmails = (): string[] => {
   return ['web@flacso.edu.uy'];
 };
 
+export const getAdminSessionTtlMs = (): number => {
+  const envVal = process.env.ADMIN_SESSION_TTL_MINUTES;
+  if (envVal) {
+    const mins = parseInt(envVal, 10);
+    if (!isNaN(mins) && mins > 0) {
+      // Ensure at least 15 minutes of session persistence
+      return Math.max(15, mins) * 60 * 1000;
+    }
+  }
+  // Default: 12 hours (720 minutes, >= 15 min)
+  return 12 * 60 * 60 * 1000;
+};
+
 export const ALLOWED_ADMIN_EMAIL = 'web@flacso.edu.uy';
 export const ADMIN_SESSION_COOKIE = 'flacso_admin_session';
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 export interface AdminSession {
   id: string;
@@ -26,10 +38,13 @@ export interface AdminSessionStore {
   createSession(user: AdminUser): Promise<AdminSession>;
   getSession(sessionId: string): Promise<AdminSession | null>;
   deleteSession(sessionId: string): Promise<void>;
+  touchSession?(sessionId: string): Promise<Date | null>;
 }
 
 export class MemoryAdminSessionStore implements AdminSessionStore {
   private readonly sessions = new Map<string, AdminSession>();
+
+  constructor(private readonly ttlMs: number = getAdminSessionTtlMs()) {}
 
   async createSession(user: AdminUser): Promise<AdminSession> {
     const id = `sess_${crypto.randomBytes(32).toString('hex')}`;
@@ -40,7 +55,7 @@ export class MemoryAdminSessionStore implements AdminSessionStore {
       user,
       csrfToken,
       createdAt: now,
-      expiresAt: new Date(now.getTime() + SESSION_TTL_MS),
+      expiresAt: new Date(now.getTime() + this.ttlMs),
     };
     this.sessions.set(id, session);
     return session;
@@ -54,6 +69,18 @@ export class MemoryAdminSessionStore implements AdminSessionStore {
       return null;
     }
     return session;
+  }
+
+  async touchSession(sessionId: string): Promise<Date | null> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    const now = new Date();
+    if (session.expiresAt.getTime() <= now.getTime()) {
+      this.sessions.delete(sessionId);
+      return null;
+    }
+    session.expiresAt = new Date(now.getTime() + this.ttlMs);
+    return session.expiresAt;
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -102,6 +129,10 @@ export function createRequireAdminSession(sessionStore: AdminSessionStore) {
         },
       });
       return;
+    }
+
+    if (sessionStore.touchSession) {
+      await sessionStore.touchSession(sessionId);
     }
 
     // CSRF check for state mutations

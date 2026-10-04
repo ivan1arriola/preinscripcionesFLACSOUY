@@ -6,6 +6,7 @@ import * as completeFormSubmissionsSchema from './migrations/004_complete_form_s
 import * as submissionFilesSchema from './migrations/005_submission_files.js';
 import * as formProfilesAndAdminAuthSchema from './migrations/006_form_profiles_and_admin_auth.js';
 import * as systemSettingsSchema from './migrations/007_system_settings.js';
+import * as adminSessionsSchema from './migrations/008_admin_sessions.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -16,6 +17,7 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await submissionFilesSchema.up(db);
   await formProfilesAndAdminAuthSchema.up(db);
   await systemSettingsSchema.up(db);
+  await adminSessionsSchema.up(db);
   console.log('Migrations complete.');
 }
 

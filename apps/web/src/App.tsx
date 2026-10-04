@@ -24,12 +24,40 @@ export function App() {
   const [path, setPath] = useState(() => normalizePath(window.location.pathname));
   const [routeError, setRouteError] = useState<string | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isAdminChecking, setIsAdminChecking] = useState(() => isAdminPath(path) && path !== ADMIN_CALLBACK_PATH);
 
   useEffect(() => {
     const onPopState = () => setPath(normalizePath(window.location.pathname));
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
+
+  useEffect(() => {
+    if (!isAdminPath(path) || path === ADMIN_CALLBACK_PATH || isAdminLoggedIn) {
+      setIsAdminChecking(false);
+      return;
+    }
+
+    let active = true;
+    setIsAdminChecking(true);
+
+    apiClient
+      .getAdminMe()
+      .then(() => {
+        if (!active) return;
+        setIsAdminLoggedIn(true);
+        setIsAdminChecking(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setIsAdminLoggedIn(false);
+        setIsAdminChecking(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [path, isAdminLoggedIn]);
 
   useEffect(() => {
     if (isAdminPath(path)) {
@@ -147,7 +175,11 @@ export function App() {
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
         {isAdminPath(path) ? (
-          isAdminLoggedIn ? (
+          isAdminChecking ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Verificando sesión administrativa...</p>
+            </div>
+          ) : isAdminLoggedIn ? (
             <AdminProfilesPage
               onRequireLogin={() => setIsAdminLoggedIn(false)}
               onLogout={() => {

@@ -143,6 +143,16 @@ export interface FormProfileAuditEventsTable {
   created_at: Generated<Date>;
 }
 
+export interface AdminSessionsTable {
+  id: string;
+  user_id: string;
+  email: string;
+  user_data: unknown;
+  csrf_token: string;
+  created_at: Generated<Date>;
+  expires_at: Date;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -158,6 +168,7 @@ export interface DatabaseSchema {
   target_spreadsheets: TargetSpreadsheetsTable;
   spreadsheet_operations: SpreadsheetOperationsTable;
   admin_users: AdminUsersTable;
+  admin_sessions: AdminSessionsTable;
   form_profiles: FormProfilesTable;
   form_profile_versions: FormProfileVersionsTable;
   form_profile_audit_events: FormProfileAuditEventsTable;

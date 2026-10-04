@@ -9,6 +9,7 @@ import {
   ADMIN_SESSION_COOKIE,
   type AdminSessionStore,
   type RequestWithAdminSession,
+  getAdminSessionTtlMs,
 } from '../../application/admin-session.js';
 
 const GoogleAuthPayloadSchema = z.object({
@@ -116,7 +117,7 @@ export function createAdminAuthRoutes(
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 12 * 60 * 60 * 1000,
+        maxAge: getAdminSessionTtlMs(),
       });
 
       res.status(200).json({
@@ -193,6 +194,18 @@ export function createAdminMeRoute(sessionStore: AdminSessionStore): Router {
       res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Sesión expirada.' } });
       return;
     }
+
+    if (sessionStore.touchSession) {
+      await sessionStore.touchSession(sessionId);
+    }
+
+    res.cookie(ADMIN_SESSION_COOKIE, session.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: getAdminSessionTtlMs(),
+    });
 
     res.json({
       user: {

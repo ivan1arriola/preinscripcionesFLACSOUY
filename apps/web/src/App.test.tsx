@@ -12,6 +12,9 @@ vi.mock('./api/client.js', async () => {
       listTargets: vi.fn(),
       getTarget: vi.fn(),
       submit: vi.fn(),
+      getAdminMe: vi.fn(),
+      adminLogin: vi.fn(),
+      adminLogout: vi.fn(),
     },
   };
 });
@@ -48,6 +51,7 @@ describe('App legacy registration routes', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(apiClient.getAdminMe).mockRejectedValue(new Error('Unauthorized'));
     window.history.replaceState({}, '', '/oferta/maestria-en-genero/');
   });
 
@@ -81,6 +85,33 @@ describe('App legacy registration routes', () => {
 
   it('renders the Google OAuth callback as the administrative login route', async () => {
     window.history.replaceState({}, '', '/accounts/google/login/callback/');
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Acceso Administrativo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Iniciar sesión con Google (FLACSO)' })).toBeInTheDocument();
+  });
+
+  it('retains persistent admin login when visiting /admin/perfiles with an active session', async () => {
+    window.history.replaceState({}, '', '/admin/perfiles');
+    vi.mocked(apiClient.getAdminMe).mockResolvedValue({
+      user: {
+        email: 'web@flacso.edu.uy',
+        name: 'Webmaster FLACSO',
+        role: 'admin',
+      },
+      csrfToken: 'csrf-persistent-token',
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('Administración de Preinscripciones')).toBeInTheDocument();
+    expect(screen.getByText('web@flacso.edu.uy')).toBeInTheDocument();
+  });
+
+  it('renders login page when visiting /admin/perfiles with expired or absent session', async () => {
+    window.history.replaceState({}, '', '/admin/perfiles');
+    vi.mocked(apiClient.getAdminMe).mockRejectedValue(new Error('Unauthorized'));
 
     render(<App />);
 
