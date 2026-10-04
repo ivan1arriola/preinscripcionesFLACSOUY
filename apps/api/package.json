@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "db:migrate": "tsx src/infrastructure/database/migrate.ts"
+    "db:migrate": "tsx src/infrastructure/database/migrate.ts",
+    "worker:notifications": "tsx src/worker-notifications.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1146.0",

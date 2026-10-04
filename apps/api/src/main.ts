@@ -23,6 +23,9 @@ import { PostgresAdminSessionStore } from './infrastructure/database/postgres-ad
 import { getAdminSessionTtlMs } from './application/admin-session.js';
 import { EncryptedSettingsService } from './infrastructure/security/encrypted-settings.js';
 import { PostgresEmailNotificationRepository } from './infrastructure/database/postgres-email-notification-repository.js';
+import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
+import { SesEmailProvider, type EmailMessage } from './infrastructure/email/ses-client.js';
+import { loadEmailConfig } from './infrastructure/email/email-config.js';
 
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
@@ -158,6 +161,37 @@ const app = createApp({
   serviceAccountEmail: googleCreds.clientEmail,
   checkDatabase: checkDb,
 });
+
+const notificationDispatcher = new EmailNotificationDispatcher({
+  repository: emailNotificationRepository,
+  getProvider: async () => {
+    try {
+      const emailConfig = await loadEmailConfig(encryptedSettingsService);
+      if (!emailConfig.enabled || emailConfig.provider === 'disabled') {
+        return null;
+      }
+      if (emailConfig.provider === 'fake') {
+        return {
+          send: async (msg: EmailMessage) => {
+            console.log(`[FakeEmailProvider] Simulación de envío a ${msg.to.join(', ')}: ${msg.subject}`);
+            return { providerMessageId: `fake-${Date.now()}` };
+          },
+        };
+      }
+      if (emailConfig.provider === 'ses' && emailConfig.ses) {
+        return new SesEmailProvider(emailConfig.ses);
+      }
+      return null;
+    } catch (err) {
+      console.warn('[Notification Dispatcher] Configuración de correo no disponible:', err instanceof Error ? err.message : err);
+      return null;
+    }
+  },
+});
+
+if (process.env.NODE_ENV !== 'test') {
+  notificationDispatcher.start(30_000);
+}
 
 const cleanupInterval = setInterval(async () => {
   try {

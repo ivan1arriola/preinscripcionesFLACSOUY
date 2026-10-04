@@ -9,6 +9,7 @@ export interface RenderedNotification {
   subject: string;
   text: string;
   html: string;
+  replyTo?: string[];
   tags: Record<string, string>;
 }
 
