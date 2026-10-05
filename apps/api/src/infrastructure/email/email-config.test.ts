@@ -147,6 +147,21 @@ describe('email-config', () => {
       }
     });
 
+    it('does not read any historical SES setting while resolving SMTP', async () => {
+      const repo = new SesReadRejectingRepository({
+        ses_aws_access_key_id: 'historical-access-key',
+        ses_aws_secret_access_key: 'historical-secret-key',
+        ses_region: 'us-east-1',
+        ses_from_email: 'legacy@flacso.edu.uy',
+      });
+      const { service } = await createCompleteSmtpSettings({}, repo);
+
+      const config = await loadEmailConfig(service, { isProduction: true });
+
+      expect(config.provider).toBe('smtp');
+      expect(repo.requestedKeys.filter((key) => key.startsWith('ses_'))).toEqual([]);
+    });
+
     it.each([
       ['host with a protocol', { smtp_host: 'https://email-smtp.us-east-1.amazonaws.com' }],
       ['port outside the valid range', { smtp_port: '65536' }],
@@ -185,6 +200,16 @@ describe('email-config', () => {
 
       await expect(promise).rejects.toThrow(/APP_SETTINGS_ENCRYPTION_KEY/);
       await expect(promise).rejects.not.toThrow(/smtp-secret-password|enc:v1:/);
+    });
+
+    it('reports a safe SMTP configuration failure for corrupted encrypted settings', async () => {
+      const { repo, service } = await createCompleteSmtpSettings();
+      await repo.setSetting('smtp_password', 'enc:v1:corrupted');
+
+      const promise = loadEmailConfig(service, { isProduction: true });
+
+      await expect(promise).rejects.toThrow(/No se pudo cargar la configuración SMTP/);
+      await expect(promise).rejects.not.toThrow(/APP_SETTINGS_ENCRYPTION_KEY|enc:v1:corrupted|smtp-secret-password/);
     });
   });
 
@@ -231,8 +256,10 @@ describe('email-config', () => {
     });
   });
 
-  async function createCompleteSmtpSettings(overrides: Record<string, string> = {}) {
-    const repo = new MemorySystemSettingsRepository();
+  async function createCompleteSmtpSettings(
+    overrides: Record<string, string> = {},
+    repo: MemorySystemSettingsRepository = new MemorySystemSettingsRepository(),
+  ) {
     const service = new EncryptedSettingsService(repo, masterKey);
     const values = {
       email_notifications_enabled: 'true',
@@ -259,3 +286,15 @@ describe('email-config', () => {
     return { repo, service };
   }
 });
+
+class SesReadRejectingRepository extends MemorySystemSettingsRepository {
+  readonly requestedKeys: string[] = [];
+
+  override async getSetting(key: string): Promise<string | null> {
+    this.requestedKeys.push(key);
+    if (key.startsWith('ses_')) {
+      throw new Error('Las claves SES históricas no deben leerse.');
+    }
+    return super.getSetting(key);
+  }
+}

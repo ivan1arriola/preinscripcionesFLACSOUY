@@ -168,6 +168,13 @@ function normalizeSmtpSecurity(value: string | null): SmtpSecurity | undefined {
   return normalized === 'starttls' || normalized === 'tls' ? normalized : undefined;
 }
 
+function smtpConfigurationReadError(error: unknown): Error {
+  if (error instanceof Error && error.message === 'APP_SETTINGS_ENCRYPTION_KEY no está configurada') {
+    return new Error('APP_SETTINGS_ENCRYPTION_KEY es requerida para leer la configuración SMTP cifrada.');
+  }
+  return new Error('No se pudo cargar la configuración SMTP de forma segura.');
+}
+
 async function loadSmtpConfig(settingsService: EncryptedSettingsService): Promise<SmtpConfig | undefined> {
   let values: [
     string | null,
@@ -190,8 +197,8 @@ async function loadSmtpConfig(settingsService: EncryptedSettingsService): Promis
       settingsService.getEncryptedSetting(SETTING_EMAIL_FROM),
       settingsService.getEncryptedSetting(SETTING_EMAIL_REPLY_TO),
     ] as const);
-  } catch {
-    throw new Error('APP_SETTINGS_ENCRYPTION_KEY es requerida para leer la configuración SMTP cifrada.');
+  } catch (error) {
+    throw smtpConfigurationReadError(error);
   }
 
   const [provider, rawHost, rawPort, rawSecurity, rawUsername, password, rawFrom, rawReplyTo] = values;
