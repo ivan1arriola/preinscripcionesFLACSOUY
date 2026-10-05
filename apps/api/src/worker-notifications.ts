@@ -3,10 +3,10 @@ import { PostgresSystemSettingsRepository } from './infrastructure/database/post
 import { EncryptedSettingsService } from './infrastructure/security/encrypted-settings.js';
 import { PostgresEmailNotificationRepository } from './infrastructure/database/postgres-email-notification-repository.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
-import { SesEmailProvider } from './infrastructure/email/ses-client.js';
+import { SmtpEmailProvider } from './infrastructure/email/smtp-email-provider.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
 
-console.log('[NotificationWorker] Iniciando worker de despacho de notificaciones SES...');
+console.log('[NotificationWorker] Iniciando worker de despacho de notificaciones por correo (SMTP)...');
 
 const db = createKyselyDb();
 const settingsRepo = new PostgresSystemSettingsRepository(db);
@@ -21,12 +21,12 @@ const dispatcher = new EmailNotificationDispatcher({
   getProvider: async () => {
     try {
       const emailConfig = await loadEmailConfig(encryptedSettingsService);
-      if (emailConfig.enabled && emailConfig.ses) {
-        return new SesEmailProvider(emailConfig.ses);
+      if (emailConfig.enabled && emailConfig.provider === 'smtp' && emailConfig.smtp) {
+        return new SmtpEmailProvider(emailConfig.smtp);
       }
       return null;
     } catch (err) {
-      console.warn('[NotificationWorker] Configuración no disponible o inválida:', err instanceof Error ? err.message : err);
+      console.warn('[NotificationWorker] Configuración de correo no disponible o inválida:', err instanceof Error ? err.message : err);
       return null;
     }
   },

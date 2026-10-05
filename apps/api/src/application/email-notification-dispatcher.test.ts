@@ -4,10 +4,24 @@ import {
   calculateBackoffMs,
 } from './email-notification-dispatcher.js';
 import { InMemoryEmailNotificationRepository } from '../infrastructure/database/in-memory-email-notification-repository.js';
-import { EmailProviderError, type EmailProvider } from '../infrastructure/email/email-provider.js';
+import {
+  EmailProviderError,
+  FakeEmailProvider,
+  type EmailProvider,
+} from '../infrastructure/email/email-provider.js';
+import {
+  loadEmailConfig,
+  SETTING_EMAIL_NOTIFICATIONS_ENABLED,
+  SETTING_EMAIL_PROVIDER,
+  SETTING_SES_AWS_ACCESS_KEY_ID,
+  SETTING_SMTP_HOST,
+} from '../infrastructure/email/email-config.js';
+import { MemorySystemSettingsRepository } from '../infrastructure/fixtures/memory-system-settings-repository.js';
+import { EncryptedSettingsService } from '../infrastructure/security/encrypted-settings.js';
 import type { SubmissionNotificationSnapshot } from './notification-snapshot.js';
 
 describe('EmailNotificationDispatcher', () => {
+  const settingsEncryptionKey = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
   const sampleSnapshot: SubmissionNotificationSnapshot = {
     submissionId: 'sub_dispatch_1',
     targetId: 'diplomado-edutec',
@@ -32,6 +46,82 @@ describe('EmailNotificationDispatcher', () => {
       expect(calculateBackoffMs(3)).toBe(1_800_000);
       expect(calculateBackoffMs(4)).toBe(7_200_000);
       expect(calculateBackoffMs(5)).toBe(7_200_000);
+    });
+  });
+
+  it.each([
+    {
+      label: 'SMTP está incompleto o deshabilitado',
+      configure: async (settings: EncryptedSettingsService) => {
+        await settings.setEncryptedSetting(SETTING_EMAIL_PROVIDER, 'smtp');
+        await settings.setEncryptedSetting(SETTING_SMTP_HOST, 'email-smtp.us-east-1.amazonaws.com');
+      },
+    },
+    {
+      label: 'sólo existe una configuración SES heredada',
+      configure: async (settings: EncryptedSettingsService) => {
+        await settings.setEncryptedSetting(SETTING_EMAIL_PROVIDER, 'ses');
+        await settings.setEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID, 'legacy-access-key');
+      },
+    },
+  ])('does not claim or modify pending jobs when $label', async ({ configure }) => {
+    const repository = new InMemoryEmailNotificationRepository();
+    const settingsRepository = new MemorySystemSettingsRepository();
+    const settings = new EncryptedSettingsService(settingsRepository, settingsEncryptionKey);
+    await settings.setEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED, 'true');
+    await configure(settings);
+    const now = new Date('2026-10-04T12:00:00Z');
+    const [job] = await repository.ensureForSubmission({
+      submissionId: 'sub_dispatch_1',
+      snapshot: sampleSnapshot,
+      availableAt: now,
+      recipients: [{ audience: 'applicant', email: 'postulante@example.com' }],
+    });
+    const pendingBeforeDispatch = await repository.findById(job!.id);
+    const claimPending = vi.spyOn(repository, 'claimPending');
+    const getProvider = vi.fn(async () => {
+      const config = await loadEmailConfig(settings, { isProduction: true });
+      if (!config.enabled || config.provider !== 'smtp' || !config.smtp) return null;
+      return new FakeEmailProvider();
+    });
+    const dispatcher = new EmailNotificationDispatcher({ repository, getProvider });
+
+    const result = await dispatcher.dispatchPending(now);
+
+    expect(getProvider).toHaveBeenCalledOnce();
+    expect(claimPending).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      claimed: 0,
+      processed: 0,
+      sent: 0,
+      failed: 0,
+      failedPermanent: 0,
+      failedRetryable: 0,
+      retryable: 0,
+      unknown: 0,
+    });
+    expect(await repository.findById(job!.id)).toEqual(pendingBeforeDispatch);
+  });
+
+  it('starts with the controlled fake provider without opening an SMTP connection', async () => {
+    const repository = new InMemoryEmailNotificationRepository();
+    const now = new Date();
+    const [job] = await repository.ensureForSubmission({
+      submissionId: 'sub_dispatch_1',
+      snapshot: sampleSnapshot,
+      availableAt: now,
+      recipients: [{ audience: 'applicant', email: 'postulante@example.com' }],
+    });
+    const fakeProvider = new FakeEmailProvider();
+    const dispatcher = new EmailNotificationDispatcher(repository, fakeProvider);
+
+    const supervisor = dispatcher.start(60_000);
+    await vi.waitFor(() => expect(fakeProvider.sentMessages).toHaveLength(1));
+    supervisor.stop();
+
+    expect(await repository.findById(job!.id)).toMatchObject({
+      status: 'sent',
+      attemptCount: 1,
     });
   });
 

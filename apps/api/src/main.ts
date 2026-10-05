@@ -23,8 +23,9 @@ import { getAdminSessionTtlMs } from './application/admin-session.js';
 import { EncryptedSettingsService } from './infrastructure/security/encrypted-settings.js';
 import { PostgresEmailNotificationRepository } from './infrastructure/database/postgres-email-notification-repository.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
-import { SesEmailProvider, type EmailMessage } from './infrastructure/email/ses-client.js';
+import { FakeEmailProvider } from './infrastructure/email/email-provider.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
+import { SmtpEmailProvider } from './infrastructure/email/smtp-email-provider.js';
 
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
@@ -151,16 +152,10 @@ const notificationDispatcher = new EmailNotificationDispatcher({
         return null;
       }
       if (emailConfig.provider === 'fake') {
-        return {
-          verify: async () => undefined,
-          send: async (msg: EmailMessage) => {
-            console.log(`[FakeEmailProvider] Simulación de envío a ${msg.to.join(', ')}: ${msg.subject}`);
-            return { providerMessageId: `fake-${Date.now()}` };
-          },
-        };
+        return new FakeEmailProvider();
       }
-      if (emailConfig.provider === 'ses' && emailConfig.ses) {
-        return new SesEmailProvider(emailConfig.ses);
+      if (emailConfig.provider === 'smtp' && emailConfig.smtp) {
+        return new SmtpEmailProvider(emailConfig.smtp);
       }
       return null;
     } catch (err) {
