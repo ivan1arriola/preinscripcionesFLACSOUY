@@ -94,12 +94,12 @@
 - `TelegramAlertRepository` with enqueue, claim batch, mark sent/failed, retryable classification and counts.
 - Settings keys: `telegram_recovery_enabled`, encrypted `telegram_bot_token`, encrypted `telegram_chat_ids`, plus non-secret status timestamps/errors.
 
-- [ ] **Step 1: Write provider tests** for successful send, timeout, non-2xx response, malformed configuration and sanitized/truncated provider errors.
-- [ ] **Step 2: Write dispatcher/repository tests** for lease, backoff, max attempts, multiple recipients and failure isolation.
-- [ ] **Step 3: Implement the Telegram client** with native HTTPS/fetch, bounded timeout and no secret/body logging.
-- [ ] **Step 4: Implement the durable queue and dispatcher** reusing the existing email outbox lease/backoff conventions.
-- [ ] **Step 5: Run focused Telegram tests** and confirm all pass.
-- [ ] **Step 6: Commit** `feat: add durable Telegram recovery alerts`.
+- [x] **Step 1: Write provider tests** for successful send, timeout, non-2xx response, malformed configuration and sanitized/truncated provider errors.
+- [x] **Step 2: Write dispatcher/repository tests** for lease, backoff, max attempts, multiple recipients and failure isolation.
+- [x] **Step 3: Implement the Telegram client** with native HTTPS/fetch, bounded timeout and no secret/body logging.
+- [x] **Step 4: Implement the durable queue and dispatcher** reusing the existing email outbox lease/backoff conventions.
+- [x] **Step 5: Run focused Telegram tests** and confirm all pass.
+- [x] **Step 6: Commit** `feat: add durable Telegram recovery alerts`.
 
 ### Task 4: Administrative retry, discard and retention worker
 

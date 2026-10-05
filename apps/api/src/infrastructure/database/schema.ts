@@ -210,6 +210,25 @@ export interface SubmissionRecoveriesTable {
   updated_at: Generated<Date>;
 }
 
+export interface TelegramRecoveryAlertsTable {
+  id: string;
+  recovery_id: string | null;
+  submission_id: string;
+  chat_id: string;
+  message: string;
+  status: 'pending' | 'processing' | 'sent' | 'failed';
+  attempt_count: Generated<number>;
+  max_attempts: Generated<number>;
+  available_at: Generated<Date>;
+  locked_until: Date | null;
+  locked_by: string | null;
+  provider_message_id: string | null;
+  last_error: string | null;
+  sent_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -232,6 +251,7 @@ export interface DatabaseSchema {
   form_profile_audit_events: FormProfileAuditEventsTable;
   email_notifications: EmailNotificationsTable;
   submission_recoveries: SubmissionRecoveriesTable;
+  telegram_recovery_alerts: TelegramRecoveryAlertsTable;
 }
 
 
