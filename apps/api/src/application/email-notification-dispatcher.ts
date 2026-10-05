@@ -1,9 +1,9 @@
 import type { EmailNotificationRepository } from '../ports/email-notification-repository.js';
 import {
-  SesEmailProviderError,
+  EmailProviderError,
   type EmailProvider,
   type EmailMessage,
-} from '../infrastructure/email/ses-client.js';
+} from '../infrastructure/email/email-provider.js';
 import {
   renderApplicantNotification,
   renderOperationalNotification,
@@ -157,8 +157,8 @@ export class EmailNotificationDispatcher {
         await this.repository.markSent(record.id, res.providerMessageId, now);
         sent++;
       } catch (err) {
-        if (err instanceof SesEmailProviderError) {
-          if (err.isTransient) {
+        if (err instanceof EmailProviderError) {
+          if (err.classification === 'retryable') {
             if (record.attemptCount >= maxAttempts) {
               const errMsg = `Excedido el límite de reintentos (${maxAttempts}): ${err.message}`;
               await this.repository.markPermanentFailure(record.id, errMsg, now);
@@ -171,10 +171,13 @@ export class EmailNotificationDispatcher {
               retryable++;
               failedRetryable++;
             }
-          } else {
+          } else if (err.classification === 'permanent') {
             await this.repository.markPermanentFailure(record.id, err.message, now);
             failed++;
             failedPermanent++;
+          } else {
+            await this.repository.markUnknown(record.id, err.message);
+            unknown++;
           }
         } else {
           // Error desconocido o caída de red sin confirmación (Unknown error)

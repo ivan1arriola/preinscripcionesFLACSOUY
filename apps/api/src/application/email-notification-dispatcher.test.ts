@@ -4,7 +4,7 @@ import {
   calculateBackoffMs,
 } from './email-notification-dispatcher.js';
 import { InMemoryEmailNotificationRepository } from '../infrastructure/database/in-memory-email-notification-repository.js';
-import { SesEmailProviderError, type EmailProvider } from '../infrastructure/email/ses-client.js';
+import { EmailProviderError, type EmailProvider } from '../infrastructure/email/email-provider.js';
 import type { SubmissionNotificationSnapshot } from './notification-snapshot.js';
 
 describe('EmailNotificationDispatcher', () => {
@@ -47,6 +47,7 @@ describe('EmailNotificationDispatcher', () => {
     });
 
     const mockProvider: EmailProvider = {
+      verify: vi.fn(),
       send: vi.fn().mockResolvedValue({ providerMessageId: 'ses-msg-12345' }),
     };
 
@@ -85,6 +86,7 @@ describe('EmailNotificationDispatcher', () => {
     });
 
     const mockProvider: EmailProvider = {
+      verify: vi.fn(),
       send: vi.fn().mockResolvedValue({ providerMessageId: 'ses-msg-op-999' }),
     };
 
@@ -113,8 +115,9 @@ describe('EmailNotificationDispatcher', () => {
     });
 
     const mockProvider: EmailProvider = {
+      verify: vi.fn(),
       send: vi.fn().mockRejectedValue(
-        new SesEmailProviderError('Rate exceeded (TooManyRequestsException)', undefined, true)
+        new EmailProviderError('Rate exceeded (TooManyRequestsException)', 'retryable')
       ),
     };
 
@@ -145,8 +148,9 @@ describe('EmailNotificationDispatcher', () => {
     });
 
     const mockProvider: EmailProvider = {
+      verify: vi.fn(),
       send: vi.fn().mockRejectedValue(
-        new SesEmailProviderError('Rate exceeded (TooManyRequestsException)', undefined, true)
+        new EmailProviderError('Rate exceeded (TooManyRequestsException)', 'retryable')
       ),
     };
 
@@ -185,8 +189,9 @@ describe('EmailNotificationDispatcher', () => {
     });
 
     const mockProvider: EmailProvider = {
+      verify: vi.fn(),
       send: vi.fn().mockRejectedValue(
-        new SesEmailProviderError('Dirección no verificada (MailFromDomainNotVerifiedException)', undefined, false)
+        new EmailProviderError('Dirección no verificada (MailFromDomainNotVerifiedException)', 'permanent')
       ),
     };
 
@@ -199,7 +204,7 @@ describe('EmailNotificationDispatcher', () => {
     expect(updatedJob?.lastError).toContain('MailFromDomainNotVerifiedException');
   });
 
-  it('marks job as unknown when error is unexpected without confirmation', async () => {
+  it('marks a provider error with unknown outcome for manual review', async () => {
     const repository = new InMemoryEmailNotificationRepository();
     const now = new Date('2026-10-04T12:00:00Z');
 
@@ -211,7 +216,10 @@ describe('EmailNotificationDispatcher', () => {
     });
 
     const mockProvider: EmailProvider = {
-      send: vi.fn().mockRejectedValue(new Error('Connection reset by peer after sending')),
+      verify: vi.fn(),
+      send: vi.fn().mockRejectedValue(
+        new EmailProviderError('Connection reset by peer after sending', 'unknown')
+      ),
     };
 
     const dispatcher = new EmailNotificationDispatcher(repository, mockProvider);
