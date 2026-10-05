@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  invalidateSmtpVerificationStatus,
   parseMasterEmails,
+  safeSmtpVerificationError,
   serializeMasterEmails,
   loadEmailConfig,
+  smtpSettingsRequireReverification,
   SETTING_EMAIL_NOTIFICATIONS_ENABLED,
   SETTING_NOTIFICATION_MASTER_EMAILS,
-  SETTING_SES_AWS_ACCESS_KEY_ID,
-  SETTING_SES_AWS_SECRET_ACCESS_KEY,
-  SETTING_SES_REGION,
-  SETTING_SES_FROM_EMAIL,
 } from './email-config.js';
+import { EmailProviderError } from './email-provider.js';
 import { EncryptedSettingsService } from '../security/encrypted-settings.js';
 import { MemorySystemSettingsRepository } from '../fixtures/memory-system-settings-repository.js';
 
@@ -51,65 +51,211 @@ describe('email-config', () => {
       expect(config.masterEmails).toEqual([]);
     });
 
-    it('supports explicit fake provider in development', async () => {
+    it('supports the explicit fake provider only outside production', async () => {
       const repo = new MemorySystemSettingsRepository();
       const service = new EncryptedSettingsService(repo, masterKey);
       await service.setEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED, 'true');
       await service.setEncryptedSetting(SETTING_NOTIFICATION_MASTER_EMAILS, serializeMasterEmails(['master@flacso.edu.uy']));
 
-      const config = await loadEmailConfig(service, { providerOverride: 'fake' });
+      const config = await loadEmailConfig(service, { isProduction: false, providerOverride: 'fake' });
       expect(config.enabled).toBe(true);
       expect(config.provider).toBe('fake');
       expect(config.masterEmails).toEqual(['master@flacso.edu.uy']);
-      expect(config.ses).toBeUndefined();
+      expect(config.smtp).toBeUndefined();
     });
 
-    it('fails closed when notifications enabled but APP_SETTINGS_ENCRYPTION_KEY is absent', async () => {
-      const repo = new MemorySystemSettingsRepository();
-      const serviceWithKey = new EncryptedSettingsService(repo, masterKey);
-      await serviceWithKey.setEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED, 'true');
+    it('does not activate the fake provider from the operational environment', async () => {
+      const previousProvider = process.env.EMAIL_PROVIDER;
+      process.env.EMAIL_PROVIDER = 'fake';
+      try {
+        const { service } = await createCompleteSmtpSettings();
 
-      // Now attempt reading with service without key
-      const serviceWithoutKey = new EncryptedSettingsService(repo, '');
+        const config = await loadEmailConfig(service, { isProduction: false });
 
-      await expect(
-        loadEmailConfig(serviceWithoutKey, { isProduction: true })
-      ).rejects.toThrow(/APP_SETTINGS_ENCRYPTION_KEY/);
+        expect(config.provider).toBe('smtp');
+      } finally {
+        if (previousProvider === undefined) {
+          delete process.env.EMAIL_PROVIDER;
+        } else {
+          process.env.EMAIL_PROVIDER = previousProvider;
+        }
+      }
     });
 
-    it('fails when notifications enabled with incomplete SES settings in system_settings', async () => {
-      const repo = new MemorySystemSettingsRepository();
-      const service = new EncryptedSettingsService(repo, masterKey);
-      await service.setEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED, 'true');
-      await service.setEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID, 'AKIAIOSFODNN7EXAMPLE');
-      // Missing secret key, region, and fromEmail
+    it('ignores the fake override in production and resolves SMTP', async () => {
+      const { service } = await createCompleteSmtpSettings();
 
-      await expect(loadEmailConfig(service)).rejects.toThrow(/incompleta/i);
+      const config = await loadEmailConfig(service, { isProduction: true, providerOverride: 'fake' });
+
+      expect(config.provider).toBe('smtp');
     });
 
-    it('loads complete SES configuration successfully', async () => {
-      const repo = new MemorySystemSettingsRepository();
-      const service = new EncryptedSettingsService(repo, masterKey);
-      await service.setEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED, 'true');
-      await service.setEncryptedSetting(SETTING_NOTIFICATION_MASTER_EMAILS, serializeMasterEmails(['master@flacso.edu.uy']));
-      await service.setEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID, 'AKIAIOSFODNN7EXAMPLE');
-      await service.setEncryptedSetting(SETTING_SES_AWS_SECRET_ACCESS_KEY, 'secret-key-123');
-      await service.setEncryptedSetting(SETTING_SES_REGION, 'us-east-1');
-      await service.setEncryptedSetting(SETTING_SES_FROM_EMAIL, 'preinscripciones@flacso.edu.uy');
+    it('resolves complete SMTP settings and normalizes host, username, and emails', async () => {
+      const { service } = await createCompleteSmtpSettings();
 
-      const config = await loadEmailConfig(service);
-      expect(config.enabled).toBe(true);
-      expect(config.provider).toBe('ses');
-      expect(config.masterEmails).toEqual(['master@flacso.edu.uy']);
-      expect(config.ses).toEqual({
-        accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
-        secretAccessKey: 'secret-key-123',
-        sessionToken: undefined,
-        region: 'us-east-1',
-        fromEmail: 'preinscripciones@flacso.edu.uy',
-        replyToEmail: undefined,
-        configurationSet: undefined,
+      const config = await loadEmailConfig(service, { isProduction: true });
+
+      expect(config).toEqual({
+        enabled: true,
+        provider: 'smtp',
+        masterEmails: ['master@flacso.edu.uy', 'web@flacso.edu.uy'],
+        smtp: {
+          host: 'email-smtp.us-east-1.amazonaws.com',
+          port: 587,
+          security: 'starttls',
+          username: 'smtp-user',
+          password: 'smtp-secret-password',
+          fromEmail: 'preinscripciones@flacso.edu.uy',
+          replyToEmail: 'respuestas@flacso.edu.uy',
+        },
       });
     });
+
+    it('decrypts the SMTP password only in the resolved in-memory configuration', async () => {
+      const { repo, service } = await createCompleteSmtpSettings();
+      const storedPassword = await repo.getSetting('smtp_password');
+
+      const config = await loadEmailConfig(service, { isProduction: true });
+
+      expect(storedPassword).toMatch(/^enc:v1:/);
+      expect(storedPassword).not.toContain('smtp-secret-password');
+      expect(config.smtp?.password).toBe('smtp-secret-password');
+    });
+
+    it('keeps notifications effectively disabled when SMTP is incomplete and preserves historical AWS values', async () => {
+      const historicalAwsSettings = {
+        ses_aws_access_key_id: 'enc:v1:historical-access-key',
+        ses_aws_secret_access_key: 'enc:v1:historical-secret-key',
+        ses_region: 'us-east-1',
+        ses_from_email: 'legacy@flacso.edu.uy',
+      };
+      const repo = new MemorySystemSettingsRepository({
+        email_notifications_enabled: 'true',
+        email_provider: 'smtp',
+        smtp_host: 'email-smtp.us-east-1.amazonaws.com',
+        smtp_port: '587',
+        smtp_security: 'starttls',
+        ...historicalAwsSettings,
+      });
+      const service = new EncryptedSettingsService(repo, masterKey);
+
+      const config = await loadEmailConfig(service, { isProduction: true });
+
+      expect(config).toEqual({ enabled: true, provider: 'disabled', masterEmails: [] });
+      for (const [key, value] of Object.entries(historicalAwsSettings)) {
+        expect(await repo.getSetting(key)).toBe(value);
+      }
+    });
+
+    it.each([
+      ['host with a protocol', { smtp_host: 'https://email-smtp.us-east-1.amazonaws.com' }],
+      ['port outside the valid range', { smtp_port: '65536' }],
+      ['unsupported security', { smtp_security: 'ssl' }],
+      ['invalid sender', { email_from: 'not-an-email' }],
+      ['invalid reply-to', { email_reply_to: 'not-an-email' }],
+    ])('does not expose SMTP when %s is stored', async (_case, override) => {
+      const { service } = await createCompleteSmtpSettings(override);
+
+      const config = await loadEmailConfig(service, { isProduction: true });
+
+      expect(config.enabled).toBe(true);
+      expect(config.provider).toBe('disabled');
+      expect(config.smtp).toBeUndefined();
+    });
+
+    it('fails safely when an encrypted SMTP password is configured without the encryption key', async () => {
+      const encryptedPassword = new EncryptedSettingsService(
+        new MemorySystemSettingsRepository(),
+        masterKey,
+      ).encrypt('smtp-secret-password');
+      const repo = new MemorySystemSettingsRepository({
+        email_notifications_enabled: 'true',
+        email_provider: 'smtp',
+        smtp_host: 'email-smtp.us-east-1.amazonaws.com',
+        smtp_port: '587',
+        smtp_security: 'starttls',
+        smtp_username: 'smtp-user',
+        smtp_password: encryptedPassword,
+        email_from: 'preinscripciones@flacso.edu.uy',
+        email_reply_to: '',
+      });
+      const serviceWithoutKey = new EncryptedSettingsService(repo, '');
+
+      const promise = loadEmailConfig(serviceWithoutKey, { isProduction: true });
+
+      await expect(promise).rejects.toThrow(/APP_SETTINGS_ENCRYPTION_KEY/);
+      await expect(promise).rejects.not.toThrow(/smtp-secret-password|enc:v1:/);
+    });
   });
+
+  describe('SMTP verification state', () => {
+    it('requires a new verification when connection fields or the password change', () => {
+      for (const key of ['smtp_host', 'smtp_port', 'smtp_security', 'smtp_username', 'smtp_password']) {
+        expect(smtpSettingsRequireReverification([key])).toBe(true);
+      }
+      expect(smtpSettingsRequireReverification(['email_from', 'email_reply_to'])).toBe(false);
+    });
+
+    it('invalidates the persisted verification result without retaining its previous message', async () => {
+      const repo = new MemorySystemSettingsRepository();
+      const service = new EncryptedSettingsService(repo, masterKey);
+      await service.setEncryptedSetting('smtp_last_connection_test_at', '2026-10-04T20:00:00.000Z');
+      await service.setEncryptedSetting('smtp_last_connection_test_ok', 'false');
+      await service.setEncryptedSetting('smtp_last_connection_test_error', 'previous safe error');
+
+      await invalidateSmtpVerificationStatus(service, 'admin@flacso.edu.uy');
+
+      for (const key of [
+        'smtp_last_connection_test_at',
+        'smtp_last_connection_test_ok',
+        'smtp_last_connection_test_error',
+      ]) {
+        expect(await service.getEncryptedSetting(key)).toBe('');
+        const stored = await repo.getSetting(key);
+        expect(stored).toMatch(/^enc:v1:/);
+        expect(stored).not.toContain('previous safe error');
+      }
+    });
+
+    it('keeps provider errors bounded and replaces unknown errors with a safe message', () => {
+      const providerError = new EmailProviderError(`Error SMTP (${'E'.repeat(300)})`, 'permanent');
+      const bounded = safeSmtpVerificationError(providerError);
+      const unknown = safeSmtpVerificationError(
+        new Error('server rejected smtp-secret-password'),
+      );
+
+      expect(bounded.length).toBeLessThanOrEqual(200);
+      expect(bounded).toMatch(/^Error SMTP/);
+      expect(unknown).toBe('No se pudo verificar la conexión SMTP.');
+      expect(unknown).not.toContain('smtp-secret-password');
+    });
+  });
+
+  async function createCompleteSmtpSettings(overrides: Record<string, string> = {}) {
+    const repo = new MemorySystemSettingsRepository();
+    const service = new EncryptedSettingsService(repo, masterKey);
+    const values = {
+      email_notifications_enabled: 'true',
+      notification_master_emails: serializeMasterEmails([
+        ' Master@flacso.edu.uy ',
+        'WEB@FLACSO.EDU.UY',
+        'master@flacso.edu.uy',
+      ]),
+      email_provider: 'smtp',
+      smtp_host: ' EMAIL-SMTP.US-EAST-1.AMAZONAWS.COM ',
+      smtp_port: '587',
+      smtp_security: 'starttls',
+      smtp_username: ' smtp-user ',
+      smtp_password: 'smtp-secret-password',
+      email_from: ' Preinscripciones@FLACSO.EDU.UY ',
+      email_reply_to: ' Respuestas@FLACSO.EDU.UY ',
+      ...overrides,
+    };
+
+    for (const [key, value] of Object.entries(values)) {
+      await service.setEncryptedSetting(key, value);
+    }
+
+    return { repo, service };
+  }
 });

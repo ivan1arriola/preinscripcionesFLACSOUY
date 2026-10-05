@@ -1,16 +1,7 @@
 import nodemailer from 'nodemailer';
 import type { EmailMessage, EmailProvider, EmailProviderErrorClassification } from './email-provider.js';
 import { EmailProviderError } from './email-provider.js';
-
-interface SmtpConfigInput {
-  host: string;
-  port: number;
-  security: 'starttls' | 'tls';
-  username: string;
-  password: string;
-  fromEmail: string;
-  replyToEmail?: string;
-}
+import type { SmtpConfig } from './email-config.js';
 
 export interface SmtpTransport {
   verify(): Promise<unknown>;
@@ -27,7 +18,7 @@ export interface SmtpTransport {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function smtpTransportOptions(config: SmtpConfigInput) {
+export function smtpTransportOptions(config: SmtpConfig) {
   return {
     host: config.host,
     port: config.port,
@@ -85,7 +76,7 @@ export class SmtpEmailProvider implements EmailProvider {
   private readonly transport: SmtpTransport;
 
   constructor(
-    private readonly config: SmtpConfigInput,
+    private readonly config: SmtpConfig,
     transport?: SmtpTransport,
   ) {
     this.transport = transport ?? nodemailer.createTransport(smtpTransportOptions(config));

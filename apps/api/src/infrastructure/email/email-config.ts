@@ -1,7 +1,29 @@
 import type { EncryptedSettingsService } from '../security/encrypted-settings.js';
+import { EmailProviderError } from './email-provider.js';
 
 export const SETTING_EMAIL_NOTIFICATIONS_ENABLED = 'email_notifications_enabled';
 export const SETTING_NOTIFICATION_MASTER_EMAILS = 'notification_master_emails';
+export const SETTING_EMAIL_PROVIDER = 'email_provider';
+export const SETTING_SMTP_HOST = 'smtp_host';
+export const SETTING_SMTP_PORT = 'smtp_port';
+export const SETTING_SMTP_SECURITY = 'smtp_security';
+export const SETTING_SMTP_USERNAME = 'smtp_username';
+export const SETTING_SMTP_PASSWORD = 'smtp_password';
+export const SETTING_EMAIL_FROM = 'email_from';
+export const SETTING_EMAIL_REPLY_TO = 'email_reply_to';
+export const SETTING_SMTP_LAST_CONNECTION_TEST_AT = 'smtp_last_connection_test_at';
+export const SETTING_SMTP_LAST_CONNECTION_TEST_OK = 'smtp_last_connection_test_ok';
+export const SETTING_SMTP_LAST_CONNECTION_TEST_ERROR = 'smtp_last_connection_test_error';
+
+const SMTP_CONNECTION_SETTING_KEYS = new Set([
+  SETTING_SMTP_HOST,
+  SETTING_SMTP_PORT,
+  SETTING_SMTP_SECURITY,
+  SETTING_SMTP_USERNAME,
+  SETTING_SMTP_PASSWORD,
+]);
+
+// Legacy exports remain until the runtime and admin routes migrate in later tasks.
 export const SETTING_SES_AWS_ACCESS_KEY_ID = 'ses_aws_access_key_id';
 export const SETTING_SES_AWS_SECRET_ACCESS_KEY = 'ses_aws_secret_access_key';
 export const SETTING_SES_AWS_SESSION_TOKEN = 'ses_aws_session_token';
@@ -73,11 +95,23 @@ export interface SesCredentialsConfig {
   configurationSet?: string;
 }
 
+export type SmtpSecurity = 'starttls' | 'tls';
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  security: SmtpSecurity;
+  username: string;
+  password: string;
+  fromEmail: string;
+  replyToEmail?: string;
+}
+
 export interface ResolvedEmailConfig {
   enabled: boolean;
-  provider: 'ses' | 'fake' | 'disabled';
+  provider: 'smtp' | 'fake' | 'disabled';
   masterEmails: string[];
-  ses?: SesCredentialsConfig;
+  smtp?: SmtpConfig;
 }
 
 export interface LoadEmailConfigOptions {
@@ -85,12 +119,120 @@ export interface LoadEmailConfigOptions {
   providerOverride?: string;
 }
 
+export function smtpSettingsRequireReverification(changedKeys: Iterable<string>): boolean {
+  for (const key of changedKeys) {
+    if (SMTP_CONNECTION_SETTING_KEYS.has(key)) return true;
+  }
+  return false;
+}
+
+export async function invalidateSmtpVerificationStatus(
+  settingsService: EncryptedSettingsService,
+  updatedBy?: string,
+): Promise<void> {
+  await Promise.all([
+    settingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_AT, '', updatedBy),
+    settingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_OK, '', updatedBy),
+    settingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_ERROR, '', updatedBy),
+  ]);
+}
+
+export function safeSmtpVerificationError(error: unknown): string {
+  if (!(error instanceof EmailProviderError)) {
+    return 'No se pudo verificar la conexión SMTP.';
+  }
+  return `Error SMTP (${error.classification}).`.slice(0, 200);
+}
+
+function normalizeEmail(value: string | null): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && EMAIL_REGEX.test(normalized) ? normalized : undefined;
+}
+
+function normalizeSmtpHost(value: string | null): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || normalized.length > 253 || /[:/\s]/.test(normalized)) return undefined;
+  const hostnamePattern = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+  return hostnamePattern.test(normalized) ? normalized : undefined;
+}
+
+function normalizeSmtpPort(value: string | null): number | undefined {
+  const normalized = value?.trim();
+  if (!normalized || !/^\d+$/.test(normalized)) return undefined;
+  const port = Number(normalized);
+  return Number.isInteger(port) && port >= 1 && port <= 65_535 ? port : undefined;
+}
+
+function normalizeSmtpSecurity(value: string | null): SmtpSecurity | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === 'starttls' || normalized === 'tls' ? normalized : undefined;
+}
+
+async function loadSmtpConfig(settingsService: EncryptedSettingsService): Promise<SmtpConfig | undefined> {
+  let values: [
+    string | null,
+    string | null,
+    string | null,
+    string | null,
+    string | null,
+    string | null,
+    string | null,
+    string | null,
+  ];
+  try {
+    values = await Promise.all([
+      settingsService.getEncryptedSetting(SETTING_EMAIL_PROVIDER),
+      settingsService.getEncryptedSetting(SETTING_SMTP_HOST),
+      settingsService.getEncryptedSetting(SETTING_SMTP_PORT),
+      settingsService.getEncryptedSetting(SETTING_SMTP_SECURITY),
+      settingsService.getEncryptedSetting(SETTING_SMTP_USERNAME),
+      settingsService.getEncryptedSetting(SETTING_SMTP_PASSWORD),
+      settingsService.getEncryptedSetting(SETTING_EMAIL_FROM),
+      settingsService.getEncryptedSetting(SETTING_EMAIL_REPLY_TO),
+    ] as const);
+  } catch {
+    throw new Error('APP_SETTINGS_ENCRYPTION_KEY es requerida para leer la configuración SMTP cifrada.');
+  }
+
+  const [provider, rawHost, rawPort, rawSecurity, rawUsername, password, rawFrom, rawReplyTo] = values;
+  if (provider?.trim().toLowerCase() !== 'smtp') return undefined;
+
+  const host = normalizeSmtpHost(rawHost);
+  const port = normalizeSmtpPort(rawPort);
+  const security = normalizeSmtpSecurity(rawSecurity);
+  const username = rawUsername?.trim();
+  const fromEmail = normalizeEmail(rawFrom);
+  const replyToEmail = rawReplyTo?.trim() ? normalizeEmail(rawReplyTo) : undefined;
+
+  if (
+    !host
+    || !port
+    || !security
+    || !username
+    || !password
+    || !fromEmail
+    || (rawReplyTo?.trim() && !replyToEmail)
+  ) {
+    return undefined;
+  }
+
+  return {
+    host,
+    port,
+    security,
+    username,
+    password,
+    fromEmail,
+    replyToEmail,
+  };
+}
+
 export async function loadEmailConfig(
   settingsService: EncryptedSettingsService,
   options?: LoadEmailConfigOptions
 ): Promise<ResolvedEmailConfig> {
   const isProduction = options?.isProduction ?? process.env.NODE_ENV === 'production';
-  const providerOverride = options?.providerOverride ?? process.env.EMAIL_PROVIDER;
+  const providerOverride = options?.providerOverride;
 
   let enabledRaw: string | null = null;
   try {
@@ -121,7 +263,7 @@ export async function loadEmailConfig(
     };
   }
 
-  if (providerOverride === 'fake' || (!isProduction && providerOverride === 'mock')) {
+  if (!isProduction && providerOverride === 'fake') {
     return {
       enabled: true,
       provider: 'fake',
@@ -129,31 +271,19 @@ export async function loadEmailConfig(
     };
   }
 
-  // Load SES configuration
-  const accessKeyId = await settingsService.getEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID);
-  const secretAccessKey = await settingsService.getEncryptedSetting(SETTING_SES_AWS_SECRET_ACCESS_KEY);
-  const sessionToken = (await settingsService.getEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN)) || undefined;
-  const region = await settingsService.getEncryptedSetting(SETTING_SES_REGION);
-  const fromEmail = await settingsService.getEncryptedSetting(SETTING_SES_FROM_EMAIL);
-  const replyToEmail = (await settingsService.getEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL)) || undefined;
-  const configurationSet = (await settingsService.getEncryptedSetting(SETTING_SES_CONFIGURATION_SET)) || undefined;
-
-  if (!accessKeyId || !secretAccessKey || !region || !fromEmail) {
-    throw new Error('Configuración de Amazon SES incompleta: faltan credenciales, región o remitente.');
+  const smtp = await loadSmtpConfig(settingsService);
+  if (!smtp) {
+    return {
+      enabled: true,
+      provider: 'disabled',
+      masterEmails,
+    };
   }
 
   return {
     enabled: true,
-    provider: 'ses',
+    provider: 'smtp',
     masterEmails,
-    ses: {
-      accessKeyId,
-      secretAccessKey,
-      sessionToken,
-      region,
-      fromEmail,
-      replyToEmail,
-      configurationSet,
-    },
+    smtp,
   };
 }

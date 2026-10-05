@@ -12,6 +12,7 @@ import * as submissionIdempotencySchema from './migrations/010_submission_idempo
 import * as academicDocumentLayoutSchema from './migrations/011_normalize_academic_document_layout.js';
 import * as targetSpreadsheetsReconciliationSchema from './migrations/012_target_spreadsheets_reconciliation.js';
 import * as emailNotificationsSchema from './migrations/013_email_notifications.js';
+import * as smtpEmailSettingsSchema from './migrations/014_smtp_email_settings.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -28,6 +29,7 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await academicDocumentLayoutSchema.up(db);
   await targetSpreadsheetsReconciliationSchema.up(db);
   await emailNotificationsSchema.up(db);
+  await smtpEmailSettingsSchema.up(db);
   console.log('Migrations complete.');
 }
 
