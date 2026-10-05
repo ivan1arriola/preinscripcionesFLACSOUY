@@ -9,6 +9,7 @@ import {
 import { extractDriveFolderId, isValidDriveFolderId } from '../../domain/google-drive-utils.js';
 import type { GoogleDriveFolderInfo } from '../../ports/google-drive-repository.js';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
+import type { AgreementOption } from '@flacso/contracts';
 import { canProvisionTargetSpreadsheet, type TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet-repository.js';
 import type { EncryptedSettingsService } from '../../infrastructure/security/encrypted-settings.js';
@@ -290,7 +291,7 @@ export function createAdminSettingsRoutes(
     let ok = true;
     if (catalog && targetSpreadsheetService) {
       const targets = (await catalog.listTargets()).filter(canProvisionTargetSpreadsheet);
-      let agreements = [];
+      let agreements: AgreementOption[] = [];
       if (catalog.listAgreements) {
         try { agreements = await catalog.listAgreements(); } catch { /* migration can preserve legacy IDs */ }
       }
@@ -332,7 +333,7 @@ export function createAdminSettingsRoutes(
     }
     try {
       const targets = (await catalog.listTargets()).filter(canProvisionTargetSpreadsheet);
-      let agreements = [];
+      let agreements: AgreementOption[] = [];
       if (catalog.listAgreements) {
         try { agreements = await catalog.listAgreements(); } catch { /* migration can preserve legacy IDs */ }
       }
