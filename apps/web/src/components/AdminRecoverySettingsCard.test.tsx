@@ -24,6 +24,7 @@ describe('AdminRecoverySettingsCard Component', () => {
     vi.mocked(apiClient.getTelegramSettings).mockResolvedValue({
       telegram: {
         enabled: true,
+        preinscriptionEnabled: false,
         hasToken: true,
         chatIdsCount: 2,
         maskedChatIds: ['-1****89', '98****21'],
@@ -38,6 +39,7 @@ describe('AdminRecoverySettingsCard Component', () => {
     await waitFor(() => {
       expect(screen.getByText(/Alertas de Incidentes por Telegram/i)).toBeInTheDocument();
       expect(screen.getByText(/Alertas activas/i)).toBeInTheDocument();
+      expect(screen.getByText(/Notificar cada preinscripción por Telegram/i)).toBeInTheDocument();
       expect(screen.getByText(/Bot configurado/i)).toBeInTheDocument();
       expect(screen.getByText('-1****89')).toBeInTheDocument();
       expect(screen.getByText('98****21')).toBeInTheDocument();
@@ -45,10 +47,11 @@ describe('AdminRecoverySettingsCard Component', () => {
     });
   });
 
-  it('saves updated configuration when form is submitted', async () => {
+  it('saves updated configuration when form is submitted with both toggles', async () => {
     vi.mocked(apiClient.getTelegramSettings).mockResolvedValue({
       telegram: {
         enabled: false,
+        preinscriptionEnabled: false,
         hasToken: false,
         chatIdsCount: 0,
         maskedChatIds: [],
@@ -63,6 +66,7 @@ describe('AdminRecoverySettingsCard Component', () => {
       message: 'Configuración guardada.',
       telegram: {
         enabled: true,
+        preinscriptionEnabled: true,
         hasToken: true,
         chatIdsCount: 1,
         maskedChatIds: ['12****78'],
@@ -78,9 +82,13 @@ describe('AdminRecoverySettingsCard Component', () => {
       expect(screen.getByText(/Sin token de bot/i)).toBeInTheDocument();
     });
 
-    // Toggle enabled
-    const toggle = screen.getByRole('checkbox');
-    fireEvent.click(toggle);
+    // Toggle recovery alerts
+    const recoveryToggle = screen.getByLabelText(/Habilitar alertas de recuperación automáticas/i);
+    fireEvent.click(recoveryToggle);
+
+    // Toggle preinscription alerts
+    const preinscriptionToggle = screen.getByLabelText(/Notificar cada preinscripción por Telegram/i);
+    fireEvent.click(preinscriptionToggle);
 
     // Enter token
     const tokenInput = screen.getByPlaceholderText(/123456789:ABCdef/i);
@@ -97,6 +105,7 @@ describe('AdminRecoverySettingsCard Component', () => {
     await waitFor(() => {
       expect(apiClient.updateTelegramSettings).toHaveBeenCalledWith('csrf-test-token', {
         enabled: true,
+        preinscriptionEnabled: true,
         botToken: '123456789:ABCdefGHI_jkl123',
         replaceToken: undefined,
         chatIds: ['12345678'],
@@ -109,6 +118,7 @@ describe('AdminRecoverySettingsCard Component', () => {
     vi.mocked(apiClient.getTelegramSettings).mockResolvedValue({
       telegram: {
         enabled: true,
+        preinscriptionEnabled: false,
         hasToken: true,
         chatIdsCount: 1,
         maskedChatIds: ['12****78'],
