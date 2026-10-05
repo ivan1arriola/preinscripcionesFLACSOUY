@@ -6,11 +6,13 @@ import type { GoogleDriveRepositoryPort } from '../ports/google-drive-repository
 import type { SpreadsheetRepository } from '../ports/spreadsheet-repository.js';
 import type { TargetSpreadsheetService } from './target-spreadsheet-service.js';
 import type { EmailNotificationRepository } from '../ports/email-notification-repository.js';
+import type { TelegramAlertRepository } from '../ports/telegram-alert-repository.js';
 import { getCanonicalFormDefinition } from '../domain/canonical-forms.js';
 import { normalizeIdentityValues } from '../domain/identity-validation.js';
 import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import { sanitizeSafeError } from '../domain/safe-error.js';
 import { createPreinscriptionNotifications } from './create-preinscription-notifications.js';
+import { enqueuePreinscriptionTelegramNotifications } from './preinscription-telegram-notification.js';
 
 export interface RetrySubmissionDependencies {
   recoveryRepository: SubmissionRecoveryRepository;
@@ -27,6 +29,10 @@ export interface RetrySubmissionDependencies {
   notificationDependencies?: {
     repository: EmailNotificationRepository;
     getMasterEmails?: () => Promise<string[]> | string[];
+  };
+  telegramDependencies?: {
+    repository: TelegramAlertRepository;
+    getPreinscriptionChatIds?: () => Promise<string[]> | string[];
   };
 }
 
@@ -319,6 +325,27 @@ export async function retryFailedSubmission(
       });
     } catch (notifErr) {
       console.error('[Recovery] Error al encolar notificaciones tras reintento:', notifErr);
+    }
+  }
+
+  // 6b. Enqueue Telegram preinscription notifications if configured
+  if (dependencies.telegramDependencies?.repository && dependencies.telegramDependencies.getPreinscriptionChatIds) {
+    try {
+      const chatIds = await dependencies.telegramDependencies.getPreinscriptionChatIds();
+      if (chatIds && chatIds.length > 0) {
+        await enqueuePreinscriptionTelegramNotifications({
+          repository: dependencies.telegramDependencies.repository,
+          submissionId,
+          target,
+          chatIds,
+          occurredAt: now,
+        });
+      }
+    } catch (tgErr) {
+      console.error(
+        '[Recovery] Error al encolar notificación Telegram tras reintento:',
+        sanitizeSafeError(tgErr)
+      );
     }
   }
 

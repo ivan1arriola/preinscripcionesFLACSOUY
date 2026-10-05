@@ -603,5 +603,124 @@ describe('Submission HTTP Routes', () => {
         await new Promise<void>((resolve) => tempServer.close(() => resolve()));
       }
     });
+
+    it('enqueues one Telegram preinscription alert per configured chat upon successful submission', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const testRepo = new InMemorySubmissionRepository();
+      const storage: TemporaryFileStoragePort = {
+        save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+        remove: async () => undefined,
+        cleanup: async () => 0,
+      };
+      const drive: GoogleDriveRepositoryPort = {
+        storeSubmissionFiles: async () => ({
+          files: [
+            { token: 'tok_id', driveFileId: 'drive-1' },
+            { token: 'tok_cv', driveFileId: 'drive-2' },
+            { token: 'tok_tit', driveFileId: 'drive-3' },
+            { token: 'tok_mot', driveFileId: 'drive-4' },
+          ],
+          documentsFolderId: 'folder-1',
+          documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+        }),
+      };
+      const telegramAlertRepo = new InMemoryTelegramAlertRepository();
+
+      const app = createApp({
+        catalog,
+        repository: testRepo,
+        temporaryFileStorage: storage,
+        googleDriveRepository: drive,
+        telegramAlertRepository: telegramAlertRepo,
+        getTelegramPreinscriptionChatIds: async () => ['-100111111', '-100222222'],
+      });
+
+      const tempServer = app.listen(0);
+      const port = (tempServer.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-preinscription-session': 'sess-1',
+          },
+          body: JSON.stringify(validPayload),
+        });
+
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        expect(data.submissionId).toBeDefined();
+
+        const alerts = await telegramAlertRepo.listAlerts({ eventType: 'preinscription' });
+        expect(alerts).toHaveLength(2);
+        expect(alerts.map((a) => a.chatId).sort()).toEqual(['-100111111', '-100222222'].sort());
+        expect(alerts[0]!.message).toContain('✅ Nueva preinscripción recibida');
+        expect(alerts[0]!.message).toContain(data.submissionId);
+        expect(alerts[0]!.eventType).toBe('preinscription');
+      } finally {
+        await new Promise<void>((resolve) => tempServer.close(() => resolve()));
+      }
+    });
+
+    it('isolates Telegram failures so 201 is returned and submission remains successful even if telegram queue fails', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const testRepo = new InMemorySubmissionRepository();
+      const storage: TemporaryFileStoragePort = {
+        save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+        remove: async () => undefined,
+        cleanup: async () => 0,
+      };
+      const drive: GoogleDriveRepositoryPort = {
+        storeSubmissionFiles: async () => ({
+          files: [
+            { token: 'tok_id', driveFileId: 'drive-1' },
+            { token: 'tok_cv', driveFileId: 'drive-2' },
+            { token: 'tok_tit', driveFileId: 'drive-3' },
+            { token: 'tok_mot', driveFileId: 'drive-4' },
+          ],
+          documentsFolderId: 'folder-1',
+          documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1',
+        }),
+      };
+      const failingTelegramAlertRepo = new InMemoryTelegramAlertRepository();
+      vi.spyOn(failingTelegramAlertRepo, 'ensureForSubmission').mockRejectedValue(
+        new Error('Database error in telegram queue')
+      );
+
+      const app = createApp({
+        catalog,
+        repository: testRepo,
+        temporaryFileStorage: storage,
+        googleDriveRepository: drive,
+        telegramAlertRepository: failingTelegramAlertRepo,
+        getTelegramPreinscriptionChatIds: async () => ['-100111111'],
+      });
+
+      const tempServer = app.listen(0);
+      const port = (tempServer.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-preinscription-session': 'sess-1',
+          },
+          body: JSON.stringify(validPayload),
+        });
+
+        // Still returns 201 Created
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        expect(data.submissionId).toBeDefined();
+
+        // Submission in repo is successful
+        const status = testRepo.processingStatuses.get(data.submissionId);
+        expect(status?.status).toBe('success');
+      } finally {
+        await new Promise<void>((resolve) => tempServer.close(() => resolve()));
+      }
+    });
   });
 });

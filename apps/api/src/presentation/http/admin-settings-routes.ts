@@ -200,6 +200,7 @@ export function createAdminSettingsRoutes(
   googleDriveRepository?: GoogleDriveRepositoryPort,
   spreadsheetRepository?: SpreadsheetRepository,
   telegramProviderFactory?: (botToken: string) => TelegramProvider,
+  telegramAlertRepository?: TelegramAlertRepository,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -1032,6 +1033,22 @@ export function createAdminSettingsRoutes(
                   try {
                     const cfg = await loadEmailConfig(encryptedSettingsService);
                     return cfg.masterEmails;
+                  } catch {
+                    return [];
+                  }
+                }
+                return [];
+              },
+            }
+          : undefined,
+        telegramDependencies: telegramAlertRepository
+          ? {
+              repository: telegramAlertRepository,
+              getPreinscriptionChatIds: async () => {
+                if (encryptedSettingsService) {
+                  try {
+                    const cfg = await loadTelegramConfig(encryptedSettingsService);
+                    return cfg.preinscriptionEnabled ? cfg.chatIds : [];
                   } catch {
                     return [];
                   }

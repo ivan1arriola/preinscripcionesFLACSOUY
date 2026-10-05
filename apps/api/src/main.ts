@@ -182,7 +182,7 @@ const telegramAlertDispatcher = new TelegramRecoveryAlertDispatcher({
   getProvider: async () => {
     try {
       const telegramConfig = await loadTelegramConfig(encryptedSettingsService);
-      if (telegramConfig.enabled && telegramConfig.botToken) {
+      if ((telegramConfig.enabled || telegramConfig.preinscriptionEnabled) && telegramConfig.botToken) {
         return new FetchTelegramProvider(telegramConfig.botToken);
       }
       return null;

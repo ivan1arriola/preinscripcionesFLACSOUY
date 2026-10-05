@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InMemorySubmissionRecoveryRepository } from '../infrastructure/database/in-memory-submission-recovery-repository.js';
 import { InMemorySubmissionRepository } from '../infrastructure/database/in-memory-submission-repository.js';
+import { InMemoryTelegramAlertRepository } from '../infrastructure/database/in-memory-telegram-alert-repository.js';
 import { FixtureAcademicCatalog } from '../infrastructure/fixtures/fixture-academic-catalog.js';
 import { retryFailedSubmission } from './retry-failed-submission.js';
 
@@ -315,5 +316,52 @@ describe('retryFailedSubmission', () => {
     if (!result.ok) {
       expect(result.code).toBe('ALREADY_DISCARDED');
     }
+  });
+
+  it('enqueues Telegram preinscription alert upon successful retry and does not duplicate if already exists', async () => {
+    const telegramRepo = new InMemoryTelegramAlertRepository();
+
+    const subRecord = await recoveryRepo.recordFailure({
+      submissionId: 'sub_tg_retry',
+      targetId: 'diplomado-salud-c2',
+      stage: 'sheets',
+      safeError: 'Error temporal de conexión.',
+      retentionDays: 7,
+    });
+
+    recoveryRepo.setDetails(subRecord.id, {
+      values: {
+        nombres: 'María',
+        apellidos: 'Rodríguez',
+        email: 'maria@example.com',
+        cedula: '12345678',
+      },
+      files: [],
+    });
+
+    const result = await retryFailedSubmission({
+      recoveryIdOrSubmissionId: subRecord.id,
+      adminEmail: 'admin@flacso.edu.uy',
+    }, {
+      recoveryRepository: recoveryRepo,
+      submissionRepository: submissionRepo,
+      catalog,
+      spreadsheetDependencies: {
+        targetSpreadsheetService: mockTargetSpreadsheetService as any,
+        repository: mockSpreadsheetRepo as any,
+      },
+      telegramDependencies: {
+        repository: telegramRepo,
+        getPreinscriptionChatIds: async () => ['1001', '1002'],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+
+    const alerts = await telegramRepo.listAlerts({ eventType: 'preinscription' });
+    expect(alerts).toHaveLength(2);
+    expect(alerts.map((a) => a.chatId).sort()).toEqual(['1001', '1002'].sort());
+    expect(alerts[0]!.message).toContain('✅ Nueva preinscripción recibida');
+    expect(alerts[0]!.message).toContain('sub_tg_retry');
   });
 });

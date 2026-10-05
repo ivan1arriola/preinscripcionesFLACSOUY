@@ -56,6 +56,7 @@ export interface AppDependencies {
   submissionRecoveryRepository?: SubmissionRecoveryRepository;
   telegramAlertRepository?: TelegramAlertRepository;
   getTelegramChatIds?: () => Promise<string[]> | string[];
+  getTelegramPreinscriptionChatIds?: () => Promise<string[]> | string[];
   telegramProviderFactory?: (botToken: string) => TelegramProvider;
 }
 
@@ -144,6 +145,53 @@ export function createApp(dependencies: AppDependencies): Express {
             }
             return [];
           },
+          getTelegramPreinscriptionChatIds: async () => {
+            if (dependencies.getTelegramPreinscriptionChatIds) {
+              return dependencies.getTelegramPreinscriptionChatIds();
+            }
+            if (encryptedSettingsService) {
+              try {
+                const cfg = await loadTelegramConfig(encryptedSettingsService);
+                return cfg.preinscriptionEnabled ? cfg.chatIds : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          },
+        }
+      : undefined,
+    dependencies.telegramAlertRepository
+      ? {
+          repository: dependencies.telegramAlertRepository,
+          getPreinscriptionChatIds: async () => {
+            if (dependencies.getTelegramPreinscriptionChatIds) {
+              return dependencies.getTelegramPreinscriptionChatIds();
+            }
+            if (encryptedSettingsService) {
+              try {
+                const cfg = await loadTelegramConfig(encryptedSettingsService);
+                return cfg.preinscriptionEnabled ? cfg.chatIds : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          },
+          getRecoveryChatIds: async () => {
+            if (dependencies.getTelegramChatIds) {
+              return dependencies.getTelegramChatIds();
+            }
+            if (encryptedSettingsService) {
+              try {
+                const cfg = await loadTelegramConfig(encryptedSettingsService);
+                return cfg.enabled ? cfg.chatIds : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          },
         }
       : undefined,
   );
@@ -178,6 +226,7 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.googleDriveRepository,
     dependencies.spreadsheetRepository,
     dependencies.telegramProviderFactory,
+    dependencies.telegramAlertRepository,
   ));
 
   // Central error handler

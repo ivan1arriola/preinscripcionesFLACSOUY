@@ -11,6 +11,7 @@ import type { EmailNotificationRepository } from '../../ports/email-notification
 import { createPreinscriptionNotifications } from '../../application/create-preinscription-notifications.js';
 import type { SubmissionRecoveryRepository } from '../../ports/submission-recovery-repository.js';
 import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
+import { enqueuePreinscriptionTelegramNotifications } from '../../application/preinscription-telegram-notification.js';
 
 export function sanitizeSafeError(error: unknown, fallback: string = 'Error de procesamiento técnico.'): string {
   if (!error) return fallback;
@@ -96,6 +97,13 @@ export interface SubmissionRecoveryDependencies {
   repository: SubmissionRecoveryRepository;
   telegramAlertRepository?: TelegramAlertRepository;
   getTelegramChatIds?: () => Promise<string[]> | string[];
+  getTelegramPreinscriptionChatIds?: () => Promise<string[]> | string[];
+}
+
+export interface SubmissionTelegramDependencies {
+  repository: TelegramAlertRepository;
+  getPreinscriptionChatIds?: () => Promise<string[]> | string[];
+  getRecoveryChatIds?: () => Promise<string[]> | string[];
 }
 
 export function createSubmissionRoutes(
@@ -105,6 +113,7 @@ export function createSubmissionRoutes(
   spreadsheetDependencies?: SubmissionSpreadsheetDependencies,
   notificationDependencies?: SubmissionNotificationDependencies,
   recoveryDependencies?: SubmissionRecoveryDependencies,
+  telegramDependencies?: SubmissionTelegramDependencies,
 ): Router {
   const router = Router({ mergeParams: true });
 
@@ -363,6 +372,29 @@ export function createSubmissionRoutes(
           });
         } catch (notificationError) {
           console.error('[Notifications] Error al encolar notificaciones de preinscripción:', notificationError);
+        }
+      }
+
+      const telegramRepo = telegramDependencies?.repository ?? recoveryDependencies?.telegramAlertRepository;
+      const getPreinscriptionChatIds =
+        telegramDependencies?.getPreinscriptionChatIds ?? recoveryDependencies?.getTelegramPreinscriptionChatIds;
+
+      if (telegramRepo && getPreinscriptionChatIds) {
+        try {
+          const chatIds = await getPreinscriptionChatIds();
+          if (chatIds && chatIds.length > 0) {
+            await enqueuePreinscriptionTelegramNotifications({
+              repository: telegramRepo,
+              submissionId: result.submissionId,
+              target: result.target,
+              chatIds,
+            });
+          }
+        } catch (telegramError) {
+          console.error(
+            '[Telegram] Error al encolar notificación de preinscripción:',
+            sanitizeSafeError(telegramError)
+          );
         }
       }
 
