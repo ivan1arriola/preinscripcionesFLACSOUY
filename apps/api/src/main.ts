@@ -23,10 +23,14 @@ import { getAdminSessionTtlMs } from './application/admin-session.js';
 import { EncryptedSettingsService } from './infrastructure/security/encrypted-settings.js';
 import { PostgresEmailNotificationRepository } from './infrastructure/database/postgres-email-notification-repository.js';
 import { PostgresSubmissionRecoveryRepository } from './infrastructure/database/postgres-submission-recovery-repository.js';
+import { PostgresTelegramAlertRepository } from './infrastructure/database/postgres-telegram-alert-repository.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
+import { TelegramRecoveryAlertDispatcher } from './application/telegram-recovery-alert-dispatcher.js';
 import { FakeEmailProvider } from './infrastructure/email/email-provider.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
 import { SmtpEmailProvider } from './infrastructure/email/smtp-email-provider.js';
+import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js';
+import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
 
 const port = Number(process.env.PORT || 3000);
@@ -40,6 +44,7 @@ const encryptedSettingsService = new EncryptedSettingsService(
 const targetSpreadsheetRepository = new PostgresTargetSpreadsheetRepository(db);
 const emailNotificationRepository = new PostgresEmailNotificationRepository(db);
 const submissionRecoveryRepository = new PostgresSubmissionRecoveryRepository(db);
+const telegramAlertRepository = new PostgresTelegramAlertRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
   ? new WordPressAcademicCatalog(
@@ -172,6 +177,26 @@ if (process.env.NODE_ENV !== 'test') {
   notificationDispatcher.start(30_000);
 }
 
+const telegramAlertDispatcher = new TelegramRecoveryAlertDispatcher({
+  repository: telegramAlertRepository,
+  getProvider: async () => {
+    try {
+      const telegramConfig = await loadTelegramConfig(encryptedSettingsService);
+      if (telegramConfig.enabled && telegramConfig.botToken) {
+        return new FetchTelegramProvider(telegramConfig.botToken);
+      }
+      return null;
+    } catch (err) {
+      console.warn('[Telegram Dispatcher] Configuración de Telegram no disponible:', err instanceof Error ? err.message : err);
+      return null;
+    }
+  },
+});
+
+if (process.env.NODE_ENV !== 'test') {
+  telegramAlertDispatcher.start(15_000);
+}
+
 const app = createApp({
   catalog,
   repository,
@@ -187,6 +212,7 @@ const app = createApp({
   emailNotificationRepository,
   emailNotificationDispatcher: notificationDispatcher,
   submissionRecoveryRepository,
+  telegramAlertRepository,
   serviceAccountEmail: googleCreds.clientEmail,
   checkDatabase: checkDb,
 });

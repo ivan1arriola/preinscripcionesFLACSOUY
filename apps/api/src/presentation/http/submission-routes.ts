@@ -10,6 +10,7 @@ import type { TargetSpreadsheetService } from '../../application/target-spreadsh
 import type { EmailNotificationRepository } from '../../ports/email-notification-repository.js';
 import { createPreinscriptionNotifications } from '../../application/create-preinscription-notifications.js';
 import type { SubmissionRecoveryRepository } from '../../ports/submission-recovery-repository.js';
+import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
 
 export function sanitizeSafeError(error: unknown, fallback: string = 'Error de procesamiento técnico.'): string {
   if (!error) return fallback;
@@ -25,6 +26,44 @@ export function sanitizeSafeError(error: unknown, fallback: string = 'Error de p
     sanitized = sanitized.slice(0, 497) + '...';
   }
   return sanitized || fallback;
+}
+
+async function tryEnqueueTelegramAlert(
+  recoveryDeps: SubmissionRecoveryDependencies | undefined,
+  recoveryId: string | undefined,
+  submissionId: string,
+  targetId: string,
+  stage: string,
+  safeError: string
+): Promise<void> {
+  if (!recoveryDeps?.telegramAlertRepository || !recoveryDeps.getTelegramChatIds) {
+    return;
+  }
+  try {
+    const chatIds = await recoveryDeps.getTelegramChatIds();
+    if (!chatIds || chatIds.length === 0) {
+      return;
+    }
+    const message = [
+      '⚠️ Incidente de preinscripción FLACSO',
+      `• ID de seguimiento: ${submissionId}`,
+      `• Destino: ${targetId}`,
+      `• Etapa: ${stage.toUpperCase()}`,
+      `• Detalle técnico: ${safeError}`,
+      '• Retención: 7 días para recuperación administrativa',
+    ].join('\n');
+
+    await recoveryDeps.telegramAlertRepository.enqueue(
+      chatIds.map((chatId) => ({
+        recoveryId: recoveryId ?? null,
+        submissionId,
+        chatId,
+        message,
+      }))
+    );
+  } catch (err) {
+    console.error('[Telegram Alerts] Error al encolar alertas de incidente:', err);
+  }
 }
 
 const submissionSchema = z.object({
@@ -55,6 +94,8 @@ export interface SubmissionNotificationDependencies {
 
 export interface SubmissionRecoveryDependencies {
   repository: SubmissionRecoveryRepository;
+  telegramAlertRepository?: TelegramAlertRepository;
+  getTelegramChatIds?: () => Promise<string[]> | string[];
 }
 
 export function createSubmissionRoutes(
@@ -185,8 +226,9 @@ export function createSubmissionRoutes(
           } else {
             await repository.markProcessing(result.submissionId, 'failed', safeError);
           }
+          let recoveryRecord;
           if (recoveryDependencies?.repository) {
-            await recoveryDependencies.repository.recordFailure({
+            recoveryRecord = await recoveryDependencies.repository.recordFailure({
               submissionId: result.submissionId,
               targetId,
               stage: 'drive',
@@ -198,6 +240,14 @@ export function createSubmissionRoutes(
             const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
             await fileDependencies.storage.extendRetention(files.map((f) => f.token), retentionExpiresAt);
           }
+          await tryEnqueueTelegramAlert(
+            recoveryDependencies,
+            recoveryRecord?.id,
+            result.submissionId,
+            targetId,
+            'drive',
+            safeError
+          );
           res.status(202).json({
             submissionId: result.submissionId,
             status: 'pending_processing',
@@ -218,8 +268,9 @@ export function createSubmissionRoutes(
             } else {
               await repository.markProcessing(result.submissionId, 'failed', safeError);
             }
+            let recoveryRecord;
             if (recoveryDependencies?.repository) {
-              await recoveryDependencies.repository.recordFailure({
+              recoveryRecord = await recoveryDependencies.repository.recordFailure({
                 submissionId: result.submissionId,
                 targetId,
                 stage: 'sheets',
@@ -231,6 +282,14 @@ export function createSubmissionRoutes(
               const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
               await fileDependencies.storage.extendRetention(files.map((f) => f.token), retentionExpiresAt);
             }
+            await tryEnqueueTelegramAlert(
+              recoveryDependencies,
+              recoveryRecord?.id,
+              result.submissionId,
+              targetId,
+              'sheets',
+              safeError
+            );
             res.status(202).json({
               submissionId: result.submissionId,
               status: 'pending_processing',
@@ -255,8 +314,9 @@ export function createSubmissionRoutes(
           } else {
             await repository.markProcessing(result.submissionId, 'failed', safeError);
           }
+          let recoveryRecord;
           if (recoveryDependencies?.repository) {
-            await recoveryDependencies.repository.recordFailure({
+            recoveryRecord = await recoveryDependencies.repository.recordFailure({
               submissionId: result.submissionId,
               targetId,
               stage: 'sheets',
@@ -268,6 +328,14 @@ export function createSubmissionRoutes(
             const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
             await fileDependencies.storage.extendRetention(files.map((f) => f.token), retentionExpiresAt);
           }
+          await tryEnqueueTelegramAlert(
+            recoveryDependencies,
+            recoveryRecord?.id,
+            result.submissionId,
+            targetId,
+            'sheets',
+            safeError
+          );
           res.status(202).json({
             submissionId: result.submissionId,
             status: 'pending_processing',

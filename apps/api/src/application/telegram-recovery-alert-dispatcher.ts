@@ -51,6 +51,9 @@ export class TelegramRecoveryAlertDispatcher {
   private readonly getProvider?: () => Promise<TelegramProvider | null>;
   private readonly batchSize: number;
   private readonly leaseDurationMs: number;
+  private timer: NodeJS.Timeout | null = null;
+  private isRunning = false;
+  private isExecuting = false;
 
   constructor(params: TelegramRecoveryAlertDispatcherParams) {
     this.repository = params.repository;
@@ -118,5 +121,41 @@ export class TelegramRecoveryAlertDispatcher {
       sanitized = sanitized.slice(0, 497) + '...';
     }
     return sanitized;
+  }
+
+  start(intervalMs = 15_000): { stop: () => void } {
+    if (this.isRunning) {
+      return { stop: () => this.stop() };
+    }
+    this.isRunning = true;
+
+    const tick = async () => {
+      if (!this.isRunning || this.isExecuting) return;
+      this.isExecuting = true;
+      try {
+        await this.dispatchBatch();
+      } catch (err) {
+        console.error('[TelegramRecoveryAlertDispatcher] Error durante ciclo de despacho:', err);
+      } finally {
+        this.isExecuting = false;
+      }
+    };
+
+    this.timer = setInterval(() => {
+      void tick();
+    }, intervalMs);
+    this.timer.unref();
+
+    void tick();
+
+    return { stop: () => this.stop() };
+  }
+
+  stop(): void {
+    this.isRunning = false;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
   }
 }

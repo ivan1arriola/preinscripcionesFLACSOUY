@@ -8,6 +8,7 @@ import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import { InMemoryEmailNotificationRepository } from '../../infrastructure/database/in-memory-email-notification-repository.js';
 import { InMemorySubmissionRecoveryRepository } from '../../infrastructure/database/in-memory-submission-recovery-repository.js';
+import { InMemoryTelegramAlertRepository } from '../../infrastructure/database/in-memory-telegram-alert-repository.js';
 
 describe('Submission HTTP Routes', () => {
   let server: Server;
@@ -507,6 +508,97 @@ describe('Submission HTTP Routes', () => {
         expect(res.status).toBe(201);
         const data = await res.json();
         expect(data.submissionId).toBeDefined();
+      } finally {
+        await new Promise<void>((resolve) => tempServer.close(() => resolve()));
+      }
+    });
+
+    it('enqueues a Telegram alert on Sheets failure with safe metadata and no PII, leaving response and recovery intact when provider is unavailable', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const testRepo = new InMemorySubmissionRepository();
+      const recoveryRepo = new InMemorySubmissionRecoveryRepository();
+      const telegramAlertRepo = new InMemoryTelegramAlertRepository();
+
+      const spreadsheetService = {
+        ensureForTarget: vi.fn(async () => ({
+          spreadsheetId: 'sheet-tgt-1',
+          sheetName: 'Preinscripciones',
+        })),
+      };
+
+      const failingSpreadsheetRepo = {
+        appendByHeaders: vi.fn(async () => {
+          throw new Error('Google Sheets API 503 Service Unavailable');
+        }),
+      };
+
+      const storage: TemporaryFileStoragePort = {
+        save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+        remove: async () => undefined,
+        cleanup: async () => 0,
+      };
+
+      const drive: GoogleDriveRepositoryPort = {
+        storeSubmissionFiles: async () => ({
+          files: [],
+          documentsFolderId: 'f1',
+          documentsFolderUrl: 'https://drive.google.com/drive/folders/f1',
+        }),
+      };
+
+      const app = createApp({
+        catalog,
+        repository: testRepo,
+        temporaryFileStorage: storage,
+        googleDriveRepository: drive,
+        submissionRecoveryRepository: recoveryRepo,
+        targetSpreadsheetService: spreadsheetService as any,
+        spreadsheetRepository: failingSpreadsheetRepo as any,
+        telegramAlertRepository: telegramAlertRepo,
+        getTelegramChatIds: async () => ['-100123456789'],
+      });
+
+      const tempServer = app.listen(0);
+      const port = (tempServer.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-preinscription-session': 'sess-1',
+          },
+          body: JSON.stringify(validPayload),
+        });
+
+        expect(res.status).toBe(202);
+        const data = await res.json();
+        expect(data.submissionId).toBeDefined();
+
+        // Recovery record is preserved
+        const recovery = await recoveryRepo.findById(data.submissionId);
+        expect(recovery).not.toBeNull();
+        expect(recovery?.stage).toBe('sheets');
+        expect(recovery?.status).toBe('pending');
+
+        // Telegram alert is enqueued
+        const alerts = await telegramAlertRepo.listAlerts?.();
+        expect(alerts).toBeDefined();
+        expect(alerts).toHaveLength(1);
+        const alert = alerts![0]!;
+        expect(alert.submissionId).toBe(data.submissionId);
+        expect(alert.chatId).toBe('-100123456789');
+        expect(alert.status).toBe('pending');
+        expect(alert.message).toContain('⚠️ Incidente de preinscripción FLACSO');
+        expect(alert.message).toContain(data.submissionId);
+        expect(alert.message).toContain('SHEETS');
+        expect(alert.message).toContain('Google Sheets API 503');
+
+        // Zero applicant PII in alert message
+        expect(alert.message).not.toContain('Lucía');
+        expect(alert.message).not.toContain('Méndez');
+        expect(alert.message).not.toContain('lucia@example.com');
+        expect(alert.message).not.toContain('34567894');
       } finally {
         await new Promise<void>((resolve) => tempServer.close(() => resolve()));
       }

@@ -31,6 +31,8 @@ import type { EmailNotificationRepository } from '../../ports/email-notification
 import type { EmailNotificationDispatcher } from '../../application/email-notification-dispatcher.js';
 import { loadEmailConfig, type SmtpConfig } from '../../infrastructure/email/email-config.js';
 import type { EmailProvider } from '../../infrastructure/email/email-provider.js';
+import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
+import { loadTelegramConfig } from '../../infrastructure/telegram/telegram-config.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -51,6 +53,8 @@ export interface AppDependencies {
   getMasterEmails?: () => Promise<string[]> | string[];
   serviceAccountEmail?: string;
   submissionRecoveryRepository?: SubmissionRecoveryRepository;
+  telegramAlertRepository?: TelegramAlertRepository;
+  getTelegramChatIds?: () => Promise<string[]> | string[];
 }
 
 export function createApp(dependencies: AppDependencies): Express {
@@ -121,7 +125,24 @@ export function createApp(dependencies: AppDependencies): Express {
         }
       : undefined,
     dependencies.submissionRecoveryRepository
-      ? { repository: dependencies.submissionRecoveryRepository }
+      ? {
+          repository: dependencies.submissionRecoveryRepository,
+          telegramAlertRepository: dependencies.telegramAlertRepository,
+          getTelegramChatIds: async () => {
+            if (dependencies.getTelegramChatIds) {
+              return dependencies.getTelegramChatIds();
+            }
+            if (encryptedSettingsService) {
+              try {
+                const cfg = await loadTelegramConfig(encryptedSettingsService);
+                return cfg.enabled ? cfg.chatIds : [];
+              } catch {
+                return [];
+              }
+            }
+            return [];
+          },
+        }
       : undefined,
   );
 
