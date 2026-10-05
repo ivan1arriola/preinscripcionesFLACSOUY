@@ -20,6 +20,19 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', 'Respuestas!1:1');
   });
 
+  it('quotes sheet names with spaces so Google Sheets accepts the A1 range', async () => {
+    const mockClient: SheetsClient = {
+      getValues: vi.fn().mockResolvedValue([['Nombre']]),
+      updateValues: vi.fn(),
+      appendValues: vi.fn(),
+    };
+
+    const repo = new GoogleSheetsRepository(mockClient);
+    await repo.readHeaders('sheet_123', 'Hoja 1');
+
+    expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', "'Hoja 1'!1:1");
+  });
+
   it('appends a row by header names and preserves manual columns as empty slots', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([

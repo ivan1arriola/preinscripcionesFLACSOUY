@@ -31,7 +31,7 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
   constructor(private readonly client: SheetsClient) {}
 
   async readHeaders(spreadsheetId: string, sheetName = 'Sheet1'): Promise<string[]> {
-    const range = `${sheetName}!1:1`;
+    const range = `${toSheetRange(sheetName)}!1:1`;
     const rows = await this.client.getValues(spreadsheetId, range);
     if (!rows || rows.length === 0) {
       return [];
@@ -54,7 +54,7 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
 
       if (missingColumnsAdded.length > 0) {
         try {
-          const headerRange = `${sheetName}!1:1`;
+          const headerRange = `${toSheetRange(sheetName)}!1:1`;
           await this.client.updateValues(spreadsheetId, headerRange, [updatedHeaders]);
           headers = updatedHeaders;
           buildResult = buildSpreadsheetRow(headers, valuesByColumnName, requiredColumns);
@@ -68,7 +68,7 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
       }
     }
 
-    const range = `${sheetName}!A:A`;
+    const range = `${toSheetRange(sheetName)}!A:A`;
     const res = await this.client.appendValues(spreadsheetId, range, [buildResult.row]);
 
     let sheetId = 0;
@@ -125,4 +125,11 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
       };
     }
   }
+}
+
+function toSheetRange(sheetName: string): string {
+  const normalized = sheetName.trim();
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(normalized)
+    ? normalized
+    : `'${normalized.replace(/'/g, "''")}'`;
 }

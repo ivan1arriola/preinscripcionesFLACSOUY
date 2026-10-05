@@ -82,8 +82,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     }
 
     if (!res.ok) {
+      const details = await readGoogleApiError(res);
       throw new GoogleSheetsClientError(
-        `Google Sheets API respondió con error HTTP ${res.status}`,
+        `Google Sheets API respondió con error HTTP ${res.status}${details ? `: ${details}` : ''}`,
         res.status
       );
     }
@@ -121,8 +122,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     }
 
     if (!res.ok) {
+      const details = await readGoogleApiError(res);
       throw new GoogleSheetsClientError(
-        `Google Sheets API respondió con error HTTP ${res.status} al insertar fila`,
+        `Google Sheets API respondió con error HTTP ${res.status} al insertar fila${details ? `: ${details}` : ''}`,
         res.status
       );
     }
@@ -162,8 +164,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     }
 
     if (!res.ok) {
+      const details = await readGoogleApiError(res);
       throw new GoogleSheetsClientError(
-        `Google Sheets API respondió con error HTTP ${res.status} al crear los encabezados`,
+        `Google Sheets API respondió con error HTTP ${res.status} al crear los encabezados${details ? `: ${details}` : ''}`,
         res.status
       );
     }
@@ -191,8 +194,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     }
 
     if (!res.ok) {
+      const details = await readGoogleApiError(res);
       throw new GoogleSheetsClientError(
-        `Google Sheets API respondió con error HTTP ${res.status} al consultar metadata`,
+        `Google Sheets API respondió con error HTTP ${res.status} al consultar metadata${details ? `: ${details}` : ''}`,
         res.status
       );
     }
@@ -233,5 +237,15 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     }
 
     return null;
+  }
+}
+
+async function readGoogleApiError(response: Response): Promise<string | undefined> {
+  try {
+    const payload = await response.json() as { error?: { message?: string } };
+    const message = payload.error?.message?.trim();
+    return message ? message.slice(0, 300) : undefined;
+  } catch {
+    return undefined;
   }
 }
