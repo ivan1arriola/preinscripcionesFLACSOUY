@@ -19,7 +19,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<string>('failed,retrying');
+  const [statusFilter, setStatusFilter] = useState<string>('pending,retrying');
   const [stageFilter, setStageFilter] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
@@ -135,7 +135,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
 
   const formatStatus = (status: string) => {
     switch (status) {
-      case 'failed':
+      case 'pending':
         return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-100 text-red-800">● Pendiente</span>;
       case 'retrying':
         return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-100 text-yellow-800">● Reintentando</span>;
@@ -207,8 +207,8 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
             onChange={(e) => setStatusFilter(e.target.value)}
             className="p-1.5 border border-gray-300 rounded bg-white text-xs focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value="failed,retrying">Pendientes y en proceso</option>
-            <option value="failed">Solo pendientes</option>
+            <option value="pending,retrying">Pendientes y en proceso</option>
+            <option value="pending">Solo pendientes</option>
             <option value="retrying">Solo en reintento</option>
             <option value="resolved">Resueltos</option>
             <option value="discarded">Descartados</option>

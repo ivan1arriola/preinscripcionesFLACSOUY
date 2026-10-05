@@ -577,7 +577,7 @@ export interface AdminRecoveryRecord {
   targetTitle: string | null;
   targetKind: string | null;
   stage: 'drive' | 'sheets' | 'notifications' | 'unknown';
-  status: 'failed' | 'retrying' | 'resolved' | 'discarded';
+  status: 'pending' | 'retrying' | 'resolved' | 'discarded';
   safeError: string;
   attemptCount: number;
   lastAttemptAt: string;
@@ -609,7 +609,7 @@ export interface AdminRecoveryDetail {
   targetTitle: string | null;
   targetKind: string | null;
   stage: 'drive' | 'sheets' | 'notifications' | 'unknown';
-  status: 'failed' | 'retrying' | 'resolved' | 'discarded';
+  status: 'pending' | 'retrying' | 'resolved' | 'discarded';
   safeError: string;
   attemptCount: number;
   lastAttemptAt: string;

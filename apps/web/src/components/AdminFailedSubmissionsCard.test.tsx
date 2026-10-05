@@ -28,7 +28,7 @@ describe('AdminFailedSubmissionsCard Component', () => {
     targetTitle: 'Diplomado en Salud',
     targetKind: 'diploma',
     stage: 'sheets' as const,
-    status: 'failed' as const,
+    status: 'pending' as const,
     safeError: 'Google Sheets 503 Backend Error',
     attemptCount: 1,
     lastAttemptAt: '2026-10-05T12:00:00Z',
@@ -50,6 +50,11 @@ describe('AdminFailedSubmissionsCard Component', () => {
     render(<AdminFailedSubmissionsCard csrfToken="csrf-test-token" />);
 
     await waitFor(() => {
+      expect(apiClient.listRecoveries).toHaveBeenCalledWith({
+        status: 'pending,retrying',
+        stage: undefined,
+        search: undefined,
+      });
       expect(screen.getByText('sub-test-123')).toBeInTheDocument();
       expect(screen.getByText('Diplomado en Salud')).toBeInTheDocument();
       expect(screen.getAllByText('Google Sheets').length).toBeGreaterThan(0);
