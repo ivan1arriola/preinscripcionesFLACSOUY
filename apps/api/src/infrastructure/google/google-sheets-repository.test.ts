@@ -33,6 +33,25 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', "'Hoja 1'!A1:ZZ1");
   });
 
+  it('uses the actual first sheet title when the configured title is stale', async () => {
+    const mockClient: SheetsClient = {
+      getValues: vi.fn().mockResolvedValue([['Nombre']]),
+      updateValues: vi.fn(),
+      appendValues: vi.fn(),
+      getSheetMetadata: vi.fn().mockResolvedValue({
+        sheetId: 0,
+        title: 'Hoja 1',
+        index: 0,
+      }),
+    };
+
+    const repo = new GoogleSheetsRepository(mockClient);
+    await repo.readHeaders('sheet_123', 'Inscripciones');
+
+    expect(mockClient.getSheetMetadata).toHaveBeenCalledWith('sheet_123', 'Inscripciones');
+    expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', "'Hoja 1'!A1:ZZ1");
+  });
+
   it('appends a row by header names and preserves manual columns as empty slots', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([

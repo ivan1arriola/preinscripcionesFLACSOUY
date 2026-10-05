@@ -998,7 +998,20 @@ export function createAdminSettingsRoutes(
         resolvedAt: recovery.resolvedAt?.toISOString() ?? null,
         createdAt: recovery.createdAt.toISOString(),
         updatedAt: recovery.updatedAt.toISOString(),
-        files: recovery.files,
+        files: (recovery.files ?? []).map((file) => ({
+          token: file.token,
+          fieldKey: file.fieldKey,
+          originalName: file.originalName,
+          mimeType: file.mimeType,
+          sizeBytes: file.size,
+          driveFileId: file.driveFileId ?? null,
+          uploadedAt: null,
+          status: file.status === 'success' && file.driveFileId
+            ? 'stored_in_drive'
+            : file.status === 'pending'
+              ? 'pending_in_storage'
+              : 'missing',
+        })),
         values: recovery.values,
       },
     });

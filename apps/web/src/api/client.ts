@@ -597,8 +597,8 @@ export interface AdminRecoveryDetailFile {
   originalName: string;
   mimeType: string;
   sizeBytes: number;
-  driveFileId?: string;
-  uploadedAt: string;
+  driveFileId?: string | null;
+  uploadedAt: string | null;
   status: 'stored_in_drive' | 'pending_in_storage' | 'missing';
 }
 

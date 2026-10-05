@@ -31,6 +31,11 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
   constructor(private readonly client: SheetsClient) {}
 
   async readHeaders(spreadsheetId: string, sheetName = 'Sheet1'): Promise<string[]> {
+    const actualSheetName = await this.resolveSheetName(spreadsheetId, sheetName);
+    return this.readHeadersFromSheet(spreadsheetId, actualSheetName);
+  }
+
+  private async readHeadersFromSheet(spreadsheetId: string, sheetName: string): Promise<string[]> {
     const range = `${toSheetRange(sheetName)}!A1:ZZ1`;
     const rows = await this.client.getValues(spreadsheetId, range);
     if (!rows || rows.length === 0) {
@@ -45,7 +50,8 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
     requiredColumns: string[],
     sheetName = 'Sheet1'
   ): Promise<AppendResult> {
-    let headers = await this.readHeaders(spreadsheetId, sheetName);
+    const actualSheetName = await this.resolveSheetName(spreadsheetId, sheetName);
+    let headers = await this.readHeadersFromSheet(spreadsheetId, actualSheetName);
     let buildResult = buildSpreadsheetRow(headers, valuesByColumnName, requiredColumns);
 
     if (!buildResult.success) {
@@ -54,7 +60,7 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
 
       if (missingColumnsAdded.length > 0) {
         try {
-          const headerRange = `${toSheetRange(sheetName)}!A1:ZZ1`;
+          const headerRange = `${toSheetRange(actualSheetName)}!A1:ZZ1`;
           await this.client.updateValues(spreadsheetId, headerRange, [updatedHeaders]);
           headers = updatedHeaders;
           buildResult = buildSpreadsheetRow(headers, valuesByColumnName, requiredColumns);
@@ -68,13 +74,13 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
       }
     }
 
-    const range = `${toSheetRange(sheetName)}!A:A`;
+    const range = `${toSheetRange(actualSheetName)}!A:A`;
     const res = await this.client.appendValues(spreadsheetId, range, [buildResult.row]);
 
     let sheetId = 0;
     if (this.client.getSheetMetadata) {
       try {
-        const meta = await this.client.getSheetMetadata(spreadsheetId, sheetName);
+        const meta = await this.client.getSheetMetadata(spreadsheetId, actualSheetName);
         if (meta && typeof meta.sheetId === 'number') {
           sheetId = meta.sheetId;
         }
@@ -87,7 +93,7 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
 
     return {
       spreadsheetId,
-      sheetName,
+      sheetName: actualSheetName,
       sheetId,
       updatedRange: res.updatedRange,
       rowUrl,
@@ -101,7 +107,8 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
     sheetName = 'Sheet1'
   ): Promise<SpreadsheetDiagnostic> {
     try {
-      const headers = await this.readHeaders(spreadsheetId, sheetName);
+      const actualSheetName = await this.resolveSheetName(spreadsheetId, sheetName);
+      const headers = await this.readHeadersFromSheet(spreadsheetId, actualSheetName);
       const headerDiagnostic = validateSpreadsheetHeaders(headers, requiredColumns);
 
       return {
@@ -123,6 +130,17 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
         },
         error: err instanceof Error ? err.message : 'Error desconocido al acceder al Spreadsheet',
       };
+    }
+  }
+
+  private async resolveSheetName(spreadsheetId: string, requestedSheetName: string): Promise<string> {
+    if (!this.client.getSheetMetadata) return requestedSheetName;
+
+    try {
+      const metadata = await this.client.getSheetMetadata(spreadsheetId, requestedSheetName);
+      return metadata?.title?.trim() || requestedSheetName;
+    } catch {
+      return requestedSheetName;
     }
   }
 }

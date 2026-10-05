@@ -149,15 +149,16 @@ describe('Submission Recovery Routes (/api/admin/settings/recoveries)', () => {
     });
     recoveryRepo.setDetails(rec.id, {
       values: { nombres: 'Valeria', email: 'valeria@example.com' },
-      files: [
-        {
-          token: 'tok_valeria_cv',
-          fieldKey: 'curriculum',
-          originalName: 'cv.pdf',
-          size: 1024,
-          mimeType: 'application/pdf',
-          status: 'failed',
-        },
+        files: [
+          {
+            token: 'tok_valeria_cv',
+            fieldKey: 'curriculum',
+            originalName: 'cv.pdf',
+            size: 1024,
+            mimeType: 'application/pdf',
+            status: 'success',
+            driveFileId: 'drive-cv-1',
+          },
       ],
     });
 
@@ -176,6 +177,9 @@ describe('Submission Recovery Routes (/api/admin/settings/recoveries)', () => {
     });
     expect(body.recovery.files).toHaveLength(1);
     expect(body.recovery.files[0].originalName).toBe('cv.pdf');
+    expect(body.recovery.files[0].sizeBytes).toBe(1024);
+    expect(body.recovery.files[0].status).toBe('stored_in_drive');
+    expect(body.recovery.files[0].driveFileId).toBe('drive-cv-1');
   });
 
   it('returns 404 for non-existent recovery detail', async () => {
