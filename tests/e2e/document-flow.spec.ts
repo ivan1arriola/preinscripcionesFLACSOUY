@@ -7,6 +7,16 @@ test.describe('Document Flow End-to-End', () => {
     buffer: Buffer.from('%PDF-1.4 dummy test document content'),
   };
 
+  const advancePastOptionalOrientation = async (page: import('@playwright/test').Page, orientation?: string, mention?: string) => {
+    const orientationSelect = page.locator('#input-orientacion');
+    if (await orientationSelect.count()) {
+      if (orientation) await orientationSelect.selectOption({ label: orientation });
+      const mentionSelect = page.locator('#input-mencion');
+      if (mention && await mentionSelect.count()) await mentionSelect.selectOption({ label: mention });
+      await page.getByRole('button', { name: /Siguiente/i }).click();
+    }
+  };
+
   test.beforeEach(async ({ page }) => {
     page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
     page.on('response', async (res) => {
@@ -54,28 +64,23 @@ test.describe('Document Flow End-to-End', () => {
     // Step 3: Trayectoria académica
     await page.locator('#input-estudios').fill('Licenciatura');
     await page.locator('input[name="posgradoFlacso"][value="No"]').check();
-    await page.locator('#input-institucion').fill('UdelaR');
-
-    // Select orientation and mention
-    await page.locator('#input-orientacion').selectOption('Educación');
-    await page.locator('#input-mencion').selectOption('Tecnología Educativa');
-
-    await page.getByRole('button', { name: /Siguiente/i }).click();
-
-    // Step 4: Documentación
-    await expect(page.getByRole('heading', { name: 'Documentación requerida' })).toBeVisible();
-    await page.locator('#file-identidad').setInputFiles(dummyPdf);
-    await page.locator('#file-cv').setInputFiles(dummyPdf);
-
-    // Title companion field and file
     await page.locator('#titulo-denominacion').fill('Licenciada en Educación');
     await page.locator('#file-titulo').setInputFiles(dummyPdf);
+    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
+
+    await page.getByRole('button', { name: /Siguiente/i }).click();
+    await advancePastOptionalOrientation(page, 'Educación', 'Tecnología Educativa');
+
+    // Step 4: Documentación
+    await expect(page.locator('legend').filter({ hasText: 'Documentación requerida' })).toBeVisible();
+    await page.locator('#file-identidad').setInputFiles(dummyPdf);
+    await page.locator('#file-cv').setInputFiles(dummyPdf);
 
     // Motivation letter
     await page.locator('#file-cartaMotivacion').setInputFiles(dummyPdf);
 
     // Wait for uploads to complete
-    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(4);
+    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(3);
 
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
@@ -84,7 +89,8 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
 
-    await page.getByRole('button', { name: /Confirmar y Enviar/i }).click();
+    await page.getByRole('button', { name: /Revisar datos/i }).click();
+    await page.getByRole('button', { name: /Confirmar y enviar/i }).click();
 
     // Success screen
     await expect(page.getByText('¡Preinscripción enviada con éxito!')).toBeVisible({ timeout: 15000 });
@@ -119,22 +125,22 @@ test.describe('Document Flow End-to-End', () => {
     // Step 3
     await page.locator('#input-estudios').fill('Universitario Completo');
     await page.locator('input[name="posgradoFlacso"][value="No"]').check();
-    await page.locator('#input-institucion').fill('UdelaR');
-    await page.locator('#input-orientacion').selectOption('Género y Políticas Públicas');
+    await page.locator('#titulo-denominacion').fill('Licenciatura en Sociología');
+    await page.locator('#file-titulo').setInputFiles(dummyPdf);
+    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
     await page.getByRole('button', { name: /Siguiente/i }).click();
+    await advancePastOptionalOrientation(page, 'Género y Políticas Públicas');
 
     // Step 4: Documentation including recommendation letters attached now
     await page.locator('#file-identidad').setInputFiles(dummyPdf);
     await page.locator('#file-cv').setInputFiles(dummyPdf);
-    await page.locator('#titulo-denominacion').fill('Licenciatura en Sociología');
-    await page.locator('#file-titulo').setInputFiles(dummyPdf);
     await page.locator('#file-cartaMotivacion').setInputFiles(dummyPdf);
 
     // Recommendation letters - choose Adjuntar ahora (default) and upload
     await page.locator('#file-cartaRecomendacion1').setInputFiles(dummyPdf);
     await page.locator('#file-cartaRecomendacion2').setInputFiles(dummyPdf);
 
-    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(6);
+    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(5);
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
     // Step 5: Final step
@@ -142,11 +148,12 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
 
-    await page.getByRole('button', { name: /Confirmar y Enviar/i }).click();
+    await page.getByRole('button', { name: /Revisar datos/i }).click();
+    await page.getByRole('button', { name: /Confirmar y enviar/i }).click();
     await expect(page.getByText('¡Preinscripción enviada con éxito!')).toBeVisible({ timeout: 15000 });
   });
 
-  test('Flow 3: completes master offer with recommendations marked for later submission', async ({ page }) => {
+  test('Flow 3: completes master offer with recommendations attached now', async ({ page }) => {
     await page.goto('/');
 
     await page.getByTestId('offer-group-maestria').locator('summary').click();
@@ -175,23 +182,21 @@ test.describe('Document Flow End-to-End', () => {
     // Step 3
     await page.locator('#input-estudios').fill('Universitario Completo');
     await page.locator('input[name="posgradoFlacso"][value="No"]').check();
-    await page.locator('#input-institucion').fill('UdelaR');
-    await page.locator('#input-orientacion').selectOption('Género y Políticas Públicas');
-    await page.getByRole('button', { name: /Siguiente/i }).click();
-
-    // Step 4: Documentation with deferred recommendations
-    await page.locator('#file-identidad').setInputFiles(dummyPdf);
-    await page.locator('#file-cv').setInputFiles(dummyPdf);
     await page.locator('#titulo-denominacion').fill('Licenciatura en Psicología');
     await page.locator('#file-titulo').setInputFiles(dummyPdf);
+    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
+    await page.getByRole('button', { name: /Siguiente/i }).click();
+    await advancePastOptionalOrientation(page, 'Género y Políticas Públicas');
+
+    // Step 4: Documentation with mandatory recommendations
+    await page.locator('#file-identidad').setInputFiles(dummyPdf);
+    await page.locator('#file-cv').setInputFiles(dummyPdf);
     await page.locator('#file-cartaMotivacion').setInputFiles(dummyPdf);
 
-    // Select "Adjuntar posteriormente" for recommendations
-    await page.locator('input[name="choice-cartaRecomendacion1"]').nth(1).check();
-    await page.locator('input[name="choice-cartaRecomendacion2"]').nth(1).check();
+    await page.locator('#file-cartaRecomendacion1').setInputFiles(dummyPdf);
+    await page.locator('#file-cartaRecomendacion2').setInputFiles(dummyPdf);
 
-    await expect(page.getByText('Marcado para entrega posterior.')).toHaveCount(2);
-    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(4);
+    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(5);
 
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
@@ -200,16 +205,20 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
 
-    await page.getByRole('button', { name: /Confirmar y Enviar/i }).click();
+    await page.getByRole('button', { name: /Revisar datos/i }).click();
+    await page.getByRole('button', { name: /Confirmar y enviar/i }).click();
     await expect(page.getByText('¡Preinscripción enviada con éxito!')).toBeVisible({ timeout: 15000 });
   });
 
   test('Flow 4: completes seminar with title absence declaration and no motivation/recommendation', async ({ page }) => {
     await page.goto('/');
 
-    await page.getByTestId('offer-group-seminarios').locator('summary').click();
+    await page.getByRole('tab', { name: /Seminarios/i }).click();
     const seminarCard = page.getByTestId('target-card-seminario-metodologia-ed3');
-    await seminarCard.getByRole('button', { name: /Completar preinscripción/i }).click();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith('/api/targets/seminario-metodologia-ed3') && response.status() === 200),
+      seminarCard.locator('button.target-card-primary-action').evaluate((button) => (button as HTMLElement).click()),
+    ]);
 
     // Step 1
     await page.locator('#input-nombre1').fill('Mateo');
@@ -233,17 +242,12 @@ test.describe('Document Flow End-to-End', () => {
     // Step 3
     await page.locator('#input-estudios').fill('Terciario');
     await page.locator('input[name="posgradoFlacso"][value="No"]').check();
-    await page.locator('#input-institucion').fill('IPA');
+    await page.locator('#toggle-sin-titulo').check();
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
     // Step 4: Documentation - check "No poseo actualmente título", no motivation letter
     await page.locator('#file-identidad').setInputFiles(dummyPdf);
     await page.locator('#file-cv').setInputFiles(dummyPdf);
-
-    // Check no title
-    await page.locator('#toggle-sin-titulo').check();
-    await expect(page.locator('#titulo-denominacion')).toHaveCount(0);
-    await expect(page.locator('#file-titulo')).toHaveCount(0);
 
     // Verify motivation letter is NOT present for seminars
     await expect(page.locator('#file-cartaMotivacion')).toHaveCount(0);
@@ -256,7 +260,8 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
 
-    await page.getByRole('button', { name: /Confirmar y Enviar/i }).click();
+    await page.getByRole('button', { name: /Revisar datos/i }).click();
+    await page.getByRole('button', { name: /Confirmar y enviar/i }).click();
     await expect(page.getByText('¡Preinscripción enviada con éxito!')).toBeVisible({ timeout: 15000 });
   });
 });

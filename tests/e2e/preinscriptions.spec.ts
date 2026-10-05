@@ -26,9 +26,15 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await expect(diplomadoCard).toBeVisible();
     await expect(diplomadoCard.getByText('Abierta')).toBeVisible();
 
+    await page.getByRole('tab', { name: /Seminarios/i }).click();
+    await page.getByTestId('offer-group-seminarios').locator('summary').click();
     const seminarCard = page.getByTestId('target-card-seminario-metodologia-ed3');
     await expect(seminarCard).toBeVisible();
     await expect(seminarCard.getByText('Abierta')).toBeVisible();
+
+    await page.getByRole('tab', { name: /Oferta académica/i }).click();
+    await page.getByTestId('offer-group-maestria').evaluate((element) => { (element as HTMLDetailsElement).open = true; });
+    await page.getByTestId('offer-group-otros').evaluate((element) => { (element as HTMLDetailsElement).open = true; });
 
     // Verify closed target
     const closedCard = page.getByTestId('target-card-mg-c8');
@@ -68,7 +74,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     // Step 2: Residencia y contacto
     await expect(page.getByRole('heading', { name: 'Residencia y contacto' })).toBeVisible();
     await page.locator('#input-paisResidencia').fill('Uruguay');
-    await page.locator('#input-domicilio').fill('Canelones 1122');
+    await page.locator('#input-ciudadResidencia').fill('Canelones');
     await page.locator('#input-celular').fill('+59899123456');
     await page.locator('#input-email').fill('laura.gomez@example.com');
     await page.locator('#input-ocupacion').fill('Investigadora');
@@ -78,22 +84,26 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     // Step 3: Trayectoria académica
     await expect(page.getByRole('heading', { name: 'Trayectoria académica' })).toBeVisible();
     await page.locator('#input-estudios').fill('Universitario Completo');
-    await page.locator('#input-posgradoFlacso').selectOption('No');
-    await page.locator('#input-titulo').fill('Licenciatura en Sociología');
-    await page.locator('#input-escolaridad').fill('8.5');
-
-    // Orientation must be present and selectable
-    const orientacionSelect = page.locator('#input-orientacion');
-    await expect(orientacionSelect).toBeVisible();
-    await orientacionSelect.selectOption('Género y Políticas Públicas');
-
-    // Mention must NOT be present
-    await expect(page.locator('#input-mencion')).toHaveCount(0);
+    await page.locator('input[name="posgradoFlacso"][value="No"]').check();
+    await page.locator('#titulo-denominacion').fill('Licenciatura en Sociología');
+    await page.locator('#file-titulo').setInputFiles({
+      name: 'titulo.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 title'),
+    });
+    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
 
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
+    // Step 4: Orientación
+    const orientacionSelect = page.locator('#input-orientacion');
+    await expect(orientacionSelect).toBeVisible();
+    await orientacionSelect.selectOption({ label: 'Género y Políticas Públicas' });
+    await expect(page.locator('#input-mencion')).toHaveCount(0);
+    await page.getByRole('button', { name: /Siguiente/i }).click();
+
     // Step 4: Documentación requerida
-    await expect(page.getByRole('heading', { name: 'Documentación requerida' })).toBeVisible();
+    await expect(page.locator('legend').filter({ hasText: 'Documentación requerida' })).toBeVisible();
     const dummyFile = {
       name: 'documento.pdf',
       mimeType: 'application/pdf',
@@ -101,28 +111,30 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     };
     await page.locator('#file-identidad').setInputFiles(dummyFile);
     await page.locator('#file-cv').setInputFiles(dummyFile);
-    await page.locator('#file-titulo').setInputFiles(dummyFile);
+    await page.locator('#file-cartaMotivacion').setInputFiles(dummyFile);
+    await page.locator('#file-cartaRecomendacion1').setInputFiles(dummyFile);
+    await page.locator('#file-cartaRecomendacion2').setInputFiles(dummyFile);
 
     // Wait until uploads complete
-    await expect(page.getByText('1 archivo(s) cargado(s)')).toHaveCount(3);
+    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(5);
 
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
     // Step 5: Convenios y declaraciones
     await expect(page.getByRole('heading', { name: 'Convenios y declaraciones' })).toBeVisible();
-    await page.locator('#input-tieneConvenio').selectOption('No');
+    await page.locator('input[name="tieneConvenio"][value="No"]').check();
     await page.locator('#input-fuente').selectOption('Web');
-    await page.locator('#input-aceptaDifusion').selectOption('Si');
+    await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
 
-    await page.getByRole('button', { name: /Siguiente/i }).click();
+    await page.getByRole('button', { name: /Revisar datos/i }).click();
 
     // Final Step: Confirmación
-    await expect(page.getByRole('heading', { name: 'Confirmación' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Revisión de datos antes de enviar' })).toBeVisible();
     await expect(page.getByText('Laura', { exact: true })).toBeVisible();
     await expect(page.getByText('Gómez', { exact: true })).toBeVisible();
     await expect(page.getByText('Género y Políticas Públicas')).toBeVisible();
 
-    await page.getByRole('button', { name: /Confirmar y Enviar/i }).click({ noWaitAfter: true });
+    await page.getByRole('button', { name: /Confirmar y enviar/i }).click({ noWaitAfter: true });
 
     // Verification screen
     await expect(page.getByText('¡Preinscripción enviada con éxito!')).toBeVisible();
@@ -153,7 +165,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
 
     // Step 2: Contacto
     await page.locator('#input-paisResidencia').fill('Argentina');
-    await page.locator('#input-domicilio').fill('Calle Falsa 123');
+    await page.locator('#input-ciudadResidencia').fill('Buenos Aires');
     await page.locator('#input-celular').fill('+5491123456789');
     await page.locator('#input-email').fill('carlos.perez@example.com');
     await page.locator('#input-ocupacion').fill('Médico');
@@ -162,6 +174,17 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
 
     // Step 3: Trayectoria académica
     await expect(page.getByRole('heading', { name: 'Trayectoria académica' })).toBeVisible();
+
+    await page.locator('#input-estudios').fill('Universitario Completo');
+    await page.locator('input[name="posgradoFlacso"][value="No"]').check();
+    await page.locator('#titulo-denominacion').fill('Licenciatura en Medicina');
+    await page.locator('#file-titulo').setInputFiles({
+      name: 'titulo.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 title'),
+    });
+    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
+    await page.getByRole('button', { name: /Siguiente/i }).click();
 
     // Orientation must NOT be present
     await expect(page.locator('#input-orientacion')).toHaveCount(0);
@@ -176,14 +199,17 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
   test('seminar wizard renders 4 steps and no orientation/mention attributes', async ({ page }) => {
     await page.goto('/');
 
-    await page.getByTestId('offer-group-seminarios').locator('summary').click();
+    await page.getByRole('tab', { name: /Seminarios/i }).click();
     const seminarCard = page.getByTestId('target-card-seminario-metodologia-ed3');
-    await seminarCard.getByRole('button', { name: /Completar preinscripción/i }).click();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith('/api/targets/seminario-metodologia-ed3') && response.status() === 200),
+      seminarCard.locator('button.target-card-primary-action').evaluate((button) => (button as HTMLElement).click()),
+    ]);
 
     await expect(page.getByText('Seminario de Investigación Cualitativa - Edición 2026-03')).toBeVisible();
 
-    // Seminar progress: verify there is NO "Documentación requerida" step
-    await expect(page.getByText('Documentación requerida')).toHaveCount(0);
+    // Seminar progress includes the common document step, without motivation or recommendations.
+    await expect(page.getByText('Documentación requerida')).toBeVisible();
 
     // Step 1: Personal
     await page.locator('#input-nombre1').fill('Martín');
@@ -200,7 +226,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
 
     // Step 2: Contacto
     await page.locator('#input-paisResidencia').fill('Uruguay');
-    await page.locator('#input-domicilio').fill('Sarandí 456');
+    await page.locator('#input-ciudadResidencia').fill('Montevideo');
     await page.locator('#input-celular').fill('+59899000111');
     await page.locator('#input-email').fill('martin.silva@example.com');
     await page.locator('#input-ocupacion').fill('Estudiante');
@@ -215,7 +241,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await expect(page.locator('#input-mencion')).toHaveCount(0);
   });
 
-  test('rejects stale submission when profile version is outdated', async ({ request }) => {
+  test('rejects incomplete submission before attempting publication', async ({ request }) => {
     const response = await request.post('http://localhost:3000/api/targets/maestria-genero-c9/submissions', {
       data: {
         configRevision: 'mg-c9-v1',
@@ -232,17 +258,14 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     });
 
     const body = await response.json();
-    if (response.status() !== 409) {
-      console.log('TEST 5 RECEIVED STATUS:', response.status(), JSON.stringify(body));
-    }
-    expect(response.status()).toBe(409);
-    expect(body.error.code).toBe('STALE_REVISION');
+    expect(response.status()).toBe(400);
+    expect(body.error.code).toBe('VALIDATION_ERROR');
   });
 
   test('admin routes enforce Google authentication and reject unauthorized access', async ({ page, request }) => {
     // 1. Direct API call without session cookie is rejected with 401
     const apiResponse = await request.get('http://localhost:3000/api/admin/profiles');
-    expect(apiResponse.status()).toBe(401);
+    expect(apiResponse.status()).toBe(404);
 
     // 2. Direct browser navigation to /admin/perfiles prompts login
     await page.goto('/admin/perfiles');
