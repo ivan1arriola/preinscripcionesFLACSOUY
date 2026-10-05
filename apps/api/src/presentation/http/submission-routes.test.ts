@@ -7,6 +7,7 @@ import { getTargetForm } from '../../application/get-target-form.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import { InMemoryEmailNotificationRepository } from '../../infrastructure/database/in-memory-email-notification-repository.js';
+import { InMemorySubmissionRecoveryRepository } from '../../infrastructure/database/in-memory-submission-recovery-repository.js';
 
 describe('Submission HTTP Routes', () => {
   let server: Server;
@@ -328,10 +329,11 @@ describe('Submission HTTP Routes', () => {
       }
     });
 
-    it('does not enqueue notifications when Drive fails', async () => {
+    it('captures Drive failure, returns tracking ID, creates recovery case and does not enqueue notifications', async () => {
       const catalog = new FixtureAcademicCatalog();
       const testRepo = new InMemorySubmissionRepository();
       const notifRepo = new InMemoryEmailNotificationRepository();
+      const recoveryRepo = new InMemorySubmissionRecoveryRepository();
       const ensureSpy = vi.spyOn(notifRepo, 'ensureForSubmission');
 
       const storage: TemporaryFileStoragePort = {
@@ -342,7 +344,7 @@ describe('Submission HTTP Routes', () => {
       };
 
       const drive: GoogleDriveRepositoryPort = {
-        storeSubmissionFiles: async () => { throw new Error('Drive error'); },
+        storeSubmissionFiles: async () => { throw new Error('Drive error: internal timeout'); },
       };
 
       const app = createApp({
@@ -351,6 +353,7 @@ describe('Submission HTTP Routes', () => {
         temporaryFileStorage: storage,
         googleDriveRepository: drive,
         emailNotificationRepository: notifRepo,
+        submissionRecoveryRepository: recoveryRepo,
       });
 
       const tempServer = app.listen(0);
@@ -365,17 +368,34 @@ describe('Submission HTTP Routes', () => {
           body: JSON.stringify(validPayload),
         });
 
-        expect(res.status).toBe(502);
+        expect(res.status).toBe(202);
+        const data = await res.json();
+        expect(data.submissionId).toBeDefined();
+        expect(data.submissionId).toMatch(/^sub_/);
+        expect(data.status).toBe('pending_processing');
         expect(ensureSpy).not.toHaveBeenCalled();
+
+        // Values are retained in submission repository
+        const savedSub = testRepo.submissions.find((s) => s.id === data.submissionId);
+        expect(savedSub).toBeDefined();
+        expect(savedSub?.values.email).toBe('lucia@example.com');
+
+        // Recovery record is created with stage 'drive'
+        const recovery = await recoveryRepo.findById(data.submissionId);
+        expect(recovery).not.toBeNull();
+        expect(recovery?.stage).toBe('drive');
+        expect(recovery?.status).toBe('pending');
+        expect(recovery?.safeError).toContain('Drive error');
       } finally {
         await new Promise<void>((resolve) => tempServer.close(() => resolve()));
       }
     });
 
-    it('does not enqueue notifications when Sheets fails', async () => {
+    it('captures Sheets failure, returns tracking ID, creates recovery case and does not enqueue notifications', async () => {
       const catalog = new FixtureAcademicCatalog();
       const testRepo = new InMemorySubmissionRepository();
       const notifRepo = new InMemoryEmailNotificationRepository();
+      const recoveryRepo = new InMemorySubmissionRecoveryRepository();
       const ensureSpy = vi.spyOn(notifRepo, 'ensureForSubmission');
 
       const storage: TemporaryFileStoragePort = {
@@ -407,6 +427,7 @@ describe('Submission HTTP Routes', () => {
           ensureForTarget: async () => ({ spreadsheetId: 'sheet-1', sheetName: 'Inscripciones' }),
         } as any,
         emailNotificationRepository: notifRepo,
+        submissionRecoveryRepository: recoveryRepo,
       });
 
       const tempServer = app.listen(0);
@@ -421,8 +442,19 @@ describe('Submission HTTP Routes', () => {
           body: JSON.stringify(validPayload),
         });
 
-        expect(res.status).toBe(502);
+        expect(res.status).toBe(202);
+        const data = await res.json();
+        expect(data.submissionId).toBeDefined();
+        expect(data.submissionId).toMatch(/^sub_/);
+        expect(data.status).toBe('pending_processing');
         expect(ensureSpy).not.toHaveBeenCalled();
+
+        // Recovery record is created with stage 'sheets'
+        const recovery = await recoveryRepo.findById(data.submissionId);
+        expect(recovery).not.toBeNull();
+        expect(recovery?.stage).toBe('sheets');
+        expect(recovery?.status).toBe('pending');
+        expect(recovery?.safeError).toContain('Sheets connection timeout');
       } finally {
         await new Promise<void>((resolve) => tempServer.close(() => resolve()));
       }

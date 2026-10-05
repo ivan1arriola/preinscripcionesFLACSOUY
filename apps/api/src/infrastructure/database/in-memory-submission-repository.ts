@@ -4,11 +4,14 @@ import type {
   ValidatedSubmissionRecord,
   SavedSubmissionResult,
 } from '../../ports/submission-repository.js';
+import type { SubmissionRecoveryRepository } from '../../ports/submission-recovery-repository.js';
 
 export class InMemorySubmissionRepository implements SubmissionRepository {
   public submissions: Array<ValidatedSubmissionRecord & { id: string; submittedAt: Date }> = [];
   public processingStatuses: Map<string, { status: string; errorMessage?: string }> = new Map();
   public fileStatuses: Map<string, { status: string; driveFileId?: string; errorMessage?: string }> = new Map();
+
+  constructor(public recoveryRepository?: SubmissionRecoveryRepository) {}
 
   async save(record: ValidatedSubmissionRecord): Promise<SavedSubmissionResult> {
     return this.saveOrGet(record);
@@ -45,5 +48,24 @@ export class InMemorySubmissionRepository implements SubmissionRepository {
 
   async markFileFailed(token: string, errorMessage: string): Promise<void> {
     this.fileStatuses.set(token, { status: 'failed', errorMessage });
+  }
+
+  async recordProcessingFailure(
+    id: string,
+    stage: 'drive' | 'sheets' | 'notifications' | 'unknown',
+    safeError: string,
+    retentionDays: number = 7
+  ): Promise<void> {
+    this.processingStatuses.set(id, { status: 'failed', errorMessage: safeError });
+    if (this.recoveryRepository) {
+      const sub = this.submissions.find((s) => s.id === id);
+      await this.recoveryRepository.recordFailure({
+        submissionId: id,
+        targetId: sub?.targetId ?? 'unknown',
+        stage,
+        safeError,
+        retentionDays,
+      });
+    }
   }
 }

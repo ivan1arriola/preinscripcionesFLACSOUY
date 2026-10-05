@@ -23,4 +23,10 @@ export interface SubmissionRepository {
   markProcessing(id: string, status: 'pending' | 'success' | 'failed' | 'unknown', errorMessage?: string): Promise<void>;
   markFileStored(token: string, driveFileId: string): Promise<void>;
   markFileFailed(token: string, errorMessage: string): Promise<void>;
+  recordProcessingFailure?(
+    id: string,
+    stage: 'drive' | 'sheets' | 'notifications' | 'unknown',
+    safeError: string,
+    retentionDays?: number
+  ): Promise<void>;
 }

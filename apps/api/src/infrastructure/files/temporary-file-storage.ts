@@ -44,6 +44,7 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
     const createdAt = new Date();
     await mkdir(directory, { recursive: true, mode: 0o700 });
     await writeFile(join(directory, 'payload'), upload.data, { mode: 0o600 });
+    const expiresAt = new Date(Date.now() + this.ttlMs);
     await writeFile(
       join(directory, 'metadata.json'),
       JSON.stringify({
@@ -54,13 +55,13 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
         mimeType: upload.mimeType,
         size: upload.data.byteLength,
         createdAt: createdAt.toISOString(),
+        expiresAt: expiresAt.toISOString(),
       }),
       { mode: 0o600 }
     );
     await chmod(directory, 0o700);
 
     if (this.repository) {
-      const expiresAt = new Date(Date.now() + this.ttlMs);
       await this.repository.create({
         token,
         sessionId,
@@ -177,6 +178,21 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
     }
   }
 
+  async extendRetention(tokens: string | string[], newExpiresAt: Date): Promise<void> {
+    const tokenList = Array.isArray(tokens) ? tokens : [tokens];
+    for (const token of tokenList) {
+      if (this.repository && this.repository.extendExpiry) {
+        await this.repository.extendExpiry(token, newExpiresAt);
+      }
+      try {
+        const metadataPath = join(this.directory(token), 'metadata.json');
+        const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
+        metadata.expiresAt = newExpiresAt.toISOString();
+        await writeFile(metadataPath, JSON.stringify(metadata), { mode: 0o600 });
+      } catch {}
+    }
+  }
+
   async cleanup(before: number): Promise<number> {
     if (this.repository) {
       const expired = await this.repository.listExpired(new Date(before));
@@ -202,9 +218,12 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
       try {
         const metadata = JSON.parse(
           await readFile(join(this.options.rootDir, token, 'metadata.json'), 'utf8')
-        ) as { createdAt: string };
+        ) as { createdAt: string; expiresAt?: string };
         const createdAt = new Date(metadata.createdAt).getTime();
-        if (createdAt < before && Date.now() - createdAt >= this.ttlMs) {
+        const expiresAt = metadata.expiresAt
+          ? new Date(metadata.expiresAt).getTime()
+          : createdAt + this.ttlMs;
+        if (expiresAt < before) {
           await rm(join(this.options.rootDir, token), { recursive: true, force: true });
           removed++;
         }

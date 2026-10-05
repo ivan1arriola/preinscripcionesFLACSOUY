@@ -146,7 +146,10 @@ describe('Submission file orchestration', () => {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
-      expect(response.status).toBe(502);
+      expect(response.status).toBe(202);
+      const data = await response.json();
+      expect(data.submissionId).toBeDefined();
+      expect(data.status).toBe('pending_processing');
       expect(removed).toBe(false);
     } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
@@ -229,7 +232,10 @@ describe('Submission file orchestration', () => {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
-      expect(response.status).toBe(502);
+      expect(response.status).toBe(202);
+      const data = await response.json();
+      expect(data.submissionId).toBeDefined();
+      expect(data.status).toBe('pending_processing');
       expect(removed).toBe(false);
     } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
@@ -268,7 +274,7 @@ describe('Submission file orchestration', () => {
     } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
 
-  it('preserves temporary files and responds with 502 when Sheets encounters a SpreadsheetSchemaRepairError', async () => {
+  it('preserves temporary files and responds with 202 when Sheets encounters a SpreadsheetSchemaRepairError', async () => {
     let removed = false;
     const drive: GoogleDriveRepositoryPort = {
       storeSubmissionFiles: async () => ({
@@ -300,10 +306,10 @@ describe('Submission file orchestration', () => {
         headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
-      expect(response.status).toBe(502);
+      expect(response.status).toBe(202);
       const body = await response.json();
-      expect(body.error.code).toBe('SPREADSHEET_PROCESSING_ERROR');
-      expect(body.error.message).toContain('Ciudad de residencia');
+      expect(body.submissionId).toBeDefined();
+      expect(body.status).toBe('pending_processing');
       expect(removed).toBe(false);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));

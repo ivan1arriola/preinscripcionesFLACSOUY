@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { sql } from 'kysely';
 import type {
   SubmissionRepository,
   ValidatedSubmissionRecord,
@@ -195,5 +196,62 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
       })
       .where('token', '=', token)
       .execute();
+  }
+
+  async recordProcessingFailure(
+    id: string,
+    stage: 'drive' | 'sheets' | 'notifications' | 'unknown',
+    safeError: string,
+    retentionDays: number = 7
+  ): Promise<void> {
+    const now = new Date();
+    const retentionExpiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
+
+    await this.db.transaction().execute(async (trx) => {
+      await trx
+        .updateTable('submission_processing')
+        .set({
+          status: 'failed',
+          error_message: safeError,
+          updated_at: now,
+        })
+        .where('submission_id', '=', id)
+        .execute();
+
+      const sub = await trx
+        .selectFrom('submissions')
+        .select('target_id')
+        .where('id', '=', id)
+        .executeTakeFirst();
+
+      if (!sub) return;
+
+      await trx
+        .insertInto('submission_recoveries')
+        .values({
+          id: `rec_${crypto.randomUUID().replace(/-/g, '')}`,
+          submission_id: id,
+          target_id: sub.target_id,
+          stage,
+          status: 'pending',
+          safe_error: safeError,
+          attempt_count: 1,
+          first_failed_at: now,
+          last_attempt_at: now,
+          retention_expires_at: retentionExpiresAt,
+          created_at: now,
+          updated_at: now,
+        })
+        .onConflict((oc) =>
+          oc.column('submission_id').doUpdateSet({
+            stage,
+            safe_error: safeError,
+            attempt_count: sql`submission_recoveries.attempt_count + 1`,
+            last_attempt_at: now,
+            updated_at: now,
+          })
+        )
+        .execute();
+    });
   }
 }

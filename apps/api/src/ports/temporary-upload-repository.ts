@@ -30,4 +30,5 @@ export interface TemporaryUploadRepository {
   remove(token: string, sessionId?: string): Promise<boolean>;
   listExpired(before: Date): Promise<TemporaryUploadRecord[]>;
   deleteMetadata(token: string): Promise<void>;
+  extendExpiry?(token: string, newExpiresAt: Date): Promise<void>;
 }

@@ -30,4 +30,51 @@ describe('TemporaryFileStorage', () => {
     await storage.cleanup(Date.now() + 60_000);
     await expect(readFile(join(root, saved.token, 'payload'))).rejects.toThrow();
   });
+
+  it('retains files attached to a failed submission for 7 days while abandoned uploads expire normally', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'flacso-upload-'));
+    const storage = new TemporaryFileStorage({
+      rootDir: root,
+      maxBytes: 1024,
+      allowedMimeTypes: ['application/pdf'],
+      ttlMs: 30 * 60 * 1000, // 30 mins
+    });
+
+    // 1. Upload abandoned file
+    const abandoned = await storage.save('session-abandoned', 'cv', {
+      originalName: 'abandoned.pdf',
+      mimeType: 'application/pdf',
+      data: Buffer.from('abandoned'),
+    });
+
+    // 2. Upload file for failed submission
+    const failedSubmissionFile = await storage.save('session-failed', 'cv', {
+      originalName: 'failed.pdf',
+      mimeType: 'application/pdf',
+      data: Buffer.from('failed-submission-cv'),
+    });
+
+    // 3. Failed submission extends retention to 7 days
+    const now = Date.now();
+    const sevenDaysLater = new Date(now + 7 * 24 * 60 * 60 * 1000);
+    await storage.extendRetention(failedSubmissionFile.token, sevenDaysLater);
+
+    // 4. After 1 hour (abandoned form expired at 30 min, but failed file still within 7 days)
+    const oneHourLater = now + 60 * 60 * 1000;
+    const cleaned = await storage.cleanup(oneHourLater);
+    expect(cleaned).toBe(1);
+
+    // Abandoned payload should be gone
+    await expect(readFile(join(root, abandoned.token, 'payload'))).rejects.toThrow();
+
+    // Failed submission payload should still exist!
+    const retainedContent = await readFile(join(root, failedSubmissionFile.token, 'payload'));
+    expect(retainedContent.toString()).toBe('failed-submission-cv');
+
+    // 5. After 8 days (now failed submission is also expired)
+    const eightDaysLater = now + 8 * 24 * 60 * 60 * 1000;
+    const secondCleaned = await storage.cleanup(eightDaysLater);
+    expect(secondCleaned).toBe(1);
+    await expect(readFile(join(root, failedSubmissionFile.token, 'payload'))).rejects.toThrow();
+  });
 });

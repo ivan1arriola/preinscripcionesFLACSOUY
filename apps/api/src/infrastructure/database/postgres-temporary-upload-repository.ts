@@ -103,6 +103,16 @@ export class PostgresTemporaryUploadRepository implements TemporaryUploadReposit
       .execute();
   }
 
+  async extendExpiry(token: string, newExpiresAt: Date): Promise<void> {
+    await this.db
+      .updateTable('temporary_uploads')
+      .set({
+        expires_at: newExpiresAt,
+      })
+      .where('token', '=', token)
+      .execute();
+  }
+
   private mapRow(row: any): TemporaryUploadRecord {
     return {
       token: row.token,

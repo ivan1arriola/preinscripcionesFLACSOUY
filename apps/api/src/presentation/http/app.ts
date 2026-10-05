@@ -9,6 +9,7 @@ import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import { createUploadRoutes } from './upload-routes.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
+import type { SubmissionRecoveryRepository } from '../../ports/submission-recovery-repository.js';
 
 import cookieParser from 'cookie-parser';
 import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
@@ -49,10 +50,17 @@ export interface AppDependencies {
   emailProviderFactory?: (config: SmtpConfig) => EmailProvider;
   getMasterEmails?: () => Promise<string[]> | string[];
   serviceAccountEmail?: string;
+  submissionRecoveryRepository?: SubmissionRecoveryRepository;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
+
+  if (dependencies.submissionRecoveryRepository && dependencies.repository && 'recoveryRepository' in dependencies.repository) {
+    if (!(dependencies.repository as any).recoveryRepository) {
+      (dependencies.repository as any).recoveryRepository = dependencies.submissionRecoveryRepository;
+    }
+  }
 
   app.use(express.json());
   app.use(cookieParser());
@@ -111,6 +119,9 @@ export function createApp(dependencies: AppDependencies): Express {
             }
           },
         }
+      : undefined,
+    dependencies.submissionRecoveryRepository
+      ? { repository: dependencies.submissionRecoveryRepository }
       : undefined,
   );
 

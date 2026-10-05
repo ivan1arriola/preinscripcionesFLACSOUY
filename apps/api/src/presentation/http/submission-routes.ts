@@ -9,6 +9,23 @@ import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.j
 import type { TargetSpreadsheetService } from '../../application/target-spreadsheet-service.js';
 import type { EmailNotificationRepository } from '../../ports/email-notification-repository.js';
 import { createPreinscriptionNotifications } from '../../application/create-preinscription-notifications.js';
+import type { SubmissionRecoveryRepository } from '../../ports/submission-recovery-repository.js';
+
+export function sanitizeSafeError(error: unknown, fallback: string = 'Error de procesamiento técnico.'): string {
+  if (!error) return fallback;
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  if (!rawMessage || typeof rawMessage !== 'string') return fallback;
+
+  let sanitized = rawMessage
+    .replace(/([?&](key|token|secret|password|access_token)=)[^&]+/gi, '$1***')
+    .replace(/Bearer\s+[a-zA-Z0-9_\-\.]+/gi, 'Bearer ***')
+    .trim();
+
+  if (sanitized.length > 500) {
+    sanitized = sanitized.slice(0, 497) + '...';
+  }
+  return sanitized || fallback;
+}
 
 const submissionSchema = z.object({
   clientSubmissionId: z.string().optional(),
@@ -36,12 +53,17 @@ export interface SubmissionNotificationDependencies {
   getMasterEmails?: () => Promise<string[]> | string[];
 }
 
+export interface SubmissionRecoveryDependencies {
+  repository: SubmissionRecoveryRepository;
+}
+
 export function createSubmissionRoutes(
   catalog: AcademicCatalog,
   repository: SubmissionRepository,
   fileDependencies?: SubmissionFileDependencies,
   spreadsheetDependencies?: SubmissionSpreadsheetDependencies,
   notificationDependencies?: SubmissionNotificationDependencies,
+  recoveryDependencies?: SubmissionRecoveryDependencies,
 ): Router {
   const router = Router({ mergeParams: true });
 
@@ -154,12 +176,33 @@ export function createSubmissionRoutes(
             }
           }
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'No se pudo guardar la documentación.';
+          const safeError = sanitizeSafeError(error, 'No se pudo guardar la documentación.');
           for (const file of files) {
-            await repository.markFileFailed(file.token, message);
+            await repository.markFileFailed(file.token, safeError);
           }
-          await repository.markProcessing(result.submissionId, 'failed', message);
-          res.status(502).json({ error: { code: 'FILE_PROCESSING_ERROR', message } });
+          if (repository.recordProcessingFailure) {
+            await repository.recordProcessingFailure(result.submissionId, 'drive', safeError, 7);
+          } else {
+            await repository.markProcessing(result.submissionId, 'failed', safeError);
+          }
+          if (recoveryDependencies?.repository) {
+            await recoveryDependencies.repository.recordFailure({
+              submissionId: result.submissionId,
+              targetId,
+              stage: 'drive',
+              safeError,
+              retentionDays: 7,
+            });
+          }
+          if (fileDependencies?.storage.extendRetention && files.length > 0) {
+            const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            await fileDependencies.storage.extendRetention(files.map((f) => f.token), retentionExpiresAt);
+          }
+          res.status(202).json({
+            submissionId: result.submissionId,
+            status: 'pending_processing',
+            message: 'La preinscripción fue recibida y se encuentra pendiente de procesamiento técnico.',
+          });
           return;
         }
       }
@@ -169,8 +212,30 @@ export function createSubmissionRoutes(
         try {
           const target = await catalog.revalidateTarget(targetId);
           if (!target) {
-            await repository.markProcessing(result.submissionId, 'failed', 'No se encontró el destino académico para crear su planilla.');
-            res.status(404).json({ error: { code: 'NOT_FOUND', message: 'No se encontró el destino académico para crear su planilla.' } });
+            const safeError = 'No se encontró el destino académico para crear su planilla.';
+            if (repository.recordProcessingFailure) {
+              await repository.recordProcessingFailure(result.submissionId, 'sheets', safeError, 7);
+            } else {
+              await repository.markProcessing(result.submissionId, 'failed', safeError);
+            }
+            if (recoveryDependencies?.repository) {
+              await recoveryDependencies.repository.recordFailure({
+                submissionId: result.submissionId,
+                targetId,
+                stage: 'sheets',
+                safeError,
+                retentionDays: 7,
+              });
+            }
+            if (fileDependencies?.storage.extendRetention && files.length > 0) {
+              const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+              await fileDependencies.storage.extendRetention(files.map((f) => f.token), retentionExpiresAt);
+            }
+            res.status(202).json({
+              submissionId: result.submissionId,
+              status: 'pending_processing',
+              message: 'La preinscripción fue recibida y se encuentra pendiente de procesamiento técnico.',
+            });
             return;
           }
           const spreadsheet = await spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);
@@ -184,9 +249,30 @@ export function createSubmissionRoutes(
             spreadsheetRowUrl = appendRes.rowUrl;
           }
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'No se pudo crear o guardar la planilla de la preinscripción.';
-          await repository.markProcessing(result.submissionId, 'failed', message);
-          res.status(502).json({ error: { code: 'SPREADSHEET_PROCESSING_ERROR', message } });
+          const safeError = sanitizeSafeError(error, 'No se pudo crear o guardar la planilla de la preinscripción.');
+          if (repository.recordProcessingFailure) {
+            await repository.recordProcessingFailure(result.submissionId, 'sheets', safeError, 7);
+          } else {
+            await repository.markProcessing(result.submissionId, 'failed', safeError);
+          }
+          if (recoveryDependencies?.repository) {
+            await recoveryDependencies.repository.recordFailure({
+              submissionId: result.submissionId,
+              targetId,
+              stage: 'sheets',
+              safeError,
+              retentionDays: 7,
+            });
+          }
+          if (fileDependencies?.storage.extendRetention && files.length > 0) {
+            const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            await fileDependencies.storage.extendRetention(files.map((f) => f.token), retentionExpiresAt);
+          }
+          res.status(202).json({
+            submissionId: result.submissionId,
+            status: 'pending_processing',
+            message: 'La preinscripción fue recibida y se encuentra pendiente de procesamiento técnico.',
+          });
           return;
         }
       }

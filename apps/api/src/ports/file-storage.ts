@@ -27,4 +27,5 @@ export interface TemporaryFileStoragePort {
   cleanup(before: number): Promise<number>;
   listBySession?(sessionId: string): Promise<TemporaryFileRecord[]>;
   touch?(sessionId: string): Promise<void>;
+  extendRetention?(tokens: string | string[], newExpiresAt: Date): Promise<void>;
 }

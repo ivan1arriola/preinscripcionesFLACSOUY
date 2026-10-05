@@ -67,11 +67,11 @@
 - Add `recordProcessingFailure(id, stage, safeError, retentionDays)` or equivalent application-level operation that is atomic with the recovery record.
 - Add a temporary-storage operation to extend an upload’s expiry for an existing failed submission without changing the normal abandoned-form TTL.
 
-- [ ] **Step 1: Add failing route tests** asserting that Drive and Sheets failures return a tracking ID, retain values/files, create a recovery case and classify the failing stage.
-- [ ] **Step 2: Add the failed-file retention test** asserting abandoned uploads still expire normally while files attached to a failed submission survive seven days.
-- [ ] **Step 3: Implement failure capture** at every post-save failure path, sanitize/truncate provider messages, and return a safe pending-processing response.
-- [ ] **Step 4: Run submission and document-flow tests** and confirm successful submissions still clean temporary files only after all processing succeeds.
-- [ ] **Step 5: Commit** `feat: retain failed submissions for recovery`.
+- [x] **Step 1: Add failing route tests** asserting that Drive and Sheets failures return a tracking ID, retain values/files, create a recovery case and classify the failing stage.
+- [x] **Step 2: Add the failed-file retention test** asserting abandoned uploads still expire normally while files attached to a failed submission survive seven days.
+- [x] **Step 3: Implement failure capture** at every post-save failure path, sanitize/truncate provider messages, and return a safe pending-processing response.
+- [x] **Step 4: Run submission and document-flow tests** and confirm successful submissions still clean temporary files only after all processing succeeds.
+- [x] **Step 5: Commit** `feat: retain failed submissions for recovery`.
 
 ### Task 3: Telegram provider, encrypted settings and durable alert queue
 
