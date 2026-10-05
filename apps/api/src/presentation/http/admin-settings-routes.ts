@@ -17,25 +17,30 @@ import type { EmailNotificationDispatcher } from '../../application/email-notifi
 import {
   loadEmailConfig,
   maskEmail,
-  maskString,
-  parseMasterEmails,
   serializeMasterEmails,
-  type SesCredentialsConfig,
+  invalidateSmtpVerificationStatus,
+  safeSmtpVerificationError,
   SETTING_EMAIL_NOTIFICATIONS_ENABLED,
+  SETTING_EMAIL_PROVIDER,
   SETTING_NOTIFICATION_MASTER_EMAILS,
-  SETTING_SES_AWS_ACCESS_KEY_ID,
-  SETTING_SES_AWS_SECRET_ACCESS_KEY,
-  SETTING_SES_AWS_SESSION_TOKEN,
-  SETTING_SES_REGION,
-  SETTING_SES_FROM_EMAIL,
-  SETTING_SES_REPLY_TO_EMAIL,
-  SETTING_SES_CONFIGURATION_SET,
+  SETTING_SMTP_HOST,
+  SETTING_SMTP_PORT,
+  SETTING_SMTP_SECURITY,
+  SETTING_SMTP_USERNAME,
+  SETTING_SMTP_PASSWORD,
+  SETTING_EMAIL_FROM,
+  SETTING_EMAIL_REPLY_TO,
+  SETTING_SMTP_LAST_CONNECTION_TEST_AT,
+  SETTING_SMTP_LAST_CONNECTION_TEST_OK,
+  SETTING_SMTP_LAST_CONNECTION_TEST_ERROR,
 } from '../../infrastructure/email/email-config.js';
-import { type EmailProvider, SesEmailProvider } from '../../infrastructure/email/ses-client.js';
+import { type EmailProvider } from '../../infrastructure/email/email-provider.js';
+import { SmtpEmailProvider } from '../../infrastructure/email/smtp-email-provider.js';
 
 const UpdateDriveFolderSchema = z.object({
   folderId: z.string().min(1, 'La carpeta de Google Drive es requerida'),
 });
+const UnlinkSpreadsheetSchema = z.object({ targetId: z.string().min(1) });
 
 const SendTestEmailSchema = z.object({
   recipientEmail: z.string().email('Dirección de correo destinatario inválida').optional(),
@@ -52,24 +57,18 @@ const RetryNotificationSchema = z.object({
 const UpdateEmailSettingsSchema = z.object({
   enabled: z.boolean().optional(),
   masterEmails: z.array(z.string().email('Formato de correo inválido')).optional(),
-  awsAccessKeyId: z.string().min(1).optional(),
-  awsSecretAccessKey: z.string().min(1).optional(),
-  awsSessionToken: z.string().nullable().optional(),
-  region: z.string().min(1).optional(),
+  host: z.string().min(1).optional(),
+  port: z.number().int().min(1).max(65535).optional(),
+  security: z.enum(['starttls', 'tls']).optional(),
+  username: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+  replacePassword: z.boolean().optional(),
   fromEmail: z.string().email('Formato de correo remitente inválido').optional(),
   replyToEmail: z.string().email('Formato de correo reply-to inválido').nullable().optional(),
-  configurationSet: z.string().nullable().optional(),
-  ses: z
-    .object({
-      accessKeyId: z.string().min(1).optional(),
-      secretAccessKey: z.string().min(1).optional(),
-      sessionToken: z.string().nullable().optional(),
-      region: z.string().min(1).optional(),
-      fromEmail: z.string().email('Formato de correo remitente inválido').optional(),
-      replyToEmail: z.string().email('Formato de correo reply-to inválido').nullable().optional(),
-      configurationSet: z.string().nullable().optional(),
-    })
-    .optional(),
+}).superRefine((value, context) => {
+  if (value.replacePassword && !value.password) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'Ingresá la nueva contraseña SMTP.' });
+  }
 });
 
 export function createAdminSettingsRoutes(
@@ -83,7 +82,7 @@ export function createAdminSettingsRoutes(
   encryptedSettingsService?: EncryptedSettingsService,
   emailNotificationRepository?: EmailNotificationRepository,
   dispatcher?: EmailNotificationDispatcher,
-  emailProviderFactory?: (config: SesCredentialsConfig) => EmailProvider,
+  emailProviderFactory?: (config: NonNullable<Awaited<ReturnType<typeof loadEmailConfig>>['smtp']>) => EmailProvider,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -226,6 +225,34 @@ export function createAdminSettingsRoutes(
     }
   });
 
+  router.post('/spreadsheets/unlink', async (req, res) => {
+    if (!targetSpreadsheetService) {
+      res.status(503).json({ error: { code: 'SPREADSHEET_PROVISIONING_UNAVAILABLE', message: 'La gestión de planillas no está disponible.' } });
+      return;
+    }
+    const parsed = UnlinkSpreadsheetSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Debe especificarse el destino de la planilla.' } });
+      return;
+    }
+    try {
+      const spreadsheet = await targetSpreadsheetService.unlinkForTarget(parsed.data.targetId);
+      res.json({ ok: true, spreadsheet, message: 'La planilla quedó desvinculada. El archivo se conserva en Google Drive.' });
+    } catch (error) {
+      const status = (error as any)?.code === 'SPREADSHEET_NOT_FOUND' ? 404 : 502;
+      res.status(status).json({ error: { code: (error as any)?.code || 'SPREADSHEET_UNLINK_ERROR', message: error instanceof Error ? error.message : 'No se pudo desvincular la planilla.' } });
+    }
+  });
+
+  const emailSettingsResponse = async () => {
+    const config = await loadEmailConfig(encryptedSettingsService!);
+    const [host, port, security, username, password, fromEmail, replyToEmail, verifiedAt, verifiedOk, verificationError] = await Promise.all([
+      encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_HOST), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_PORT), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_SECURITY), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_USERNAME), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_PASSWORD), encryptedSettingsService!.getEncryptedSetting(SETTING_EMAIL_FROM), encryptedSettingsService!.getEncryptedSetting(SETTING_EMAIL_REPLY_TO), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_AT), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_OK), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_ERROR),
+    ]);
+    const record = await settingsRepository.getSettingRecord(SETTING_SMTP_HOST);
+    return { ok: true, enabled: config.enabled, configured: Boolean(config.smtp), provider: 'smtp', smtp: { host: host ?? '', port: Number(port || 587), security: security === 'tls' ? 'tls' : 'starttls', username: username ?? '', hasPassword: Boolean(password), fromEmail: fromEmail ? maskEmail(fromEmail) : null, replyToEmail: replyToEmail ? maskEmail(replyToEmail) : null }, masterEmails: config.masterEmails, status: { lastConnectionTestAt: verifiedAt || null, lastConnectionTestOk: verifiedOk === '' || verifiedOk === null ? null : verifiedOk === 'true', lastConnectionTestError: verificationError || null }, updatedAt: record?.updatedAt ?? null, updatedBy: record?.updatedBy ?? null };
+  };
+
   router.get('/email', async (_req, res) => {
     if (!encryptedSettingsService) {
       res.status(503).json({
@@ -238,51 +265,7 @@ export function createAdminSettingsRoutes(
     }
 
     try {
-      const enabled = (await encryptedSettingsService.getEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED)) === 'true';
-      const rawMasters = await encryptedSettingsService.getEncryptedSetting(SETTING_NOTIFICATION_MASTER_EMAILS);
-      const masterEmails = parseMasterEmails(rawMasters);
-
-      const accessKeyId = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID);
-      const secretAccessKey = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_SECRET_ACCESS_KEY);
-      const sessionToken = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN);
-      const region = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_REGION);
-      const fromEmail = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_FROM_EMAIL);
-      const replyToEmail = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL);
-      const configurationSet = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_CONFIGURATION_SET);
-
-      const hasAccessKey = Boolean(accessKeyId);
-      const hasSecretKey = Boolean(secretAccessKey);
-      const hasSessionToken = Boolean(sessionToken);
-      const isConfigured = Boolean(accessKeyId && secretAccessKey && region && fromEmail);
-      const fromEmailMasked = fromEmail ? maskEmail(fromEmail) : null;
-      const replyToEmailMasked = replyToEmail ? maskEmail(replyToEmail) : null;
-      const accessKeyIdMasked = accessKeyId ? maskString(accessKeyId) : null;
-
-      const record = await settingsRepository.getSettingRecord(SETTING_SES_AWS_ACCESS_KEY_ID);
-
-      res.json({
-        ok: true,
-        enabled,
-        configured: isConfigured,
-        region: region || null,
-        fromEmailMasked,
-        replyToEmailMasked,
-        accessKeyIdMasked,
-        configurationSet: configurationSet || null,
-        ses: {
-          configured: isConfigured,
-          hasAccessKey,
-          hasSecretKey,
-          hasSessionToken,
-          region: region || null,
-          fromEmail: fromEmailMasked,
-          replyToEmail: replyToEmailMasked,
-          configurationSet: configurationSet || null,
-        },
-        masterEmails,
-        updatedAt: record?.updatedAt ?? null,
-        updatedBy: record?.updatedBy ?? null,
-      });
+      res.json(await emailSettingsResponse());
     } catch (error) {
       res.status(503).json({
         error: {
@@ -319,14 +302,6 @@ export function createAdminSettingsRoutes(
     const actor = req.adminUser?.email || 'admin';
     const { enabled, masterEmails } = parsed.data;
 
-    const accessKeyToSet = parsed.data.awsAccessKeyId ?? parsed.data.ses?.accessKeyId;
-    const secretKeyToSet = parsed.data.awsSecretAccessKey ?? parsed.data.ses?.secretAccessKey;
-    const sessionTokenToSet = parsed.data.awsSessionToken !== undefined ? parsed.data.awsSessionToken : parsed.data.ses?.sessionToken;
-    const regionToSet = parsed.data.region ?? parsed.data.ses?.region;
-    const fromEmailToSet = parsed.data.fromEmail ?? parsed.data.ses?.fromEmail;
-    const replyToEmailToSet = parsed.data.replyToEmail !== undefined ? parsed.data.replyToEmail : parsed.data.ses?.replyToEmail;
-    const configSetToSet = parsed.data.configurationSet !== undefined ? parsed.data.configurationSet : parsed.data.ses?.configurationSet;
-
     try {
       if (typeof enabled === 'boolean') {
         await encryptedSettingsService.setEncryptedSetting(
@@ -336,6 +311,8 @@ export function createAdminSettingsRoutes(
         );
       }
 
+      await encryptedSettingsService.setEncryptedSetting(SETTING_EMAIL_PROVIDER, 'smtp', actor);
+
       if (masterEmails !== undefined) {
         await encryptedSettingsService.setEncryptedSetting(
           SETTING_NOTIFICATION_MASTER_EMAILS,
@@ -344,78 +321,12 @@ export function createAdminSettingsRoutes(
         );
       }
 
-      if (accessKeyToSet !== undefined) {
-        await encryptedSettingsService.setEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID, accessKeyToSet.trim(), actor);
-      }
-      if (secretKeyToSet !== undefined) {
-        await encryptedSettingsService.setEncryptedSetting(SETTING_SES_AWS_SECRET_ACCESS_KEY, secretKeyToSet.trim(), actor);
-      }
-      if (sessionTokenToSet !== undefined) {
-        if (sessionTokenToSet === null || sessionTokenToSet.trim() === '') {
-          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN, '', actor);
-        } else {
-          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN, sessionTokenToSet.trim(), actor);
-        }
-      }
-      if (regionToSet !== undefined) {
-        await encryptedSettingsService.setEncryptedSetting(SETTING_SES_REGION, regionToSet.trim(), actor);
-      }
-      if (fromEmailToSet !== undefined) {
-        await encryptedSettingsService.setEncryptedSetting(SETTING_SES_FROM_EMAIL, fromEmailToSet.trim(), actor);
-      }
-      if (replyToEmailToSet !== undefined) {
-        if (replyToEmailToSet === null || replyToEmailToSet.trim() === '') {
-          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL, '', actor);
-        } else {
-          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL, replyToEmailToSet.trim(), actor);
-        }
-      }
-      if (configSetToSet !== undefined) {
-        if (configSetToSet === null || configSetToSet.trim() === '') {
-          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_CONFIGURATION_SET, '', actor);
-        } else {
-          await encryptedSettingsService.setEncryptedSetting(SETTING_SES_CONFIGURATION_SET, configSetToSet.trim(), actor);
-        }
-      }
-
-      const updatedEnabled = (await encryptedSettingsService.getEncryptedSetting(SETTING_EMAIL_NOTIFICATIONS_ENABLED)) === 'true';
-      const rawMasters = await encryptedSettingsService.getEncryptedSetting(SETTING_NOTIFICATION_MASTER_EMAILS);
-      const updatedMasterEmails = parseMasterEmails(rawMasters);
-
-      const accessKeyId = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_ACCESS_KEY_ID);
-      const secretAccessKey = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_SECRET_ACCESS_KEY);
-      const sessionToken = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_AWS_SESSION_TOKEN);
-      const region = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_REGION);
-      const fromEmail = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_FROM_EMAIL);
-      const replyToEmail = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_REPLY_TO_EMAIL);
-      const configurationSet = await encryptedSettingsService.getEncryptedSetting(SETTING_SES_CONFIGURATION_SET);
-
-      const isConfigured = Boolean(accessKeyId && secretAccessKey && region && fromEmail);
-      const fromEmailMasked = fromEmail ? maskEmail(fromEmail) : null;
-      const replyToEmailMasked = replyToEmail ? maskEmail(replyToEmail) : null;
-      const accessKeyIdMasked = accessKeyId ? maskString(accessKeyId) : null;
-
-      res.json({
-        ok: true,
-        enabled: updatedEnabled,
-        configured: isConfigured,
-        region: region || null,
-        fromEmailMasked,
-        replyToEmailMasked,
-        accessKeyIdMasked,
-        configurationSet: configurationSet || null,
-        ses: {
-          configured: isConfigured,
-          hasAccessKey: Boolean(accessKeyId),
-          hasSecretKey: Boolean(secretAccessKey),
-          hasSessionToken: Boolean(sessionToken),
-          region: region || null,
-          fromEmail: fromEmailMasked,
-          replyToEmail: replyToEmailMasked,
-          configurationSet: configurationSet || null,
-        },
-        masterEmails: updatedMasterEmails,
-      });
+      const fields: Array<[string, string | undefined]> = [[SETTING_SMTP_HOST, parsed.data.host], [SETTING_SMTP_PORT, parsed.data.port?.toString()], [SETTING_SMTP_SECURITY, parsed.data.security], [SETTING_SMTP_USERNAME, parsed.data.username], [SETTING_EMAIL_FROM, parsed.data.fromEmail]];
+      for (const [key, value] of fields) if (value !== undefined) await encryptedSettingsService.setEncryptedSetting(key, value.trim(), actor);
+      if (parsed.data.replyToEmail !== undefined) await encryptedSettingsService.setEncryptedSetting(SETTING_EMAIL_REPLY_TO, parsed.data.replyToEmail?.trim() || '', actor);
+      if (parsed.data.replacePassword) await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_PASSWORD, parsed.data.password!.trim(), actor);
+      if (parsed.data.host !== undefined || parsed.data.port !== undefined || parsed.data.security !== undefined || parsed.data.username !== undefined || parsed.data.password !== undefined) await invalidateSmtpVerificationStatus(encryptedSettingsService, actor);
+      res.json(await emailSettingsResponse());
     } catch (error) {
       res.status(503).json({
         error: {
@@ -450,23 +361,23 @@ export function createAdminSettingsRoutes(
 
     try {
       const config = await loadEmailConfig(encryptedSettingsService);
-      if (!config.ses) {
+      if (!config.smtp) {
         res.status(400).json({
           error: {
-            code: 'SES_NOT_CONFIGURED',
-            message: 'Amazon SES no está completamente configurado (falta Access Key, Secret Key, Región o Remitente).',
+            code: 'SMTP_NOT_CONFIGURED',
+            message: 'SMTP no está completamente configurado.',
           },
         });
         return;
       }
 
-      const provider = emailProviderFactory ? emailProviderFactory(config.ses) : new SesEmailProvider(config.ses);
+      const provider = emailProviderFactory ? emailProviderFactory(config.smtp) : new SmtpEmailProvider(config.smtp);
       const result = await provider.send({
         to: [recipient],
-        subject: 'Prueba de configuración de Amazon SES - FLACSO Uruguay',
-        text: 'Este es un mensaje de prueba enviado desde el panel de administración de FLACSO Uruguay para verificar la conectividad con Amazon SES.',
-        html: '<p>Este es un mensaje de prueba enviado desde el panel de administración de <strong>FLACSO Uruguay</strong> para verificar la conectividad con Amazon SES.</p>',
-        replyTo: config.ses.replyToEmail ? [config.ses.replyToEmail] : undefined,
+        subject: 'Prueba de correo SMTP - FLACSO Uruguay',
+        text: 'Este es un mensaje de prueba enviado desde el panel de administración de FLACSO Uruguay para verificar la conexión SMTP.',
+        html: '<p>Este es un mensaje de prueba enviado desde el panel de administración de <strong>FLACSO Uruguay</strong> para verificar la conexión SMTP.</p>',
+        replyTo: config.smtp.replyToEmail ? [config.smtp.replyToEmail] : undefined,
         tags: { purpose: 'test_notification' },
       });
 
@@ -478,10 +389,36 @@ export function createAdminSettingsRoutes(
     } catch (error) {
       res.status(502).json({
         error: {
-          code: 'SES_SEND_ERROR',
-          message: error instanceof Error ? error.message : 'Error al enviar correo de prueba vía Amazon SES.',
+          code: 'SMTP_SEND_ERROR',
+          message: 'No se pudo enviar el correo de prueba SMTP.',
         },
       });
+    }
+  });
+
+  router.post('/email/verify', async (_req: RequestWithAdminSession, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({ error: { code: 'ENCRYPTION_UNAVAILABLE', message: 'Servicio de configuración cifrada no disponible.' } });
+      return;
+    }
+    const actor = _req.adminUser?.email || 'admin';
+    try {
+      const config = await loadEmailConfig(encryptedSettingsService);
+      if (!config.smtp) {
+        res.status(400).json({ error: { code: 'SMTP_NOT_CONFIGURED', message: 'SMTP no está completamente configurado.' } });
+        return;
+      }
+      const provider = emailProviderFactory ? emailProviderFactory(config.smtp) : new SmtpEmailProvider(config.smtp);
+      await provider.verify();
+      await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_AT, new Date().toISOString(), actor);
+      await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_OK, 'true', actor);
+      await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_ERROR, '', actor);
+      res.json({ ok: true });
+    } catch (error) {
+      await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_AT, new Date().toISOString(), actor);
+      await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_OK, 'false', actor);
+      await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_ERROR, safeSmtpVerificationError(error), actor);
+      res.status(502).json({ error: { code: 'SMTP_VERIFY_ERROR', message: 'No se pudo verificar la conexión SMTP.' } });
     }
   });
 

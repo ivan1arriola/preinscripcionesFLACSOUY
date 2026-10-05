@@ -28,7 +28,7 @@ export interface SpreadsheetProvisioner {
 
 export interface TargetReconciliationItem {
   targetId: string;
-  status: 'reconciled' | 'created' | 'unchanged' | 'blocked';
+  status: 'reconciled' | 'created' | 'unchanged' | 'blocked' | 'detached';
   spreadsheetId?: string;
   code?: string;
   message?: string;
@@ -95,6 +95,21 @@ export class TargetSpreadsheetService {
     return configurations;
   }
 
+  async unlinkForTarget(targetId: string): Promise<TargetSpreadsheetConfiguration> {
+    const current = await this.repository.get(targetId);
+    if (!current) throw Object.assign(new Error('La oferta todavía no tiene una planilla asociada.'), { code: 'SPREADSHEET_NOT_FOUND' });
+    if (this.discoveryPort?.setSpreadsheetAppProperties) {
+      await this.discoveryPort.setSpreadsheetAppProperties(current.spreadsheetId, {
+        flacsoResource: 'preinscription-spreadsheet',
+        flacsoTargetId: targetId,
+        flacsoDetached: 'true',
+      });
+    }
+    const detached = { ...current, status: 'detached' as const, updatedAt: new Date() };
+    await this.repository.save(detached);
+    return detached;
+  }
+
   async reconcileTargets(targets: AcademicTarget[]): Promise<TargetsReconciliationResult> {
     const items: TargetReconciliationItem[] = [];
     let hasBlocked = false;
@@ -134,14 +149,16 @@ export class TargetSpreadsheetService {
     await this.repository.ensureTarget(target);
 
     if (this.discoveryPort) {
+      const previousConfig = await this.repository.get(target.id);
       // 1. Dynamic discovery in Drive by targetId
-      const discovered = await this.discoveryPort.findByTargetId(rootFolderId, target.id);
+      const discovered = previousConfig?.status === 'detached'
+        ? null
+        : await this.discoveryPort.findByTargetId(rootFolderId, target.id);
       if (discovered) {
         const targetFolderId = this.discoveryPort.ensureTargetFolder
           ? await this.discoveryPort.ensureTargetFolder(rootFolderId, target)
           : rootFolderId;
 
-        const previousConfig = await this.repository.get(target.id);
         const needsRelocation = discovered.parentFolderId !== targetFolderId;
         const rootChanged = previousConfig?.rootFolderId && previousConfig.rootFolderId !== rootFolderId;
 
@@ -171,7 +188,7 @@ export class TargetSpreadsheetService {
       }
 
       // 2. Not found dynamically: check if historical row exists in target_spreadsheets as migration bridge
-      const historical = await this.repository.get(target.id);
+      const historical = previousConfig?.status === 'detached' ? null : previousConfig;
       if (historical) {
         if (this.discoveryPort.inspectSpreadsheet) {
           const inspected = await this.discoveryPort.inspectSpreadsheet(historical.spreadsheetId);

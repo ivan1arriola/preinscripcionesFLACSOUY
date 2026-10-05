@@ -6,7 +6,7 @@ export interface TargetSpreadsheetConfiguration {
   sheetName: string;
   url?: string;
   rootFolderId?: string;
-  status?: 'reconciled' | 'created' | 'unchanged' | 'blocked';
+  status?: 'reconciled' | 'created' | 'unchanged' | 'blocked' | 'detached';
   lastDiscoveredAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;

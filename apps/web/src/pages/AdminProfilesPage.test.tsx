@@ -22,22 +22,10 @@ vi.mock('../api/client.js', async () => {
       getAdminEmailSettings: vi.fn().mockResolvedValue({
         enabled: true,
         configured: true,
-        region: 'us-east-1',
-        fromEmailMasked: 'pr***s@flacso.edu.uy',
-        replyToEmailMasked: null,
-        accessKeyIdMasked: 'AK***LE',
-        configurationSet: null,
-        ses: {
-          configured: true,
-          hasAccessKey: true,
-          hasSecretKey: true,
-          hasSessionToken: false,
-          region: 'us-east-1',
-          fromEmail: 'pr***s@flacso.edu.uy',
-          replyToEmail: null,
-          configurationSet: null,
-        },
+        provider: 'smtp',
+        smtp: { host: 'smtp.flacso.edu.uy', port: 587, security: 'starttls', username: 'pre@flacso.edu.uy', hasPassword: true, fromEmail: 'pr***s@flacso.edu.uy', replyToEmail: null },
         masterEmails: [],
+        status: { lastConnectionTestAt: null, lastConnectionTestOk: null, lastConnectionTestError: null },
       }),
       getAdminNotifications: vi.fn().mockResolvedValue({
         ok: true,
@@ -69,22 +57,10 @@ describe('AdminProfilesPage Component', () => {
     vi.mocked(apiClient.getAdminEmailSettings).mockResolvedValue({
       enabled: true,
       configured: true,
-      region: 'us-east-1',
-      fromEmailMasked: 'pr***s@flacso.edu.uy',
-      replyToEmailMasked: null,
-      accessKeyIdMasked: 'AK***LE',
-      configurationSet: null,
-      ses: {
-        configured: true,
-        hasAccessKey: true,
-        hasSecretKey: true,
-        hasSessionToken: false,
-        region: 'us-east-1',
-        fromEmail: 'pr***s@flacso.edu.uy',
-        replyToEmail: null,
-        configurationSet: null,
-      },
+      provider: 'smtp',
+      smtp: { host: 'smtp.flacso.edu.uy', port: 587, security: 'starttls', username: 'pre@flacso.edu.uy', hasPassword: true, fromEmail: 'pr***s@flacso.edu.uy', replyToEmail: null },
       masterEmails: [],
+      status: { lastConnectionTestAt: null, lastConnectionTestOk: null, lastConnectionTestError: null },
     });
     vi.mocked(apiClient.getAdminNotifications).mockResolvedValue({
       ok: true,
@@ -136,7 +112,7 @@ describe('AdminProfilesPage Component', () => {
     fireEvent.click(sheetsTab);
 
     // Switch to Notifications section
-    const notifsTab = screen.getByRole('tab', { name: /Notificaciones SES/i });
+    const notifsTab = screen.getByRole('tab', { name: /Notificaciones SMTP/i });
     fireEvent.click(notifsTab);
 
     // Switch back to Canonical Profiles section

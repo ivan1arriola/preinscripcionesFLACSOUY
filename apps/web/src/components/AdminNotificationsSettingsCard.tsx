@@ -20,13 +20,13 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
 
   // Form fields
   const [enabled, setEnabled] = useState(false);
-  const [region, setRegion] = useState('us-east-1');
+  const [host, setHost] = useState('');
+  const [port, setPort] = useState(587);
+  const [security, setSecurity] = useState<'starttls' | 'tls'>('starttls');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [fromEmail, setFromEmail] = useState('');
   const [replyToEmail, setReplyToEmail] = useState('');
-  const [configurationSet, setConfigurationSet] = useState('');
-  const [accessKeyId, setAccessKeyId] = useState('');
-  const [secretAccessKey, setSecretAccessKey] = useState('');
-  const [sessionToken, setSessionToken] = useState('');
   const [masterEmailsText, setMasterEmailsText] = useState('');
 
   // Test email state
@@ -58,10 +58,12 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
       const data = await apiClient.getAdminEmailSettings();
       setSettings(data);
       setEnabled(data.enabled);
-      setRegion(data.region || 'us-east-1');
-      setFromEmail(data.ses.fromEmail || '');
-      setReplyToEmail(data.ses.replyToEmail || '');
-      setConfigurationSet(data.configurationSet || '');
+      setHost(data.smtp.host || '');
+      setPort(data.smtp.port || 587);
+      setSecurity(data.smtp.security);
+      setUsername(data.smtp.username || '');
+      setFromEmail(data.smtp.fromEmail || '');
+      setReplyToEmail(data.smtp.replyToEmail || '');
       setMasterEmailsText(data.masterEmails.join('\n'));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al cargar la configuración de correo');
@@ -111,23 +113,22 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
       const updated = await apiClient.updateAdminEmailSettings(
         {
           enabled,
-          region: region.trim() || undefined,
+          host: host.trim(),
+          port,
+          security,
+          username: username.trim(),
+          password: password || undefined,
+          replacePassword: Boolean(password),
           fromEmail: fromEmail.trim() || undefined,
           replyToEmail: replyToEmail.trim() || null,
-          configurationSet: configurationSet.trim() || null,
-          awsAccessKeyId: accessKeyId.trim() || undefined,
-          awsSecretAccessKey: secretAccessKey.trim() || undefined,
-          awsSessionToken: sessionToken.trim() || null,
           masterEmails: parsedMasters,
         },
         csrfToken
       );
 
       setSettings(updated);
-      setAccessKeyId('');
-      setSecretAccessKey('');
-      setSessionToken('');
-      setSuccess('Configuración de Amazon SES y destinatarios maestros guardada con éxito.');
+      setPassword('');
+      setSuccess('Configuración SMTP y destinatarios maestros guardada con éxito.');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al guardar la configuración');
     } finally {
@@ -189,7 +190,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-500">
-        Cargando configuración de notificaciones SES...
+        Cargando configuración de notificaciones SMTP...
       </div>
     );
   }
@@ -200,7 +201,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-6">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Configuración de Amazon SES y Notificaciones</h2>
+            <h2 className="text-lg font-bold text-gray-900">Configuración SMTP y notificaciones</h2>
             <p className="text-sm text-gray-600">
               Notificaciones transaccionales automáticas para postulantes, coordinaciones y correos institucionales.
             </p>
@@ -217,12 +218,12 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
             </span>
             <span
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                settings?.ses.configured
+                settings?.configured
                   ? 'bg-blue-100 text-blue-800'
                   : 'bg-yellow-100 text-yellow-800'
               }`}
             >
-              {settings?.ses.configured ? 'SES Configurado' : 'SES Pendiente'}
+              {settings?.configured ? 'SMTP configurado' : 'SMTP pendiente'}
             </span>
           </div>
         </div>
@@ -259,17 +260,17 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
             </div>
           </div>
 
-          {/* SES Credentials & Region */}
+          {/* SMTP connection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Región de AWS SES
+                Servidor SMTP
               </label>
               <input
                 type="text"
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                placeholder="us-east-1"
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                placeholder="smtp.flacso.edu.uy"
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 required
               />
@@ -277,15 +278,33 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
 
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Configuration Set de SES (opcional)
+                Puerto
               </label>
               <input
-                type="text"
-                value={configurationSet}
-                onChange={(e) => setConfigurationSet(e.target.value)}
-                placeholder="flacso-notifications"
+                type="number"
+                value={port}
+                onChange={(e) => setPort(Number(e.target.value))}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                required
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Seguridad</label>
+              <select value={security} onChange={(e) => setSecurity(e.target.value as 'starttls' | 'tls')} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md">
+                <option value="starttls">STARTTLS</option>
+                <option value="tls">TLS directo</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Usuario SMTP</label>
+              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" required />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Contraseña SMTP</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={settings?.smtp.hasPassword ? 'Dejar vacío para conservarla' : 'Contraseña SMTP'} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" />
             </div>
 
             <div>
@@ -296,13 +315,13 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
                 type="email"
                 value={fromEmail}
                 onChange={(e) => setFromEmail(e.target.value)}
-                placeholder={settings?.ses.fromEmail || 'preinscripciones@flacso.edu.uy'}
+                placeholder={settings?.smtp.fromEmail || 'preinscripciones@flacso.edu.uy'}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 required={enabled}
               />
-              {settings?.ses.fromEmail && (
+              {settings?.smtp.fromEmail && (
                 <p className="text-xs text-gray-500 mt-1">
-                  Actual: <span className="font-mono">{settings.ses.fromEmail}</span>
+                  Actual: <span className="font-mono">{settings.smtp.fromEmail}</span>
                 </p>
               )}
             </div>
@@ -315,64 +334,16 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
                 type="email"
                 value={replyToEmail}
                 onChange={(e) => setReplyToEmail(e.target.value)}
-                placeholder={settings?.ses.replyToEmail || 'consultas@flacso.edu.uy'}
+                placeholder={settings?.smtp.replyToEmail || 'consultas@flacso.edu.uy'}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
-              {settings?.ses.replyToEmail && (
+              {settings?.smtp.replyToEmail && (
                 <p className="text-xs text-gray-500 mt-1">
-                  Actual: <span className="font-mono">{settings.ses.replyToEmail}</span>
+                  Actual: <span className="font-mono">{settings.smtp.replyToEmail}</span>
                 </p>
               )}
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                AWS Access Key ID
-              </label>
-              <input
-                type="text"
-                value={accessKeyId}
-                onChange={(e) => setAccessKeyId(e.target.value)}
-                placeholder={settings?.ses.hasAccessKey ? settings.accessKeyIdMasked || '••••••••' : 'AKIA...'}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              {settings?.ses.hasAccessKey && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Clave configurada ({settings.accessKeyIdMasked}). Ingrese un nuevo valor solo para reemplazarla.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                AWS Secret Access Key
-              </label>
-              <input
-                type="password"
-                value={secretAccessKey}
-                onChange={(e) => setSecretAccessKey(e.target.value)}
-                placeholder={settings?.ses.hasSecretKey ? '••••••••••••••••' : 'Clave secreta AWS'}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              {settings?.ses.hasSecretKey && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Clave secreta configurada y cifrada (AES-256-GCM). Ingrese un nuevo valor solo para reemplazarla.
-                </p>
-              )}
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                AWS Session Token (opcional, para credenciales temporales o roles asumidos)
-              </label>
-              <input
-                type="password"
-                value={sessionToken}
-                onChange={(e) => setSessionToken(e.target.value)}
-                placeholder={settings?.ses.hasSessionToken ? '••••••••••••••••' : 'Opcional'}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
           </div>
 
           {/* Master Emails */}
@@ -406,9 +377,9 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
 
       {/* Test Email Card */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h3 className="text-base font-bold text-gray-900 mb-2">Envío de Prueba Amazon SES</h3>
+        <h3 className="text-base font-bold text-gray-900 mb-2">Envío de prueba SMTP</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Compruebe la autenticación y conectividad con Amazon SES enviando un mensaje directo a una dirección verificada.
+          Enviá un mensaje directo sólo después de verificar la conexión SMTP.
         </p>
 
         {testResult && (
@@ -642,7 +613,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
             <h4 className="text-base font-bold text-gray-900 mb-2">Confirmar reintento de estado desconocido</h4>
             <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-md text-xs mb-4 leading-relaxed">
               ⚠️ <strong>Advertencia de duplicado potencial:</strong> La notificación a{' '}
-              <span className="font-mono">{retryTarget.recipientEmail}</span> terminó con error ambiguo (tiempo de espera o desconexión). Es posible que Amazon SES ya haya entregado el correo al destinatario. Reintentar forzosamente podría enviar un correo duplicado.
+              <span className="font-mono">{retryTarget.recipientEmail}</span> terminó con error ambiguo (tiempo de espera o desconexión). Es posible que el servidor SMTP ya haya aceptado el correo. Reintentar forzosamente podría enviar un correo duplicado.
             </div>
             <p className="text-xs text-gray-600 mb-6">
               ¿Desea forzar el reencolado de esta notificación para un nuevo intento?

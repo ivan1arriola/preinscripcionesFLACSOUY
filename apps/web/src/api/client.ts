@@ -248,7 +248,7 @@ export const apiClient = {
         spreadsheetId: string;
         sheetName: string;
         url?: string;
-        status?: 'reconciled' | 'created' | 'unchanged' | 'blocked';
+        status?: 'reconciled' | 'created' | 'unchanged' | 'blocked' | 'detached';
         rootFolderId?: string;
       } | null;
     }>;
@@ -268,7 +268,7 @@ export const apiClient = {
       status: 'completed' | 'blocked';
       targets: Array<{
         targetId: string;
-        status: 'reconciled' | 'created' | 'unchanged' | 'blocked';
+        status: 'reconciled' | 'created' | 'unchanged' | 'blocked' | 'detached';
         spreadsheetId?: string;
         code?: string;
         message?: string;
@@ -282,6 +282,19 @@ export const apiClient = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new ApiError(res.status, err.error?.code || 'SPREADSHEETS_PROVISION_ERROR', err.error?.message || 'No se pudieron crear las planillas');
+    }
+    return res.json();
+  },
+
+  async unlinkAdminSpreadsheet(targetId: string, csrfToken: string): Promise<{ ok: boolean; message: string }> {
+    const res = await fetch('/api/admin/settings/spreadsheets/unlink', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+      body: JSON.stringify({ targetId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'SPREADSHEET_UNLINK_ERROR', err.error?.message || 'No se pudo desvincular la planilla');
     }
     return res.json();
   },
@@ -329,6 +342,18 @@ export const apiClient = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new ApiError(res.status, err.error?.code || 'SEND_TEST_EMAIL_ERROR', err.error?.message || 'Error al enviar correo de prueba');
+    }
+    return res.json();
+  },
+
+  async verifyAdminEmail(csrfToken: string): Promise<{ ok: boolean }> {
+    const res = await fetch('/api/admin/settings/email/verify', {
+      method: 'POST',
+      headers: { 'x-csrf-token': csrfToken },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'VERIFY_EMAIL_ERROR', err.error?.message || 'Error al verificar SMTP');
     }
     return res.json();
   },
@@ -398,22 +423,22 @@ export const apiClient = {
 export interface AdminEmailSettings {
   enabled: boolean;
   configured: boolean;
-  region: string | null;
-  fromEmailMasked: string | null;
-  replyToEmailMasked: string | null;
-  accessKeyIdMasked: string | null;
-  configurationSet: string | null;
-  ses: {
-    configured: boolean;
-    hasAccessKey: boolean;
-    hasSecretKey: boolean;
-    hasSessionToken: boolean;
-    region: string | null;
+  provider: 'smtp';
+  smtp: {
+    host: string;
+    port: number;
+    security: 'starttls' | 'tls';
+    username: string;
+    hasPassword: boolean;
     fromEmail: string | null;
     replyToEmail: string | null;
-    configurationSet: string | null;
   };
   masterEmails: string[];
+  status: {
+    lastConnectionTestAt: string | null;
+    lastConnectionTestOk: boolean | null;
+    lastConnectionTestError: string | null;
+  };
   updatedAt?: string | null;
   updatedBy?: string | null;
 }
@@ -421,10 +446,12 @@ export interface AdminEmailSettings {
 export interface UpdateAdminEmailSettingsInput {
   enabled?: boolean;
   masterEmails?: string[];
-  awsAccessKeyId?: string;
-  awsSecretAccessKey?: string;
-  awsSessionToken?: string | null;
-  region?: string;
+  host?: string;
+  port?: number;
+  security?: 'starttls' | 'tls';
+  username?: string;
+  password?: string;
+  replacePassword?: boolean;
   fromEmail?: string;
   replyToEmail?: string | null;
   configurationSet?: string | null;

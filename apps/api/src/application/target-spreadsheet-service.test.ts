@@ -66,6 +66,26 @@ describe('TargetSpreadsheetService', () => {
     }));
   });
 
+  it('unlinks a spreadsheet without deleting it and creates a new one on the next preparation', async () => {
+    const repository = new MemoryTargetSpreadsheetRepository();
+    await repository.save({ targetId: target.id, spreadsheetId: 'old-sheet', sheetName: 'Inscripciones', status: 'created' });
+    const setProperties = vi.fn().mockResolvedValue(undefined);
+    const provisioner: SpreadsheetProvisioner = { create: vi.fn().mockResolvedValue({ spreadsheetId: 'new-sheet', sheetName: 'Inscripciones' }) };
+    const service = new TargetSpreadsheetService(repository, provisioner, async () => 'root-1', {
+      findByTargetId: vi.fn().mockResolvedValue({ targetId: target.id, spreadsheetId: 'old-sheet', sheetName: 'Inscripciones', parentFolderId: 'folder', url: 'https://old' }),
+      ensureTargetFolder: vi.fn().mockResolvedValue('folder'),
+      setSpreadsheetAppProperties: setProperties,
+    } as any);
+
+    const detached = await service.unlinkForTarget(target.id);
+    expect(detached.status).toBe('detached');
+    expect(detached.spreadsheetId).toBe('old-sheet');
+    expect(setProperties).toHaveBeenCalledWith('old-sheet', expect.objectContaining({ flacsoDetached: 'true' }));
+    const prepared = await service.ensureForTarget(target);
+    expect(prepared.spreadsheetId).toBe('new-sheet');
+    expect(provisioner.create).toHaveBeenCalledTimes(1);
+  });
+
   it('fails clearly when the Drive root has not been configured', async () => {
     const repository = new MemoryTargetSpreadsheetRepository();
     const provisioner: SpreadsheetProvisioner = { create: vi.fn() };

@@ -405,9 +405,9 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.enabled).toBe(false);
-      expect(body.ses.configured).toBe(false);
-      expect(body.ses.region).toBeNull();
-      expect(body.ses.fromEmail).toBeNull();
+      expect(body.smtp.configured).toBeUndefined();
+      expect(body.configured).toBe(false);
+      expect(body.smtp.fromEmail).toBeNull();
       expect(body.masterEmails).toEqual([]);
     });
 
@@ -428,7 +428,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(body.error).toBeDefined();
     });
 
-    it('PUT /email saves SES configuration and master emails encrypted, never exposes plaintext secrets', async () => {
+    it('PUT /email saves SMTP configuration and master emails encrypted, never exposes plaintext secrets', async () => {
       const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
         method: 'PUT',
         headers: {
@@ -438,14 +438,14 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
         },
         body: JSON.stringify({
           enabled: true,
-          ses: {
-            accessKeyId: 'AKIAIOSFODNN7EXAMPLE',
-            secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-            region: 'us-east-1',
-            fromEmail: 'preinscripciones@flacso.edu.uy',
-            replyToEmail: 'consultas@flacso.edu.uy',
-            configurationSet: 'flacso-notifications-config',
-          },
+          host: 'smtp.flacso.edu.uy',
+          port: 587,
+          security: 'starttls',
+          username: 'preinscripciones@flacso.edu.uy',
+          password: 'smtp-secret-example',
+          replacePassword: true,
+          fromEmail: 'preinscripciones@flacso.edu.uy',
+          replyToEmail: 'consultas@flacso.edu.uy',
           masterEmails: ['coordinacion@flacso.edu.uy', 'soporte@flacso.edu.uy'],
         }),
       });
@@ -453,21 +453,20 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.enabled).toBe(true);
-      expect(body.ses.configured).toBe(true);
-      expect(body.ses.region).toBe('us-east-1');
-      expect(body.ses.fromEmail).toBe('pr***s@flacso.edu.uy');
-      expect(body.ses.replyToEmail).toBe('co***s@flacso.edu.uy');
-      expect(body.ses.hasAccessKey).toBe(true);
-      expect(body.ses.hasSecretKey).toBe(true);
+      expect(body.configured).toBe(true);
+      expect(body.smtp.host).toBe('smtp.flacso.edu.uy');
+      expect(body.smtp.fromEmail).toBe('pr***s@flacso.edu.uy');
+      expect(body.smtp.replyToEmail).toBe('co***s@flacso.edu.uy');
+      expect(body.smtp.hasPassword).toBe(true);
       expect(body.masterEmails).toEqual(['coordinacion@flacso.edu.uy', 'soporte@flacso.edu.uy']);
 
       // CRITICAL: Plaintext secrets MUST NEVER appear in API response
-      expect(JSON.stringify(body)).not.toContain('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+      expect(JSON.stringify(body)).not.toContain('smtp-secret-example');
 
       // CRITICAL: Plaintext secrets MUST NEVER appear in raw repository
-      const rawSecret = await settingsRepository.getSetting('ses_aws_secret_access_key');
+      const rawSecret = await settingsRepository.getSetting('smtp_password');
       expect(rawSecret).not.toBeNull();
-      expect(rawSecret).not.toContain('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+      expect(rawSecret).not.toContain('smtp-secret-example');
       expect(rawSecret!.startsWith('enc:v1:')).toBe(true);
     });
 
@@ -479,11 +478,11 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       const body = await res.json();
 
       expect(body.enabled).toBe(true);
-      expect(body.ses.configured).toBe(true);
-      expect(body.ses.fromEmail).toBe('pr***s@flacso.edu.uy');
-      expect(body.ses.region).toBe('us-east-1');
+      expect(body.configured).toBe(true);
+      expect(body.smtp.fromEmail).toBe('pr***s@flacso.edu.uy');
+      expect(body.smtp.host).toBe('smtp.flacso.edu.uy');
       expect(body.masterEmails).toEqual(['coordinacion@flacso.edu.uy', 'soporte@flacso.edu.uy']);
-      expect(JSON.stringify(body)).not.toContain('wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
+      expect(JSON.stringify(body)).not.toContain('smtp-secret-example');
     });
 
     it('POST /email/test rejects unauthenticated request (401)', async () => {
@@ -508,7 +507,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(res.status).toBe(400);
     });
 
-    it('POST /email/test sends test email when SES is configured (200)', async () => {
+    it('POST /email/test sends test email when SMTP is configured (200)', async () => {
       const res = await fetch(`${baseUrl}/api/admin/settings/email/test`, {
         method: 'POST',
         headers: {

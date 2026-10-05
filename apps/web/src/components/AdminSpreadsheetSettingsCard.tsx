@@ -13,6 +13,7 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
   const [provisioning, setProvisioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [unlinking, setUnlinking] = useState<string | null>(null);
 
   const load = async (synchronizeMissing = true) => {
     setLoading(true);
@@ -56,6 +57,18 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
     } finally {
       setProvisioning(false);
     }
+  };
+
+  const unlink = async (targetId: string) => {
+    if (!window.confirm('La planilla se conservará en Google Drive, pero dejará de ser la activa. ¿Continuar?')) return;
+    setUnlinking(targetId); setError(null); setSummary(null);
+    try {
+      const result = await apiClient.unlinkAdminSpreadsheet(targetId, csrfToken);
+      setSummary(result.message);
+      await load(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo desvincular la planilla.');
+    } finally { setUnlinking(null); }
   };
 
   return (
@@ -104,9 +117,13 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
                   {target.spreadsheet?.status === 'unchanged' && (
                     <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-medium">Lista</span>
                   )}
+                  {target.spreadsheet?.status === 'detached' && (
+                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded text-[10px] font-medium">Desvinculada</span>
+                  )}
                 </div>
               </div>
-              {target.spreadsheet ? (
+              {target.spreadsheet && target.spreadsheet.status !== 'detached' ? (
+                <div className="flex items-center gap-3">
                 <a
                   href={target.spreadsheet.url ?? `https://docs.google.com/spreadsheets/d/${target.spreadsheet.spreadsheetId}/edit`}
                   target="_blank"
@@ -115,6 +132,12 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
                 >
                   Abrir planilla ↗
                 </a>
+                <button type="button" onClick={() => unlink(target.targetId)} disabled={unlinking === target.targetId} className="text-xs font-medium text-red-700 hover:text-red-900 disabled:opacity-50">
+                  {unlinking === target.targetId ? 'Desvinculando…' : 'Desvincular'}
+                </button>
+                </div>
+              ) : target.spreadsheet?.status === 'detached' ? (
+                <span className="text-xs text-amber-700">Prepará una nueva planilla cuando la necesites</span>
               ) : (
                 <span className="text-xs text-amber-700">Creación pendiente</span>
               )}

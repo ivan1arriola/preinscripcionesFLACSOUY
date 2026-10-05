@@ -28,8 +28,8 @@ import type { TargetSpreadsheetRepository } from '../../ports/target-spreadsheet
 import { EncryptedSettingsService } from '../../infrastructure/security/encrypted-settings.js';
 import type { EmailNotificationRepository } from '../../ports/email-notification-repository.js';
 import type { EmailNotificationDispatcher } from '../../application/email-notification-dispatcher.js';
-import { loadEmailConfig, type SesCredentialsConfig } from '../../infrastructure/email/email-config.js';
-import type { EmailProvider } from '../../infrastructure/email/ses-client.js';
+import { loadEmailConfig, type SmtpConfig } from '../../infrastructure/email/email-config.js';
+import type { EmailProvider } from '../../infrastructure/email/email-provider.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -46,7 +46,7 @@ export interface AppDependencies {
   encryptedSettingsService?: EncryptedSettingsService;
   emailNotificationRepository?: EmailNotificationRepository;
   emailNotificationDispatcher?: EmailNotificationDispatcher;
-  emailProviderFactory?: (config: SesCredentialsConfig) => EmailProvider;
+  emailProviderFactory?: (config: SmtpConfig) => EmailProvider;
   getMasterEmails?: () => Promise<string[]> | string[];
   serviceAccountEmail?: string;
 }

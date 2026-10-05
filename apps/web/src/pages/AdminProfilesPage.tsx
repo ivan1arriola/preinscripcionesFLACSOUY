@@ -141,7 +141,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          ✉️ Notificaciones SES
+          ✉️ Notificaciones SMTP
         </button>
       </div>
 

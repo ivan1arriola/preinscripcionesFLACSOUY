@@ -223,6 +223,7 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
       'trashed = false',
       "appProperties has { key='flacsoResource' and value='preinscription-spreadsheet' }",
       `appProperties has { key='flacsoTargetId' and value='${targetId.replace(/'/g, "\\'")}' }`,
+      "not appProperties has { key='flacsoDetached' and value='true' }",
     ].join(' and ');
     const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,parents,webViewLink,appProperties)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
     const response = await this.fetchImpl(url, {
