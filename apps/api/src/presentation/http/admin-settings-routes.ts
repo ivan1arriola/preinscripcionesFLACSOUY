@@ -58,6 +58,7 @@ import {
   SETTING_TELEGRAM_LAST_TEST_ERROR,
 } from '../../infrastructure/telegram/telegram-config.js';
 import type { TelegramProvider } from '../../ports/telegram-provider.js';
+import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
 import { FetchTelegramProvider } from '../../infrastructure/telegram/telegram-provider.js';
 
 const UpdateDriveFolderSchema = z.object({
@@ -201,6 +202,7 @@ export function createAdminSettingsRoutes(
   googleDriveRepository?: GoogleDriveRepositoryPort,
   spreadsheetRepository?: SpreadsheetRepository,
   telegramProviderFactory?: (botToken: string) => TelegramProvider,
+  telegramAlertRepository?: TelegramAlertRepository,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -1039,6 +1041,19 @@ export function createAdminSettingsRoutes(
                   }
                 }
                 return [];
+              },
+            }
+          : undefined,
+        telegramDependencies: telegramAlertRepository && encryptedSettingsService
+          ? {
+              repository: telegramAlertRepository,
+              getPreinscriptionChatIds: async () => {
+                try {
+                  const cfg = await loadTelegramConfig(encryptedSettingsService);
+                  return cfg.preinscriptionEnabled && cfg.chatIds ? cfg.chatIds : [];
+                } catch {
+                  return [];
+                }
               },
             }
           : undefined,

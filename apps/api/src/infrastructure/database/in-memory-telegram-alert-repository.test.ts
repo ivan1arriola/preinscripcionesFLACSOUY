@@ -11,8 +11,8 @@ describe('InMemoryTelegramAlertRepository', () => {
     });
 
     expect(alert).toBeDefined();
-    expect(alert.eventType).toBe('recovery');
-    expect(alert.dedupeKey).toBe('sub_123:1001:recovery');
+    expect(alert!.eventType).toBe('recovery');
+    expect(alert!.dedupeKey).toBe('sub_123:1001:recovery');
   });
 
   it('ensureForSubmission is idempotent for the same dedupeKey', async () => {
@@ -76,9 +76,9 @@ describe('InMemoryTelegramAlertRepository', () => {
       message: 'Alerta recuperación',
     });
 
-    expect(preinscription.id).not.toBe(recovery.id);
-    expect(preinscription.eventType).toBe('preinscription');
-    expect(recovery.eventType).toBe('recovery');
+    expect(preinscription!.id).not.toBe(recovery!.id);
+    expect(preinscription!.eventType).toBe('preinscription');
+    expect(recovery!.eventType).toBe('recovery');
     expect(repo.alerts).toHaveLength(2);
   });
 

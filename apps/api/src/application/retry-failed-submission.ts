@@ -344,7 +344,7 @@ export async function retryFailedSubmission(
     } catch (tgErr) {
       console.error(
         '[Recovery] Error al encolar notificación Telegram tras reintento:',
-        sanitizeSafeError(tgErr)
+        sanitizeSafeError(tgErr, 'Error al encolar notificación de Telegram.')
       );
     }
   }

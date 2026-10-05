@@ -4,6 +4,7 @@ import type { DatabaseSchema, TelegramRecoveryAlertsTable } from './schema.js';
 import type {
   TelegramAlertRepository,
   TelegramAlertRecord,
+  TelegramEventType,
   EnqueueTelegramAlertInput,
   TelegramAlertCounts,
   TelegramAlertFilter,

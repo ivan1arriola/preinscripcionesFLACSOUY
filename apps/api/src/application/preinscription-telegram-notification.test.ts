@@ -60,14 +60,10 @@ describe('preinscription-telegram-notification', () => {
       id: 'target_abc',
       title: 'Maestría en Educación',
       kind: 'academic_offer',
-      programType: 'maestria',
-      cohort: '2026',
-      academicPeriod: '2026',
-      isPublished: true,
-      hasAvailableQuota: true,
+      registrationOpen: true,
+      configRevision: 'rev-1',
       orientations: [],
       mentions: [],
-      specificRequirements: [],
     };
 
     it('enqueues one job per chat ID with preinscription event type and correct dedupe key', async () => {
