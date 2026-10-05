@@ -20,7 +20,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
   let settingsRepository: MemorySystemSettingsRepository;
   let encryptedSettingsService: EncryptedSettingsService;
   let emailNotificationRepository: InMemoryEmailNotificationRepository;
-  let mockEmailProvider: { send: any };
+  let mockEmailProvider: { verify: any; send: any };
   let dispatcher: EmailNotificationDispatcher;
   let validCookie: string;
   let csrfToken: string;
@@ -45,6 +45,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
     encryptedSettingsService = new EncryptedSettingsService(settingsRepository, testMasterKey);
     emailNotificationRepository = new InMemoryEmailNotificationRepository();
     mockEmailProvider = {
+      verify: vi.fn(async () => undefined),
       send: vi.fn(async () => ({ providerMessageId: 'mock-ses-test-msg-id-123' })),
     };
     dispatcher = new EmailNotificationDispatcher({

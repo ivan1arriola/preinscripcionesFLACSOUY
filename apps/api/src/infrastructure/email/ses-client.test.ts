@@ -12,6 +12,14 @@ describe('SesEmailProvider', () => {
     configurationSet: 'flacso-notifications-config',
   };
 
+  it('implements verification without sending through SES', async () => {
+    const mockClient = { send: vi.fn() } as any;
+    const provider = new SesEmailProvider(baseConfig, mockClient);
+
+    await expect(provider.verify()).resolves.toBeUndefined();
+    expect(mockClient.send).not.toHaveBeenCalled();
+  });
+
   it('rejects sending when recipients list is empty before calling AWS', async () => {
     const mockClient = { send: vi.fn() } as any;
     const provider = new SesEmailProvider(baseConfig, mockClient);

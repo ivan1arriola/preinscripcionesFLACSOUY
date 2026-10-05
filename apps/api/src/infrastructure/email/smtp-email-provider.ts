@@ -61,12 +61,12 @@ function smtpErrorDetails(error: unknown): { code?: string; responseCode?: numbe
 
 function classifySmtpError(error: unknown): EmailProviderErrorClassification {
   const { code, responseCode, command } = smtpErrorDetails(error);
+  if (command?.toUpperCase().includes('DATA')) return 'unknown';
   if (typeof responseCode === 'number') {
     if (responseCode >= 500) return 'permanent';
     if (responseCode >= 400) return 'retryable';
   }
   if (code === 'EAUTH' || code === 'EENVELOPE') return 'permanent';
-  if (command?.toUpperCase().includes('DATA')) return 'unknown';
   if (code === 'ECONNREFUSED' || code === 'ENOTFOUND' || code === 'EHOSTUNREACH' || code === 'EAI_AGAIN') {
     return 'retryable';
   }

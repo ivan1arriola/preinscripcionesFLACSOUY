@@ -87,6 +87,7 @@ describe('SmtpEmailProvider', () => {
     [{ responseCode: 451, command: 'MAIL FROM' }, 'retryable'],
     [{ responseCode: 550, command: 'RCPT TO' }, 'permanent'],
     [{ code: 'ETIMEDOUT', command: 'DATA' }, 'unknown'],
+    [{ responseCode: 451, command: 'DATA' }, 'unknown'],
   ] as const)('classifies SMTP errors as %s', async (smtpError, classification) => {
     const injectedTransport = transport();
     (injectedTransport.sendMail as ReturnType<typeof vi.fn>).mockRejectedValue(smtpError);

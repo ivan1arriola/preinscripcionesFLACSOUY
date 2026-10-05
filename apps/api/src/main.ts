@@ -152,6 +152,7 @@ const notificationDispatcher = new EmailNotificationDispatcher({
       }
       if (emailConfig.provider === 'fake') {
         return {
+          verify: async () => undefined,
           send: async (msg: EmailMessage) => {
             console.log(`[FakeEmailProvider] Simulación de envío a ${msg.to.join(', ')}: ${msg.subject}`);
             return { providerMessageId: `fake-${Date.now()}` };

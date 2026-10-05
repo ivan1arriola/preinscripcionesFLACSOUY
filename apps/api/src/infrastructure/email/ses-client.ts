@@ -46,6 +46,11 @@ export class SesEmailProvider implements EmailProvider {
       });
   }
 
+  async verify(): Promise<void> {
+    // The legacy SES API adapter has no separate non-sending verification call.
+    // This keeps the provider contract compatible until SMTP replaces it.
+  }
+
   async send(message: EmailMessage): Promise<{ providerMessageId: string }> {
     if (!message.to || message.to.length === 0) {
       throw new SesEmailProviderError('Destinatarios vacíos: se requiere al menos un destinatario.', undefined, false);
