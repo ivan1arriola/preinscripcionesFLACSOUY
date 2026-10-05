@@ -17,7 +17,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const headers = await repo.readHeaders('sheet_123', 'Respuestas');
 
     expect(headers).toEqual(['Nombre', 'Apellido', 'Correo electrónico']);
-    expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', 'Respuestas!1:1');
+    expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', 'Respuestas!A1:ZZ1');
   });
 
   it('quotes sheet names with spaces so Google Sheets accepts the A1 range', async () => {
@@ -30,7 +30,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const repo = new GoogleSheetsRepository(mockClient);
     await repo.readHeaders('sheet_123', 'Hoja 1');
 
-    expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', "'Hoja 1'!1:1");
+    expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', "'Hoja 1'!A1:ZZ1");
   });
 
   it('appends a row by header names and preserves manual columns as empty slots', async () => {
@@ -127,10 +127,10 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
       'Inscripciones'
     );
 
-    // Header row 1:1 updated additively with Ciudad de residencia at the end
+    // Header row A1:ZZ1 updated additively with Ciudad de residencia at the end
     expect(mockClient.updateValues).toHaveBeenCalledWith(
       'sheet_123',
-      'Inscripciones!1:1',
+      'Inscripciones!A1:ZZ1',
       [['Timestamp', 'Observaciones Asistente', 'Nombre', 'País de residencia', 'Ciudad de residencia']]
     );
 

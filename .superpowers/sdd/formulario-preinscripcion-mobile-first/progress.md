@@ -7,6 +7,7 @@ Ruling: The unavailable `task-start` helper referenced by the executing-plans sk
 Task 1 complete: `d3ff0f5` — `preinscription-form-view-model.ts` and focused tests provide section grouping, document progress, and first-error mapping. Verified with web typecheck/build and focused Vitest.
 Task 2 complete: `d3ff0f5` — start card, explicit start state, and separate preinscription options preserve existing field contracts. Verified with PreinscriptionWizard and start-card tests.
 Task 3 complete: `d3ff0f5` — compact progress indicator and sticky mobile navigation with safe-area padding. Verified with WizardProgress, MobileWizardNavigation, and wizard tests.
-Task 4 partial: `d3ff0f5` — standard document cards and aggregate progress implemented; title/defer variants retain existing specialized paths and need final visual/E2E review.
-Task 5 partial: `d3ff0f5` — error summary and grouped preinscription review context implemented; success copy/copy action added. Needs final visual/E2E review.
+Task 4 complete: `d3ff0f5` — standard document cards and aggregate progress implemented; title/defer variants retain their existing specialized rules. Focused component tests and document-flow E2E passed.
+Task 5 complete: `d3ff0f5` — error summary, grouped preinscription review context and copyable success tracking code implemented. Focused component tests and full wizard tests passed.
+Task 6 complete: `12e1dff` plus current QA — 360/390 px E2E coverage, typecheck/build and visual browser review passed; QA checklist recorded in `docs/FORMULARIO-MOBILE.md`.
 Recovery: `de31954` restored the Telegram independent toggle and spreadsheet administration implementation from the operational prior state after an interrupted local edit had emptied those files.
