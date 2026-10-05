@@ -32,6 +32,20 @@ vi.mock('../api/client.js', async () => {
         counts: { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 },
         notifications: [],
       }),
+      getTelegramSettings: vi.fn().mockResolvedValue({
+        telegram: {
+          enabled: false,
+          hasToken: false,
+          chatIdsCount: 0,
+          maskedChatIds: [],
+          lastTestedAt: null,
+          lastTestStatus: null,
+          lastTestError: null,
+        },
+      }),
+      listRecoveries: vi.fn().mockResolvedValue({
+        recoveries: [],
+      }),
     },
   };
 });
@@ -66,6 +80,20 @@ describe('AdminProfilesPage Component', () => {
       ok: true,
       counts: { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 },
       notifications: [],
+    });
+    vi.mocked(apiClient.getTelegramSettings).mockResolvedValue({
+      telegram: {
+        enabled: false,
+        hasToken: false,
+        chatIdsCount: 0,
+        maskedChatIds: [],
+        lastTestedAt: null,
+        lastTestStatus: null,
+        lastTestError: null,
+      },
+    });
+    vi.mocked(apiClient.listRecoveries).mockResolvedValue({
+      recoveries: [],
     });
   });
 
@@ -114,6 +142,15 @@ describe('AdminProfilesPage Component', () => {
     // Switch to Notifications section
     const notifsTab = screen.getByRole('tab', { name: /Notificaciones SMTP/i });
     fireEvent.click(notifsTab);
+
+    // Switch to Recovery section
+    const recoveryTab = screen.getByRole('tab', { name: /Recuperación y Alertas/i });
+    fireEvent.click(recoveryTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Bandeja de Recuperación de Preinscripciones/i)).toBeInTheDocument();
+      expect(screen.getByText(/Alertas de Incidentes por Telegram/i)).toBeInTheDocument();
+    });
 
     // Switch back to Canonical Profiles section
     const profilesTab = screen.getByRole('tab', { name: /Formularios Canónicos/i });

@@ -3,6 +3,8 @@ import { apiClient, ApiError } from '../api/client.js';
 import { AdminDriveSettingsCard } from '../components/AdminDriveSettingsCard.js';
 import { AdminSpreadsheetSettingsCard } from '../components/AdminSpreadsheetSettingsCard.js';
 import { AdminNotificationsSettingsCard } from '../components/AdminNotificationsSettingsCard.js';
+import { AdminRecoverySettingsCard } from '../components/AdminRecoverySettingsCard.js';
+import { AdminFailedSubmissionsCard } from '../components/AdminFailedSubmissionsCard.js';
 
 interface AdminProfilesPageProps {
   onRequireLogin: () => void;
@@ -13,7 +15,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
   onRequireLogin,
   onLogout,
 }) => {
-  const [activeSection, setActiveSection] = useState<'profiles' | 'drive' | 'spreadsheets' | 'notifications'>('profiles');
+  const [activeSection, setActiveSection] = useState<'profiles' | 'drive' | 'spreadsheets' | 'notifications' | 'recovery'>('profiles');
   const [adminUser, setAdminUser] = useState<any>(null);
   const [csrfToken, setCsrfToken] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +145,19 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
         >
           ✉️ Notificaciones SMTP
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'recovery'}
+          onClick={() => setActiveSection('recovery')}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            activeSection === 'recovery'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          🛡️ Recuperación y Alertas
+        </button>
       </div>
 
       {activeSection === 'drive' ? (
@@ -151,6 +166,11 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
         <AdminSpreadsheetSettingsCard csrfToken={csrfToken} />
       ) : activeSection === 'notifications' ? (
         <AdminNotificationsSettingsCard csrfToken={csrfToken} />
+      ) : activeSection === 'recovery' ? (
+        <div className="space-y-8">
+          <AdminFailedSubmissionsCard csrfToken={csrfToken} />
+          <AdminRecoverySettingsCard csrfToken={csrfToken} />
+        </div>
       ) : (
         <div className="space-y-6">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 shadow-sm">

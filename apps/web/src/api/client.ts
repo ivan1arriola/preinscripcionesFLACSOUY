@@ -418,7 +418,197 @@ export const apiClient = {
     }
     return res.json();
   },
+
+  async getTelegramSettings(): Promise<{ telegram: AdminTelegramSettings }> {
+    const res = await fetch('/api/admin/settings/telegram');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'TELEGRAM_SETTINGS_ERROR', err.error?.message || 'Error al obtener configuración de Telegram');
+    }
+    return res.json();
+  },
+
+  async updateTelegramSettings(
+    csrfToken: string,
+    input: UpdateAdminTelegramSettingsInput
+  ): Promise<{ ok: boolean; message: string; telegram: AdminTelegramSettings }> {
+    const res = await fetch('/api/admin/settings/telegram', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+      },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'UPDATE_TELEGRAM_ERROR', err.error?.message || 'Error al guardar configuración de Telegram');
+    }
+    return res.json();
+  },
+
+  async testTelegramSettings(
+    csrfToken: string,
+    input?: { chatId?: string }
+  ): Promise<{ ok: boolean; message: string }> {
+    const res = await fetch('/api/admin/settings/telegram/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+      },
+      body: JSON.stringify(input ?? {}),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'TEST_TELEGRAM_ERROR', err.error?.message || 'Error al probar alertas de Telegram');
+    }
+    return res.json();
+  },
+
+  async listRecoveries(params?: {
+    status?: string;
+    stage?: string;
+    targetId?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ recoveries: AdminRecoveryRecord[] }> {
+    const query = new URLSearchParams();
+    if (params?.status) query.set('status', params.status);
+    if (params?.stage) query.set('stage', params.stage);
+    if (params?.targetId) query.set('targetId', params.targetId);
+    if (params?.search) query.set('search', params.search);
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.offset) query.set('offset', String(params.offset));
+
+    const qs = query.toString();
+    const res = await fetch(`/api/admin/settings/recoveries${qs ? `?${qs}` : ''}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'LIST_RECOVERIES_ERROR', err.error?.message || 'Error al listar preinscripciones para recuperación');
+    }
+    return res.json();
+  },
+
+  async getRecovery(id: string): Promise<{ recovery: AdminRecoveryDetail }> {
+    const res = await fetch(`/api/admin/settings/recoveries/${encodeURIComponent(id)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'GET_RECOVERY_ERROR', err.error?.message || 'Error al obtener caso de recuperación');
+    }
+    return res.json();
+  },
+
+  async retryRecovery(
+    id: string,
+    csrfToken: string
+  ): Promise<{ ok: boolean; submissionId: string; message: string }> {
+    const res = await fetch(`/api/admin/settings/recoveries/${encodeURIComponent(id)}/retry`, {
+      method: 'POST',
+      headers: {
+        'x-csrf-token': csrfToken,
+      },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'RETRY_RECOVERY_ERROR', err.error?.message || 'Error al reintentar procesamiento');
+    }
+    return res.json();
+  },
+
+  async discardRecovery(
+    id: string,
+    csrfToken: string,
+    reason?: string
+  ): Promise<{ ok: boolean; message: string }> {
+    const res = await fetch(`/api/admin/settings/recoveries/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+      },
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'DISCARD_RECOVERY_ERROR', err.error?.message || 'Error al descartar caso de recuperación');
+    }
+    return res.json();
+  },
 };
+
+export interface AdminTelegramSettings {
+  enabled: boolean;
+  hasToken: boolean;
+  chatIdsCount: number;
+  maskedChatIds: string[];
+  lastTestedAt?: string | null;
+  lastTestStatus?: 'ok' | 'error' | null;
+  lastTestError?: string | null;
+  lastAlertSentAt?: string | null;
+}
+
+export interface UpdateAdminTelegramSettingsInput {
+  enabled?: boolean;
+  botToken?: string;
+  replaceToken?: boolean;
+  chatIds?: string[];
+}
+
+export interface AdminRecoveryRecord {
+  id: string;
+  submissionId: string;
+  targetId: string;
+  targetTitle: string | null;
+  targetKind: string | null;
+  stage: 'drive' | 'sheets' | 'notifications' | 'unknown';
+  status: 'failed' | 'retrying' | 'resolved' | 'discarded';
+  safeError: string;
+  attemptCount: number;
+  lastAttemptAt: string;
+  retentionExpiresAt: string;
+  resolvedAt: string | null;
+  discardedAt: string | null;
+  discardedBy: string | null;
+  discardReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  filesCount: number;
+}
+
+export interface AdminRecoveryDetailFile {
+  token: string;
+  fieldKey: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  driveFileId?: string;
+  uploadedAt: string;
+  status: 'stored_in_drive' | 'pending_in_storage' | 'missing';
+}
+
+export interface AdminRecoveryDetail {
+  id: string;
+  submissionId: string;
+  targetId: string;
+  targetTitle: string | null;
+  targetKind: string | null;
+  stage: 'drive' | 'sheets' | 'notifications' | 'unknown';
+  status: 'failed' | 'retrying' | 'resolved' | 'discarded';
+  safeError: string;
+  attemptCount: number;
+  lastAttemptAt: string;
+  retentionExpiresAt: string;
+  resolvedAt: string | null;
+  discardedAt: string | null;
+  discardedBy: string | null;
+  discardReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  files: AdminRecoveryDetailFile[];
+  values?: Record<string, string>;
+}
 
 export interface AdminEmailSettings {
   enabled: boolean;

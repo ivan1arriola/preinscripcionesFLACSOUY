@@ -32,6 +32,7 @@ import type { EmailNotificationDispatcher } from '../../application/email-notifi
 import { loadEmailConfig, type SmtpConfig } from '../../infrastructure/email/email-config.js';
 import type { EmailProvider } from '../../infrastructure/email/email-provider.js';
 import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
+import type { TelegramProvider } from '../../ports/telegram-provider.js';
 import { loadTelegramConfig } from '../../infrastructure/telegram/telegram-config.js';
 
 export interface AppDependencies {
@@ -55,6 +56,7 @@ export interface AppDependencies {
   submissionRecoveryRepository?: SubmissionRecoveryRepository;
   telegramAlertRepository?: TelegramAlertRepository;
   getTelegramChatIds?: () => Promise<string[]> | string[];
+  telegramProviderFactory?: (botToken: string) => TelegramProvider;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
@@ -175,6 +177,7 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.temporaryFileStorage,
     dependencies.googleDriveRepository,
     dependencies.spreadsheetRepository,
+    dependencies.telegramProviderFactory,
   ));
 
   // Central error handler

@@ -21,6 +21,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
   let encryptedSettingsService: EncryptedSettingsService;
   let emailNotificationRepository: InMemoryEmailNotificationRepository;
   let mockEmailProvider: { verify: any; send: any };
+  let mockTelegramProvider: { verify: any; send: any };
   let dispatcher: EmailNotificationDispatcher;
   let validCookie: string;
   let csrfToken: string;
@@ -48,6 +49,10 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       verify: vi.fn(async () => undefined),
       send: vi.fn(async () => ({ providerMessageId: 'mock-ses-test-msg-id-123' })),
     };
+    mockTelegramProvider = {
+      verify: vi.fn(async () => undefined),
+      send: vi.fn(async () => ({ providerMessageId: 'mock-tg-test-msg-id-123' })),
+    };
     dispatcher = new EmailNotificationDispatcher({
       repository: emailNotificationRepository,
       provider: mockEmailProvider,
@@ -63,6 +68,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       emailNotificationRepository,
       emailNotificationDispatcher: dispatcher,
       emailProviderFactory: () => mockEmailProvider,
+      telegramProviderFactory: () => mockTelegramProvider,
       serviceAccountEmail: 'preinscripciones@flacso-uruguay.iam.gserviceaccount.com',
       googleDriveRepository: {
         storeSubmissionFiles: async () => ({ files: [], documentsFolderId: 'folder-1', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1' }),
@@ -720,6 +726,123 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(body).toHaveProperty('processed');
       expect(body).toHaveProperty('sent');
       expect(body).toHaveProperty('failed');
+    });
+  });
+
+  describe('Telegram Settings Routes (/api/admin/settings/telegram)', () => {
+    it('GET /telegram returns 401 when unauthenticated', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/telegram`);
+      expect(res.status).toBe(401);
+    });
+
+    it('GET /telegram returns masked default configuration', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/telegram`, {
+        headers: { Cookie: validCookie },
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toHaveProperty('telegram');
+      expect(data.telegram.enabled).toBe(false);
+      expect(data.telegram.hasToken).toBe(false);
+      expect(data.telegram.chatIdsCount).toBe(0);
+      expect(data.telegram.maskedChatIds).toEqual([]);
+    });
+
+    it('PUT /telegram returns 400 on invalid bot token format', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/telegram`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          botToken: 'invalid-token-without-colon',
+        }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error.code).toBe('INVALID_REQUEST');
+    });
+
+    it('PUT /telegram returns 400 on invalid chat IDs', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/telegram`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatIds: ['not-a-number'],
+        }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error.code).toBe('INVALID_REQUEST');
+    });
+
+    it('PUT /telegram saves settings and returns masked configuration without exposing token', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/telegram`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enabled: true,
+          botToken: '123456789:ABCdefGHI_jkl123',
+          chatIds: ['-100123456789', '987654321'],
+        }),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(data.telegram.enabled).toBe(true);
+      expect(data.telegram.hasToken).toBe(true);
+      expect(data.telegram.chatIdsCount).toBe(2);
+      expect(data.telegram.maskedChatIds).toEqual(['-1****89', '98****21']);
+      // Raw token must never be in response
+      expect(JSON.stringify(data)).not.toContain('ABCdefGHI_jkl123');
+    });
+
+    it('POST /telegram/test sends a test message and records success', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/telegram/test`, {
+        method: 'POST',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+      expect(mockTelegramProvider.verify).toHaveBeenCalled();
+      expect(mockTelegramProvider.send).toHaveBeenCalled();
+    });
+
+    it('POST /telegram/test records and returns safe sanitized error on failure', async () => {
+      mockTelegramProvider.send.mockRejectedValueOnce(
+        new Error('Telegram error 400: chat not found /bot123456789:ABCdefGHI_jkl123/sendMessage')
+      );
+
+      const res = await fetch(`${baseUrl}/api/admin/settings/telegram/test`, {
+        method: 'POST',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ chatId: '99999' }),
+      });
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.error.code).toBe('TELEGRAM_TEST_FAILED');
+      expect(data.error.message).not.toContain('ABCdefGHI_jkl123');
+      expect(data.error.message).toContain('chat not found');
     });
   });
 });

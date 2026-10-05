@@ -46,6 +46,17 @@ import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
 import { retryFailedSubmission } from '../../application/retry-failed-submission.js';
+import {
+  loadTelegramConfig,
+  saveTelegramConfig,
+  maskTelegramConfig,
+  maskChatId,
+  SETTING_TELEGRAM_LAST_TESTED_AT,
+  SETTING_TELEGRAM_LAST_TEST_STATUS,
+  SETTING_TELEGRAM_LAST_TEST_ERROR,
+} from '../../infrastructure/telegram/telegram-config.js';
+import type { TelegramProvider } from '../../ports/telegram-provider.js';
+import { FetchTelegramProvider } from '../../infrastructure/telegram/telegram-provider.js';
 
 const UpdateDriveFolderSchema = z.object({
   folderId: z.string().min(1, 'La carpeta de Google Drive es requerida'),
@@ -96,6 +107,57 @@ const DiscardRecoverySchema = z
   })
   .optional();
 
+const UpdateTelegramSettingsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    botToken: z.string().optional(),
+    replaceToken: z.boolean().optional(),
+    chatIds: z.array(z.string()).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.replaceToken && (!val.botToken || !val.botToken.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['botToken'],
+        message: 'Ingresá el nuevo token de Telegram.',
+      });
+    }
+    if (val.botToken && val.botToken.trim()) {
+      if (!/^[0-9]+:[a-zA-Z0-9_\-]+$/.test(val.botToken.trim())) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['botToken'],
+          message: 'El token de Telegram no tiene el formato esperado (ej. 123456789:ABCdef...).',
+        });
+      }
+    }
+    if (val.chatIds) {
+      for (let i = 0; i < val.chatIds.length; i++) {
+        const id = val.chatIds[i]!.trim();
+        if (!id || !/^-?[0-9]+$/.test(id)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['chatIds', i],
+            message: `El chat ID "${val.chatIds[i]}" no es válido (debe ser numérico, ej. 123456789 o -100123456789).`,
+          });
+        }
+      }
+    }
+  });
+
+const SendTestTelegramSchema = z.object({
+  chatId: z.string().regex(/^-?[0-9]+$/, 'El identificador de chat debe ser numérico').optional(),
+});
+
+function sanitizeTelegramError(raw: string): string {
+  let sanitized = raw.replace(/([?&](key|token|secret|password|access_token)=)[^&]+/gi, '$1***');
+  sanitized = sanitized.replace(/\/bot[0-9]+:[a-zA-Z0-9_\-]+/g, '/bot[REDACTED_TOKEN]');
+  if (sanitized.length > 500) {
+    sanitized = sanitized.slice(0, 497) + '...';
+  }
+  return sanitized;
+}
+
 export function createAdminSettingsRoutes(
   settingsRepository: SystemSettingsRepository,
   sessionStore: AdminSessionStore,
@@ -113,6 +175,7 @@ export function createAdminSettingsRoutes(
   temporaryFileStorage?: TemporaryFileStoragePort,
   googleDriveRepository?: GoogleDriveRepositoryPort,
   spreadsheetRepository?: SpreadsheetRepository,
+  telegramProviderFactory?: (botToken: string) => TelegramProvider,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -600,6 +663,163 @@ export function createAdminSettingsRoutes(
         error: {
           code: 'DISPATCH_ERROR',
           message: error instanceof Error ? error.message : 'Error al procesar la cola de notificaciones.',
+        },
+      });
+    }
+  });
+
+  // --- Telegram routes ---
+  router.get('/telegram', async (_req, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({
+        error: { code: 'SETTINGS_UNAVAILABLE', message: 'Servicio de configuración no disponible.' },
+      });
+      return;
+    }
+
+    try {
+      const config = await loadTelegramConfig(encryptedSettingsService);
+      res.json({
+        telegram: maskTelegramConfig(config),
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: {
+          code: 'SETTINGS_ERROR',
+          message: error instanceof Error ? error.message : 'Error al obtener configuración de Telegram.',
+        },
+      });
+    }
+  });
+
+  router.put('/telegram', async (req: RequestWithAdminSession, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({
+        error: { code: 'SETTINGS_UNAVAILABLE', message: 'Servicio de configuración no disponible.' },
+      });
+      return;
+    }
+
+    const parsed = UpdateTelegramSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'Datos de configuración de Telegram inválidos.',
+          issues: parsed.error.issues,
+        },
+      });
+      return;
+    }
+
+    const actor = req.adminUser?.email || 'admin';
+    let tokenToSave: string | undefined = undefined;
+    if (parsed.data.botToken && parsed.data.botToken.trim()) {
+      tokenToSave = parsed.data.botToken.trim();
+    }
+
+    try {
+      await saveTelegramConfig(
+        encryptedSettingsService,
+        {
+          enabled: parsed.data.enabled,
+          botToken: tokenToSave,
+          chatIds: parsed.data.chatIds,
+        },
+        actor
+      );
+
+      const updated = await loadTelegramConfig(encryptedSettingsService);
+      res.json({
+        ok: true,
+        message: 'Configuración de Telegram guardada correctamente.',
+        telegram: maskTelegramConfig(updated),
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: {
+          code: 'INVALID_TELEGRAM_CONFIG',
+          message: error instanceof Error ? error.message : 'Error al guardar configuración de Telegram.',
+        },
+      });
+    }
+  });
+
+  router.post('/telegram/test', async (req: RequestWithAdminSession, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({
+        error: { code: 'SETTINGS_UNAVAILABLE', message: 'Servicio de configuración no disponible.' },
+      });
+      return;
+    }
+
+    const parsed = SendTestTelegramSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'Datos de prueba inválidos.',
+          issues: parsed.error.issues,
+        },
+      });
+      return;
+    }
+
+    const config = await loadTelegramConfig(encryptedSettingsService);
+    if (!config.botToken) {
+      res.status(400).json({
+        error: {
+          code: 'TELEGRAM_TOKEN_MISSING',
+          message: 'No hay un token de bot configurado para enviar la prueba.',
+        },
+      });
+      return;
+    }
+
+    const targetChatId = parsed.data.chatId ?? (config.chatIds.length > 0 ? config.chatIds[0] : undefined);
+    if (!targetChatId) {
+      res.status(400).json({
+        error: {
+          code: 'TELEGRAM_CHAT_ID_MISSING',
+          message: 'No hay destinatarios (chat_id) configurados ni especificados para la prueba.',
+        },
+      });
+      return;
+    }
+
+    const provider = telegramProviderFactory
+      ? telegramProviderFactory(config.botToken)
+      : new FetchTelegramProvider(config.botToken);
+
+    try {
+      await provider.verify();
+      await provider.send(
+        '🔔 *Prueba de conexión*\nSistema de Preinscripciones FLACSO Uruguay\nLas alertas de recuperación por Telegram están operativas.',
+        targetChatId
+      );
+
+      const now = new Date();
+      await encryptedSettingsService.setEncryptedSetting(SETTING_TELEGRAM_LAST_TESTED_AT, now.toISOString(), req.adminUser?.email);
+      await encryptedSettingsService.setEncryptedSetting(SETTING_TELEGRAM_LAST_TEST_STATUS, 'ok', req.adminUser?.email);
+      await encryptedSettingsService.setEncryptedSetting(SETTING_TELEGRAM_LAST_TEST_ERROR, '', req.adminUser?.email);
+
+      res.json({
+        ok: true,
+        message: `Mensaje de prueba enviado con éxito al chat ${maskChatId(targetChatId)}.`,
+      });
+    } catch (err) {
+      const rawError = err instanceof Error ? err.message : String(err);
+      const safeError = sanitizeTelegramError(rawError);
+
+      const now = new Date();
+      await encryptedSettingsService.setEncryptedSetting(SETTING_TELEGRAM_LAST_TESTED_AT, now.toISOString(), req.adminUser?.email);
+      await encryptedSettingsService.setEncryptedSetting(SETTING_TELEGRAM_LAST_TEST_STATUS, 'error', req.adminUser?.email);
+      await encryptedSettingsService.setEncryptedSetting(SETTING_TELEGRAM_LAST_TEST_ERROR, safeError, req.adminUser?.email);
+
+      res.status(400).json({
+        error: {
+          code: 'TELEGRAM_TEST_FAILED',
+          message: `Fallo al verificar o enviar mensaje a Telegram: ${safeError}`,
         },
       });
     }
