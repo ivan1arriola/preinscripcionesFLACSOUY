@@ -62,8 +62,10 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
       setPort(data.smtp.port || 587);
       setSecurity(data.smtp.security);
       setUsername(data.smtp.username || '');
-      setFromEmail(data.smtp.fromEmail || '');
-      setReplyToEmail(data.smtp.replyToEmail || '');
+      // The API deliberately returns masked addresses. Keep the inputs empty so
+      // saving unchanged settings does not send a masked value back for validation.
+      setFromEmail('');
+      setReplyToEmail('');
       setMasterEmailsText(data.masterEmails.join('\n'));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al cargar la configuración de correo');
@@ -120,7 +122,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
           password: password || undefined,
           replacePassword: Boolean(password),
           fromEmail: fromEmail.trim() || undefined,
-          replyToEmail: replyToEmail.trim() || null,
+          replyToEmail: replyToEmail.trim() || undefined,
           masterEmails: parsedMasters,
         },
         csrfToken
@@ -317,7 +319,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
                 onChange={(e) => setFromEmail(e.target.value)}
                 placeholder={settings?.smtp.fromEmail || 'preinscripciones@flacso.edu.uy'}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                required={enabled}
+                required={enabled && !settings?.smtp.fromEmail}
               />
               {settings?.smtp.fromEmail && (
                 <p className="text-xs text-gray-500 mt-1">
