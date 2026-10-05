@@ -87,7 +87,7 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
     };
   }
 
-  async open(token: string, sessionId: string): Promise<FileUpload & { createdAt: Date }> {
+  async open(token: string, sessionId?: string): Promise<FileUpload & { createdAt: Date }> {
     if (this.repository) {
       const record = await this.repository.get(token, sessionId);
       if (!record) {

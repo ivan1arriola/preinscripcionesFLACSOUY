@@ -18,6 +18,7 @@ describe('PostgresTelegramAlertRepository (Integration)', () => {
     db = createKyselyDb(dbUrl);
     await runMigrations(db);
     repository = new PostgresTelegramAlertRepository(db);
+    await db.deleteFrom('telegram_recovery_alerts').execute();
 
     // Create a target and submission for foreign key constraint
     await db

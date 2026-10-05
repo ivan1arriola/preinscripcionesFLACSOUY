@@ -11,12 +11,17 @@ import type {
 
 function mapRow(
   row: Selectable<SubmissionRecoveriesTable>,
-  files?: Selectable<SubmissionFilesTable>[]
+  files?: Selectable<SubmissionFilesTable>[],
+  values?: Record<string, string>,
+  targetTitle?: string,
+  targetKind?: string
 ): SubmissionRecoveryRecord {
   return {
     id: row.id,
     submissionId: row.submission_id,
     targetId: row.target_id,
+    targetTitle,
+    targetKind,
     stage: row.stage,
     status: row.status,
     safeError: row.safe_error,
@@ -42,6 +47,7 @@ function mapRow(
       driveFileId: f.drive_file_id,
       errorMessage: f.error_message,
     })),
+    values,
   };
 }
 
@@ -113,6 +119,17 @@ export class PostgresSubmissionRecoveryRepository implements SubmissionRecoveryR
       query = query.where('target_id', '=', filter.targetId);
     }
 
+    if (filter?.search) {
+      const s = `%${filter.search}%`;
+      query = query.where((eb) =>
+        eb.or([
+          eb('submission_id', 'ilike', s),
+          eb('target_id', 'ilike', s),
+          eb('safe_error', 'ilike', s),
+        ])
+      );
+    }
+
     query = query.orderBy('last_attempt_at', 'desc');
 
     if (filter?.offset) {
@@ -141,13 +158,30 @@ export class PostgresSubmissionRecoveryRepository implements SubmissionRecoveryR
 
     if (!row) return null;
 
-    const files = await this.db
-      .selectFrom('submission_files')
-      .selectAll()
-      .where('submission_id', '=', row.submission_id)
-      .execute();
+    const [files, valuesRows, targetRow] = await Promise.all([
+      this.db
+        .selectFrom('submission_files')
+        .selectAll()
+        .where('submission_id', '=', row.submission_id)
+        .execute(),
+      this.db
+        .selectFrom('submission_values')
+        .selectAll()
+        .where('submission_id', '=', row.submission_id)
+        .execute(),
+      this.db
+        .selectFrom('targets')
+        .select(['title', 'kind'])
+        .where('id', '=', row.target_id)
+        .executeTakeFirst(),
+    ]);
 
-    return mapRow(row, files);
+    const values: Record<string, string> = {};
+    for (const v of valuesRows) {
+      values[v.input_key] = v.value;
+    }
+
+    return mapRow(row, files, values, targetRow?.title, targetRow?.kind);
   }
 
   async claim(

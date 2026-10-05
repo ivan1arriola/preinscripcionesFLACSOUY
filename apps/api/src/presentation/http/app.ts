@@ -149,6 +149,11 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.emailNotificationRepository,
     dependencies.emailNotificationDispatcher,
     dependencies.emailProviderFactory,
+    dependencies.submissionRecoveryRepository,
+    dependencies.repository,
+    dependencies.temporaryFileStorage,
+    dependencies.googleDriveRepository,
+    dependencies.spreadsheetRepository,
   ));
 
   // Central error handler

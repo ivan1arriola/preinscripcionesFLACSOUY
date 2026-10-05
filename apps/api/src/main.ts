@@ -22,10 +22,12 @@ import { PostgresAdminSessionStore } from './infrastructure/database/postgres-ad
 import { getAdminSessionTtlMs } from './application/admin-session.js';
 import { EncryptedSettingsService } from './infrastructure/security/encrypted-settings.js';
 import { PostgresEmailNotificationRepository } from './infrastructure/database/postgres-email-notification-repository.js';
+import { PostgresSubmissionRecoveryRepository } from './infrastructure/database/postgres-submission-recovery-repository.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
 import { FakeEmailProvider } from './infrastructure/email/email-provider.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
 import { SmtpEmailProvider } from './infrastructure/email/smtp-email-provider.js';
+import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
 
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
@@ -37,6 +39,7 @@ const encryptedSettingsService = new EncryptedSettingsService(
 );
 const targetSpreadsheetRepository = new PostgresTargetSpreadsheetRepository(db);
 const emailNotificationRepository = new PostgresEmailNotificationRepository(db);
+const submissionRecoveryRepository = new PostgresSubmissionRecoveryRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
   ? new WordPressAcademicCatalog(
@@ -183,18 +186,24 @@ const app = createApp({
   encryptedSettingsService,
   emailNotificationRepository,
   emailNotificationDispatcher: notificationDispatcher,
+  submissionRecoveryRepository,
   serviceAccountEmail: googleCreds.clientEmail,
   checkDatabase: checkDb,
 });
 
 const cleanupInterval = setInterval(async () => {
   try {
-    const cleaned = await temporaryFileStorage.cleanup(Date.now());
-    if (cleaned > 0) {
-      console.log(`[Uploads] Limpieza automática eliminó ${cleaned} archivo(s) temporales vencidos.`);
+    const result = await cleanupExpiredRecoveries({
+      recoveryRepository: submissionRecoveryRepository,
+      fileStorage: temporaryFileStorage,
+    });
+    if (result.deletedRecoveries > 0 || result.removedFiles > 0) {
+      console.log(
+        `[Cleanup] Limpieza automática eliminó ${result.deletedRecoveries} registro(s) de recuperación y ${result.removedFiles} archivo(s) temporales vencidos.`
+      );
     }
   } catch (err) {
-    console.error('[Uploads] Error en la limpieza automática de archivos temporales:', err);
+    console.error('[Cleanup] Error en la limpieza automática de recuperaciones y archivos temporales:', err);
   }
 }, 15 * 60 * 1000);
 cleanupInterval.unref();

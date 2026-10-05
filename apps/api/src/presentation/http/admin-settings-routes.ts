@@ -36,6 +36,16 @@ import {
 } from '../../infrastructure/email/email-config.js';
 import { type EmailProvider } from '../../infrastructure/email/email-provider.js';
 import { SmtpEmailProvider } from '../../infrastructure/email/smtp-email-provider.js';
+import type {
+  SubmissionRecoveryRepository,
+  RecoveryStage,
+  RecoveryStatus,
+} from '../../ports/submission-recovery-repository.js';
+import type { SubmissionRepository } from '../../ports/submission-repository.js';
+import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
+import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
+import type { SpreadsheetRepository } from '../../ports/spreadsheet-repository.js';
+import { retryFailedSubmission } from '../../application/retry-failed-submission.js';
 
 const UpdateDriveFolderSchema = z.object({
   folderId: z.string().min(1, 'La carpeta de Google Drive es requerida'),
@@ -71,6 +81,21 @@ const UpdateEmailSettingsSchema = z.object({
   }
 });
 
+const ListRecoveriesQuerySchema = z.object({
+  status: z.string().optional(),
+  stage: z.enum(['drive', 'sheets', 'notifications', 'unknown']).optional(),
+  targetId: z.string().optional(),
+  search: z.string().optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+  offset: z.coerce.number().int().nonnegative().default(0),
+});
+
+const DiscardRecoverySchema = z
+  .object({
+    reason: z.string().max(500).optional(),
+  })
+  .optional();
+
 export function createAdminSettingsRoutes(
   settingsRepository: SystemSettingsRepository,
   sessionStore: AdminSessionStore,
@@ -83,6 +108,11 @@ export function createAdminSettingsRoutes(
   emailNotificationRepository?: EmailNotificationRepository,
   dispatcher?: EmailNotificationDispatcher,
   emailProviderFactory?: (config: NonNullable<Awaited<ReturnType<typeof loadEmailConfig>>['smtp']>) => EmailProvider,
+  submissionRecoveryRepository?: SubmissionRecoveryRepository,
+  submissionRepository?: SubmissionRepository,
+  temporaryFileStorage?: TemporaryFileStoragePort,
+  googleDriveRepository?: GoogleDriveRepositoryPort,
+  spreadsheetRepository?: SpreadsheetRepository,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -573,6 +603,231 @@ export function createAdminSettingsRoutes(
         },
       });
     }
+  });
+
+  // --- Recovery routes ---
+  router.get('/recoveries', async (req, res) => {
+    if (!submissionRecoveryRepository) {
+      res.status(503).json({
+        error: { code: 'RECOVERY_UNAVAILABLE', message: 'Servicio de recuperación no disponible.' },
+      });
+      return;
+    }
+
+    const parsed = ListRecoveriesQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: { code: 'INVALID_QUERY', message: 'Parámetros de búsqueda inválidos.', details: parsed.error.flatten() },
+      });
+      return;
+    }
+
+    const { status, stage, targetId, search, limit, offset } = parsed.data;
+    const statusFilter = status
+      ? status.includes(',')
+        ? (status.split(',').map((s) => s.trim()) as RecoveryStatus[])
+        : (status as RecoveryStatus)
+      : undefined;
+
+    const list = await submissionRecoveryRepository.listFailed({
+      status: statusFilter,
+      stage: stage as RecoveryStage | undefined,
+      targetId,
+      search,
+      limit,
+      offset,
+    });
+
+    res.json({
+      recoveries: list.map((r) => ({
+        id: r.id,
+        submissionId: r.submissionId,
+        targetId: r.targetId,
+        targetTitle: r.targetTitle,
+        targetKind: r.targetKind,
+        stage: r.stage,
+        status: r.status,
+        safeError: r.safeError,
+        attemptCount: r.attemptCount,
+        firstFailedAt: r.firstFailedAt.toISOString(),
+        lastAttemptAt: r.lastAttemptAt.toISOString(),
+        retentionExpiresAt: r.retentionExpiresAt.toISOString(),
+        lockedUntil: r.lockedUntil?.toISOString() ?? null,
+        lockedBy: r.lockedBy ?? null,
+        discardedAt: r.discardedAt?.toISOString() ?? null,
+        discardedBy: r.discardedBy ?? null,
+        discardReason: r.discardReason ?? null,
+        resolvedAt: r.resolvedAt?.toISOString() ?? null,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+      })),
+    });
+  });
+
+  router.get('/recoveries/:id', async (req, res) => {
+    if (!submissionRecoveryRepository) {
+      res.status(503).json({
+        error: { code: 'RECOVERY_UNAVAILABLE', message: 'Servicio de recuperación no disponible.' },
+      });
+      return;
+    }
+
+    const recovery = await submissionRecoveryRepository.findById(req.params.id);
+    if (!recovery) {
+      res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Caso de recuperación no encontrado.' },
+      });
+      return;
+    }
+
+    res.json({
+      recovery: {
+        id: recovery.id,
+        submissionId: recovery.submissionId,
+        targetId: recovery.targetId,
+        targetTitle: recovery.targetTitle,
+        targetKind: recovery.targetKind,
+        stage: recovery.stage,
+        status: recovery.status,
+        safeError: recovery.safeError,
+        attemptCount: recovery.attemptCount,
+        firstFailedAt: recovery.firstFailedAt.toISOString(),
+        lastAttemptAt: recovery.lastAttemptAt.toISOString(),
+        retentionExpiresAt: recovery.retentionExpiresAt.toISOString(),
+        lockedUntil: recovery.lockedUntil?.toISOString() ?? null,
+        lockedBy: recovery.lockedBy ?? null,
+        discardedAt: recovery.discardedAt?.toISOString() ?? null,
+        discardedBy: recovery.discardedBy ?? null,
+        discardReason: recovery.discardReason ?? null,
+        resolvedAt: recovery.resolvedAt?.toISOString() ?? null,
+        createdAt: recovery.createdAt.toISOString(),
+        updatedAt: recovery.updatedAt.toISOString(),
+        files: recovery.files,
+        values: recovery.values,
+      },
+    });
+  });
+
+  router.post('/recoveries/:id/retry', async (req, res) => {
+    if (!submissionRecoveryRepository || !submissionRepository || !catalog) {
+      res.status(503).json({
+        error: { code: 'RECOVERY_UNAVAILABLE', message: 'Servicio de recuperación no disponible.' },
+      });
+      return;
+    }
+
+    const adminEmail = (req as RequestWithAdminSession).adminUser?.email ?? 'web@flacso.edu.uy';
+    const result = await retryFailedSubmission(
+      {
+        recoveryIdOrSubmissionId: req.params.id,
+        adminEmail,
+      },
+      {
+        recoveryRepository: submissionRecoveryRepository,
+        submissionRepository,
+        catalog,
+        fileDependencies: temporaryFileStorage && googleDriveRepository
+          ? { storage: temporaryFileStorage, drive: googleDriveRepository }
+          : undefined,
+        spreadsheetDependencies: targetSpreadsheetService && spreadsheetRepository
+          ? { targetSpreadsheetService, repository: spreadsheetRepository }
+          : undefined,
+        notificationDependencies: emailNotificationRepository
+          ? {
+              repository: emailNotificationRepository,
+              getMasterEmails: async () => {
+                if (encryptedSettingsService) {
+                  try {
+                    const cfg = await loadEmailConfig(encryptedSettingsService);
+                    return cfg.masterEmails;
+                  } catch {
+                    return [];
+                  }
+                }
+                return [];
+              },
+            }
+          : undefined,
+      }
+    );
+
+    if (result.ok) {
+      res.json({
+        ok: true,
+        submissionId: result.submissionId,
+        message: result.message,
+      });
+      return;
+    }
+
+    let statusCode = 500;
+    if (result.code === 'NOT_FOUND' || result.code === 'TARGET_NOT_FOUND') {
+      statusCode = 404;
+    } else if (result.code === 'ALREADY_RESOLVED' || result.code === 'ALREADY_DISCARDED') {
+      statusCode = 400;
+    } else if (result.code === 'CONCURRENT_CLAIM' || result.code === 'CLAIM_FAILED') {
+      statusCode = 409;
+    } else if (result.code === 'MISSING_FILE') {
+      statusCode = 422;
+    }
+
+    res.status(statusCode).json({
+      error: {
+        code: result.code,
+        message: result.message,
+      },
+    });
+  });
+
+  router.delete('/recoveries/:id', async (req, res) => {
+    if (!submissionRecoveryRepository) {
+      res.status(503).json({
+        error: { code: 'RECOVERY_UNAVAILABLE', message: 'Servicio de recuperación no disponible.' },
+      });
+      return;
+    }
+
+    const recovery = await submissionRecoveryRepository.findById(req.params.id);
+    if (!recovery) {
+      res.status(404).json({
+        error: { code: 'NOT_FOUND', message: 'Caso de recuperación no encontrado.' },
+      });
+      return;
+    }
+
+    if (recovery.status === 'resolved') {
+      res.status(400).json({
+        error: { code: 'CANNOT_DISCARD_RESOLVED', message: 'No se puede descartar un caso ya resuelto.' },
+      });
+      return;
+    }
+
+    const parsed = DiscardRecoverySchema.safeParse(req.body);
+    const reason = parsed.success ? parsed.data?.reason : undefined;
+    const adminEmail = (req as RequestWithAdminSession).adminUser?.email ?? 'web@flacso.edu.uy';
+
+    await submissionRecoveryRepository.discard(recovery.id, adminEmail, reason);
+
+    if (submissionRepository?.markProcessing) {
+      await submissionRepository.markProcessing(
+        recovery.submissionId,
+        'failed',
+        reason ? `Descartado: ${reason}` : 'Descartado administrativamente.'
+      );
+    }
+
+    if (temporaryFileStorage && recovery.files) {
+      for (const file of recovery.files) {
+        try {
+          await temporaryFileStorage.remove(file.token);
+        } catch {}
+      }
+    }
+
+    res.json({
+      ok: true,
+      message: 'Caso descartado correctamente.',
+    });
   });
 
   return router;

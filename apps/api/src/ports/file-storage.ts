@@ -22,7 +22,7 @@ export interface SaveFileMetadata {
 
 export interface TemporaryFileStoragePort {
   save(sessionId: string, fieldKey: string, upload: FileUpload, meta?: SaveFileMetadata): Promise<TemporaryFileRecord>;
-  open(token: string, sessionId: string): Promise<FileUpload & { createdAt: Date }>;
+  open(token: string, sessionId?: string): Promise<FileUpload & { createdAt: Date }>;
   remove(token: string, sessionId?: string): Promise<void>;
   cleanup(before: number): Promise<number>;
   listBySession?(sessionId: string): Promise<TemporaryFileRecord[]>;

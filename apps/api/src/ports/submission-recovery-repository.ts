@@ -32,6 +32,9 @@ export interface SubmissionRecoveryRecord {
   createdAt: Date;
   updatedAt: Date;
   files?: RecoveryFileSummary[];
+  values?: Record<string, string>;
+  targetTitle?: string;
+  targetKind?: string;
 }
 
 export interface CreateRecoveryInput {

@@ -77,6 +77,16 @@ export class InMemorySubmissionRecoveryRepository implements SubmissionRecoveryR
       list = list.filter((r) => r.targetId === filter.targetId);
     }
 
+    if (filter?.search) {
+      const s = filter.search.toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.submissionId.toLowerCase().includes(s) ||
+          r.targetId.toLowerCase().includes(s) ||
+          r.safeError.toLowerCase().includes(s)
+      );
+    }
+
     list.sort((a, b) => b.lastAttemptAt.getTime() - a.lastAttemptAt.getTime());
 
     if (filter?.offset) {
@@ -87,7 +97,11 @@ export class InMemorySubmissionRecoveryRepository implements SubmissionRecoveryR
       list = list.slice(0, filter.limit);
     }
 
-    return list.map((r) => ({ ...r, files: r.files ? [...r.files] : [] }));
+    return list.map((r) => ({
+      ...r,
+      files: r.files ? [...r.files] : [],
+      values: undefined, // List view must be metadata-only (no PII)
+    }));
   }
 
   async findById(idOrSubmissionId: string): Promise<SubmissionRecoveryRecord | null> {
@@ -96,7 +110,30 @@ export class InMemorySubmissionRecoveryRepository implements SubmissionRecoveryR
       Array.from(this.records.values()).find((r) => r.submissionId === idOrSubmissionId);
 
     if (!record) return null;
-    return { ...record, files: record.files ? [...record.files] : [] };
+    return {
+      ...record,
+      files: record.files ? [...record.files] : [],
+      values: record.values ? { ...record.values } : undefined,
+    };
+  }
+
+  setDetails(
+    idOrSubmissionId: string,
+    details: {
+      files?: import('../../ports/submission-recovery-repository.js').RecoveryFileSummary[];
+      values?: Record<string, string>;
+      targetTitle?: string;
+      targetKind?: string;
+    }
+  ): void {
+    const record =
+      this.records.get(idOrSubmissionId) ||
+      Array.from(this.records.values()).find((r) => r.submissionId === idOrSubmissionId);
+    if (!record) return;
+    if (details.files !== undefined) record.files = details.files;
+    if (details.values !== undefined) record.values = details.values;
+    if (details.targetTitle !== undefined) record.targetTitle = details.targetTitle;
+    if (details.targetKind !== undefined) record.targetKind = details.targetKind;
   }
 
   async claim(

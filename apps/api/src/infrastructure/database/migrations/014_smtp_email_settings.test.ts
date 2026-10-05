@@ -28,7 +28,7 @@ describe('014_smtp_email_settings migration', () => {
       await admin.end();
     }
     db = createKyselyDb(testUrl.toString());
-  });
+  }, 30000);
 
   afterAll(async () => {
     await db?.destroy();
@@ -41,7 +41,7 @@ describe('014_smtp_email_settings migration', () => {
     } finally {
       await admin.end();
     }
-  });
+  }, 30000);
 
   it('seeds non-secret SMTP defaults idempotently without changing legacy SES values', async () => {
     await runMigrations(db!);
