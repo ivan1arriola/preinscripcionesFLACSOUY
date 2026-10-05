@@ -16,6 +16,13 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string[]>>({});
   const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyTrackingCode = async () => {
+    if (!submissionId || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(submissionId);
+    setCopied(true);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -77,17 +84,28 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
 
   if (submissionId) {
     return (
-      <div className="bg-white p-8 rounded-lg shadow max-w-xl mx-auto text-center space-y-4">
+      <div className="bg-white p-6 sm:p-8 rounded-xl shadow max-w-xl mx-auto text-center space-y-4">
         <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto text-2xl font-bold">
           ✓
         </div>
         <h2 className="text-2xl font-bold text-gray-900">¡Preinscripción enviada con éxito!</h2>
         <p className="text-gray-600">
-          Su solicitud ha sido registrada correctamente en el sistema de preinscripciones.
+          Tu solicitud fue registrada correctamente. Guardá el código para consultar el estado de tu preinscripción.
         </p>
-        <div className="p-3 bg-gray-50 rounded border text-sm text-gray-700 font-mono">
-          Código de seguimiento: {submissionId}
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-left">
+          <span className="block text-xs font-semibold uppercase tracking-wide text-blue-800">Código de seguimiento</span>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="min-w-0 flex-1 break-all text-sm font-semibold text-blue-950">{submissionId}</code>
+            <button
+              type="button"
+              onClick={copyTrackingCode}
+              className="min-h-11 shrink-0 rounded-md border border-blue-300 bg-white px-3 text-sm font-semibold text-blue-800 hover:bg-blue-50"
+            >
+              {copied ? 'Copiado' : 'Copiar'}
+            </button>
+          </div>
         </div>
+        <p className="text-sm text-gray-600">El equipo de FLACSO revisará la información y se comunicará contigo si necesita algo más.</p>
         <div className="pt-4">
           <button
             type="button"

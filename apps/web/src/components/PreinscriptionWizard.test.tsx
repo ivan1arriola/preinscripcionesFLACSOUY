@@ -22,6 +22,10 @@ const createForm = (
 };
 
 describe('PreinscriptionWizard Component', () => {
+  const startWizard = () => {
+    fireEvent.click(screen.getByRole('button', { name: /Comenzar preinscripción/i }));
+  };
+
   const diplomaForm = createForm(
     {
       id: 'davia-c11',
@@ -60,8 +64,9 @@ describe('PreinscriptionWizard Component', () => {
 
   it('renders progress bar with the separate orientation step and starts at step 1', () => {
     render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} />);
+    startWizard();
 
-    expect(screen.getAllByText('Datos personales y demográficos')).toHaveLength(2);
+    expect(screen.getAllByText('Datos personales y demográficos')).toHaveLength(3);
     expect(screen.getByText('Residencia y contacto')).toBeInTheDocument();
     expect(screen.getByText('Trayectoria académica')).toBeInTheDocument();
     expect(screen.getByText('Orientación y mención')).toBeInTheDocument();
@@ -75,11 +80,12 @@ describe('PreinscriptionWizard Component', () => {
 
   it('blocks advance when current step required fields are missing', async () => {
     render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} />);
+    startWizard();
 
     // Click "Siguiente →" without filling fields
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-    expect(screen.getByText(/El campo Primer nombre es obligatorio/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/El campo Primer nombre es obligatorio/i).length).toBeGreaterThan(0);
     // Stays on step 1
     expect(screen.getByLabelText(/Primer nombre/i)).toBeInTheDocument();
   });
@@ -103,6 +109,7 @@ describe('PreinscriptionWizard Component', () => {
         onUpload={mockUpload}
       />
     );
+    startWizard();
 
     // Step 1: Personal
     fireEvent.change(screen.getByLabelText(/Primer nombre/i), { target: { value: 'Lucía' } });
@@ -198,9 +205,10 @@ describe('PreinscriptionWizard Component', () => {
 
   it('omits orientation and mention selectors when target has none (seminar)', () => {
     render(<PreinscriptionWizard form={seminarForm} onSubmit={vi.fn()} />);
+    startWizard();
 
     // Check steps: exactly 5 canonical steps
-    expect(screen.getAllByText('Datos personales y demográficos')).toHaveLength(2);
+    expect(screen.getAllByText('Datos personales y demográficos')).toHaveLength(3);
     expect(screen.getByText('Residencia y contacto')).toBeInTheDocument();
     expect(screen.getByText('Trayectoria académica')).toBeInTheDocument();
     expect(screen.getByText('Documentación requerida')).toBeInTheDocument();
@@ -249,6 +257,7 @@ describe('PreinscriptionWizard Component', () => {
         onUpload={mockUpload}
       />
     );
+    startWizard();
 
     // Step 1: Personal
     fireEvent.change(screen.getByLabelText(/Primer nombre/i), { target: { value: 'Ana' } });
@@ -295,8 +304,8 @@ describe('PreinscriptionWizard Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Errors for the two recommendation letters
-    expect(screen.getByText(/El documento Primera carta de recomendación es obligatorio/i)).toBeInTheDocument();
-    expect(screen.getByText(/El documento Segunda carta de recomendación es obligatorio/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/El documento Primera carta de recomendación es obligatorio/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/El documento Segunda carta de recomendación es obligatorio/i).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText(/Primera carta de recomendación/i), { target: { files: [dummyFile] } });
     fireEvent.change(screen.getByLabelText(/Segunda carta de recomendación/i), { target: { files: [dummyFile] } });
@@ -322,6 +331,7 @@ describe('PreinscriptionWizard Component', () => {
     );
 
     render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} onUpload={mockUpload} />);
+    startWizard();
 
     // Step 1: Personal
     fireEvent.change(screen.getByLabelText(/Primer nombre/i), { target: { value: 'Elena' } });
@@ -382,6 +392,7 @@ describe('PreinscriptionWizard Component', () => {
     );
 
     render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} onUpload={mockUpload} />);
+    startWizard();
 
     // Step 1: select genero = Otra and tipoDocumento = pasaporte
     fireEvent.change(screen.getByLabelText(/Primer nombre/i), { target: { value: 'Sam' } });
@@ -396,8 +407,8 @@ describe('PreinscriptionWizard Component', () => {
     // Click siguiente without specifying generoOtra and paisEmisorDocumento
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
-    expect(screen.getByText(/Debe especificar su identidad de género/i)).toBeInTheDocument();
-    expect(screen.getByText(/Debe especificar el país emisor del documento/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Debe especificar su identidad de género/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Debe especificar el país emisor del documento/i).length).toBeGreaterThan(0);
 
     // Fill them and advance
     fireEvent.change(screen.getByLabelText(/Especifique su identidad de género/i), { target: { value: 'No binarie' } });
@@ -418,7 +429,7 @@ describe('PreinscriptionWizard Component', () => {
 
     // Click siguiente without specifying posgradoCual
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
-    expect(screen.getByText(/Debe especificar qué posgrado cursó en FLACSO/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Debe especificar qué posgrado cursó en FLACSO/i).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText(/¿Cuál posgrado\?/i), { target: { value: 'Diploma en Género' } });
     fireEvent.change(screen.getByLabelText(/Denominación del título/i), { target: { value: 'Licenciatura' } });
@@ -451,7 +462,7 @@ describe('PreinscriptionWizard Component', () => {
 
     // Click submit without selecting agreement
     fireEvent.click(screen.getByRole('button', { name: /Revisar datos/i }));
-    expect(screen.getByText(/Debe seleccionar el convenio correspondiente/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Debe seleccionar el convenio correspondiente/i).length).toBeGreaterThan(0);
   });
 
   it('renders final submit button with institutional blue palette, wizard-submit-action class and no green classes', () => {
@@ -462,6 +473,7 @@ describe('PreinscriptionWizard Component', () => {
       documents: [],
     };
     const { rerender } = render(<PreinscriptionWizard form={singleStepForm} onSubmit={vi.fn()} isSubmitting={false} />);
+    startWizard();
     const submitBtn = screen.getByRole('button', { name: /Revisar datos/i });
     expect(submitBtn).toBeInTheDocument();
     expect(submitBtn).toHaveClass('wizard-submit-action');
@@ -496,6 +508,7 @@ describe('PreinscriptionWizard Component', () => {
     };
 
     const { rerender } = render(<PreinscriptionWizard form={testForm} onSubmit={handleSubmit} isSubmitting={false} />);
+    startWizard();
 
     // Step 1: contacto
     fireEvent.change(screen.getByLabelText(/Ciudad de residencia/i), { target: { value: 'Montevideo' } });

@@ -4,6 +4,9 @@ import { WizardProgress } from './WizardProgress.js';
 import { FormStep } from './FormStep.js';
 import { PreinscriptionSummary } from './PreinscriptionSummary.js';
 import { PreinscriptionLoadingOverlay } from './PreinscriptionLoadingOverlay.js';
+import { PreinscriptionStartCard } from './PreinscriptionStartCard.js';
+import { MobileWizardNavigation } from './MobileWizardNavigation.js';
+import { FormErrorSummary } from './FormErrorSummary.js';
 import { apiClient } from '../api/client.js';
 
 interface PreinscriptionWizardProps {
@@ -23,6 +26,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [highestStepReached, setHighestStepReached] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
   const [isReviewing, setIsReviewing] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<SubmissionFileToken[]>([]);
@@ -287,6 +291,24 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   const isFinalStep = currentStepIndex === steps.length - 1;
 
+  if (!hasStarted) {
+    return (
+      <div className="preinscription-wizard mx-auto py-4 relative">
+        {isSubmitting && <PreinscriptionLoadingOverlay />}
+        <PreinscriptionStartCard
+          title={form.title}
+          documentSummary={(form.documents ?? []).map((document) => ({
+            label: document.label,
+            required: document.required,
+          }))}
+          sectionCount={steps.length}
+          onStart={() => setHasStarted(true)}
+          disabled={isSubmitting || !form.registrationOpen}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="preinscription-wizard mx-auto py-4 relative">
       {isSubmitting && <PreinscriptionLoadingOverlay />}
@@ -316,6 +338,19 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
         </div>
       ) : (
         <form onSubmit={isFinalStep ? handleReview : (e) => { e.preventDefault(); handleNext(); }}>
+          <FormErrorSummary
+            errors={errors}
+            orderedKeys={[...new Set([
+              ...currentStepInputs.map((input) => input.key),
+              ...currentStepDocs.map((document) => document.key),
+              'tituloDenominacion',
+            ])]}
+            onSelectField={(key) => {
+              const element = document.getElementById(`input-${key}`) ?? document.getElementById(`file-${key}`);
+              element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              element?.focus();
+            }}
+          />
           <div className="form-step-card bg-white shadow rounded-lg p-6 mb-6">
             <FormStep
               step={currentStep}
@@ -343,40 +378,15 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
             </div>
           )}
 
-          <div className="wizard-navigation flex justify-between items-center pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={handleBack}
-              disabled={currentStepIndex === 0 || isSubmitting}
-              className={`px-4 py-2 text-sm font-medium rounded-md border ${
-                currentStepIndex === 0
-                  ? 'invisible'
-                  : 'wizard-secondary-action border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              ← Anterior
-            </button>
-
-            {!isFinalStep ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={isSubmitting || !form.registrationOpen}
-                className="wizard-primary-action px-6 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
-              >
-                Siguiente →
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleReview}
-                disabled={isSubmitting || !form.registrationOpen}
-                className="wizard-submit-action px-6 py-2 text-sm font-semibold rounded-md shadow-sm transition-colors"
-              >
-                Revisar datos
-              </button>
-            )}
-          </div>
+          <MobileWizardNavigation
+            canGoBack={currentStepIndex > 0}
+            canContinue={form.registrationOpen}
+            isFinalStep={isFinalStep}
+            isSubmitting={isSubmitting}
+            onBack={handleBack}
+            onContinue={isFinalStep ? handleReview : handleNext}
+            continueLabel={isFinalStep ? 'Revisar datos' : 'Siguiente'}
+          />
         </form>
       )}
     </div>

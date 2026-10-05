@@ -19,7 +19,6 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
 
   // Form fields
   const [enabled, setEnabled] = useState(false);
-  const [preinscriptionEnabled, setPreinscriptionEnabled] = useState(false);
   const [botToken, setBotToken] = useState('');
   const [replaceToken, setReplaceToken] = useState(false);
   const [chatIdsInput, setChatIdsInput] = useState('');
@@ -32,7 +31,6 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
       const data = await apiClient.getTelegramSettings();
       setSettings(data.telegram);
       setEnabled(data.telegram.enabled);
-      setPreinscriptionEnabled(data.telegram.preinscriptionEnabled ?? false);
       setReplaceToken(false);
       setBotToken('');
     } catch (err) {
@@ -60,7 +58,6 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
     try {
       const res = await apiClient.updateTelegramSettings(csrfToken, {
         enabled,
-        preinscriptionEnabled,
         botToken: replaceToken || !settings?.hasToken ? botToken.trim() : undefined,
         replaceToken: settings?.hasToken ? replaceToken : undefined,
         chatIds: parsedChatIds.length > 0 ? parsedChatIds : undefined,
@@ -68,7 +65,6 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
 
       setSettings(res.telegram);
       setEnabled(res.telegram.enabled);
-      setPreinscriptionEnabled(res.telegram.preinscriptionEnabled ?? false);
       setReplaceToken(false);
       setBotToken('');
       setChatIdsInput('');
@@ -154,7 +150,7 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* Habilitar / Deshabilitar Alertas de Recuperación */}
+        {/* Habilitar / Deshabilitar */}
         <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
           <div>
             <label htmlFor="telegram-enabled-toggle" className="text-sm font-semibold text-gray-900 cursor-pointer">
@@ -169,25 +165,6 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
             type="checkbox"
             checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
-            className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-          />
-        </div>
-
-        {/* Habilitar / Deshabilitar Notificaciones de Preinscripción */}
-        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div>
-            <label htmlFor="telegram-preinscription-toggle" className="text-sm font-semibold text-gray-900 cursor-pointer">
-              Notificar cada preinscripción por Telegram
-            </label>
-            <p className="text-xs text-gray-500">
-              Envía una alerta operativa mínima por cada preinscripción confirmada a los chats configurados.
-            </p>
-          </div>
-          <input
-            id="telegram-preinscription-toggle"
-            type="checkbox"
-            checked={preinscriptionEnabled}
-            onChange={(e) => setPreinscriptionEnabled(e.target.checked)}
             className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
           />
         </div>

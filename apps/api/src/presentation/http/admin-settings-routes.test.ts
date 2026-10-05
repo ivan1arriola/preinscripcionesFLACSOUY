@@ -882,32 +882,6 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(JSON.stringify(data)).not.toContain('ABCdefGHI_jkl123');
     });
 
-    it('PUT /telegram manages enabled and preinscriptionEnabled independently', async () => {
-      const res = await fetch(`${baseUrl}/api/admin/settings/telegram`, {
-        method: 'PUT',
-        headers: {
-          Cookie: validCookie,
-          'x-csrf-token': csrfToken,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          enabled: false,
-          preinscriptionEnabled: true,
-        }),
-      });
-      expect(res.status).toBe(200);
-      const data = await res.json();
-      expect(data.telegram.enabled).toBe(false);
-      expect(data.telegram.preinscriptionEnabled).toBe(true);
-
-      const res2 = await fetch(`${baseUrl}/api/admin/settings/telegram`, {
-        headers: { Cookie: validCookie },
-      });
-      const data2 = await res2.json();
-      expect(data2.telegram.enabled).toBe(false);
-      expect(data2.telegram.preinscriptionEnabled).toBe(true);
-    });
-
     it('POST /telegram/test sends a test message and records success', async () => {
       const res = await fetch(`${baseUrl}/api/admin/settings/telegram/test`, {
         method: 'POST',

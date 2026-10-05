@@ -76,7 +76,7 @@ export function buildSummarySections(
 ): SummarySection[] {
   const agreements = form.agreements ?? [];
 
-  return form.steps
+  const sections = form.steps
     .map((step, stepIndex) => {
       const stepInputs = form.inputs
         .filter((i) => {
@@ -120,8 +120,6 @@ export function buildSummarySections(
               'estudios',
               'posgradoFlacso',
               'posgradoCual',
-              'orientacion',
-              'mencion',
               'tituloDenominacion',
               'sinTituloActual',
             ].includes(i.key);
@@ -178,6 +176,26 @@ export function buildSummarySections(
       };
     })
     .filter((s) => s.fields.length > 0 || s.documents.length > 0);
+
+  const optionValues = ['orientacion', 'mencion']
+    .filter((key) => values[key])
+    .map((key) => ({
+      key,
+      label: key === 'orientacion' ? 'Orientación' : 'Mención',
+      value: formatFieldValue(key, values[key]),
+    }));
+  if (optionValues.length > 0) {
+    const optionStepIndex = form.steps.findIndex((step) => step.id === 'orientacion');
+    sections.push({
+      stepIndex: optionStepIndex >= 0 ? optionStepIndex : 0,
+      stepId: 'preinscription-options',
+      title: 'Sobre esta preinscripción',
+      fields: optionValues,
+      documents: [],
+    });
+  }
+
+  return sections;
 }
 
 export const PreinscriptionSummary: React.FC<PreinscriptionSummaryProps> = ({
