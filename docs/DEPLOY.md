@@ -19,43 +19,61 @@ Copiar en el servidor:
 - `google-oauth-web-client.json` a `/opt/flacso/preinscripcionesFLACSOUY/.secrets/google-oauth-web-client.json`.
 
 `APP_SETTINGS_ENCRYPTION_KEY` debe existir en `.env.production` antes de
-activar las notificaciones SES. Es la misma variable de entorno que se usa en
-local, pero el valor de producción debe ser diferente y no debe copiarse desde
-la PC. Generar y guardar la clave directamente en el servidor con permisos
-restrictivos (cadena hexadecimal de 64 caracteres para AES-256-GCM):
+activar las notificaciones por correo (SMTP) o las alertas de incidentes por Telegram.
+Es la misma variable de entorno que se usa en local, pero el valor de producción debe
+ser diferente y no debe copiarse desde la PC. Generar y guardar la clave directamente
+en el servidor con permisos restrictivos (cadena hexadecimal de 64 caracteres para AES-256-GCM):
 ```bash
 openssl rand -hex 32
 ```
 
-### Configuración y Operación de Amazon SES
+### Configuración y Operación SMTP (Amazon SES u otro proveedor)
 
-1. **Credenciales y Política IAM recomendada:**
-   Crear un usuario IAM o rol con permisos mínimos para envío de correo:
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Action": [
-           "ses:SendEmail"
-         ],
-         "Resource": "*"
-       }
-     ]
-   }
-   ```
-   Las credenciales (`AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`) se configuran cifradas desde el panel administrativo (`/admin/perfiles` pestaña `✉️ Notificaciones SES`), nunca en texto plano en la base ni en `.env`.
+1. **Credenciales SMTP:**
+   El envío transaccional utiliza SMTP estándar (por ejemplo, Amazon SES SMTP en el puerto 587 con STARTTLS o puerto 465 con TLS directo).
+   Los parámetros (`smtp_host`, `smtp_port`, `smtp_security`, `smtp_username`, `smtp_password`, `email_from`, `email_reply_to` y `notification_master_emails`) se configuran cifrados desde el panel administrativo (`/admin/perfiles` pestaña `✉️ Notificaciones SMTP`). Nunca se almacenan en texto plano en la base de datos ni en variables de entorno.
 
-2. **Modo Sandbox e Identidades Verificadas:**
-   - En cuentas nuevas de AWS SES (modo Sandbox), solo se puede enviar correos **desde** y **hacia** identidades verificadas (dominios o correos individuales).
-   - Para producción, solicitar la salida de Sandbox en la consola de AWS SES para permitir envíos a cualquier postulante.
-   - Verificar el dominio remitente (ej. `flacso.edu.uy`) mediante registros DNS (DKIM / SPF / DMARC).
+2. **Verificación de dominios e identidades:**
+   - Si se utiliza Amazon SES, verificar el dominio del remitente (`flacso.edu.uy`) mediante registros DNS (DKIM, SPF y DMARC).
+   - Asegurarse de que la cuenta haya salido del modo Sandbox de SES si se requiere enviar a cualquier postulante.
 
-3. **Reintentos y Observabilidad:**
-   - Los fallos transitorios se reintentan automáticamente con backoff exponencial (1m, 5m, 30m, 2h).
-   - Los registros en estado `failed` pueden ser reintentados manualmente desde la interfaz de administración.
-   - Los registros en estado `unknown` (desconexión o timeout antes de confirmar entrega) requieren confirmación explícita (`force: true`) debido al riesgo de entrega duplicada al postulante si SES ya despachó el mensaje.
+3. **Reintentos y Observabilidad de Notificaciones:**
+   - La cola Outbox procesa envíos en segundo plano con leases distribuidos.
+   - Los fallos transitorios se reintentan automáticamente con backoff exponencial.
+   - Los registros en estado `failed` pueden ser reintentados manualmente desde la interfaz.
+   - Los registros en estado `unknown` (timeout o desconexión durante el envío) requieren confirmación explícita (`force: true`) para prevenir duplicados.
+
+### Alertas de Incidentes por Telegram
+
+1. **Creación del Bot:**
+   - Crear un bot en Telegram a través de `@BotFather` (`/newbot`) y copiar el token generado.
+   - Guardar el token en el panel administrativo (`/admin/perfiles` pestaña `🛡️ Recuperación y Alertas`). El token se almacena cifrado y nunca se vuelve a exponer en claro.
+
+2. **Configuración de Destinatarios (Chat IDs):**
+   - **Requisito obligatorio:** Cada persona o grupo destinatario debe haber iniciado una conversación con el bot (enviándole `/start`) antes de que el bot pueda entregar mensajes.
+   - Obtener el ID de usuario o grupo (usando un bot como `@userinfobot` o consultando `https://api.telegram.org/bot<TOKEN>/getUpdates`).
+   - Ingresar uno o varios Chat IDs (uno por línea o separados por coma) en el panel administrativo.
+
+3. **Prueba y Contenido de Alertas:**
+   - Probar el envío inmediato con el botón "Enviar mensaje de prueba" en el panel.
+   - Las alertas operacionales contienen únicamente metadatos seguros de diagnóstico (ID de seguimiento, oferta académica truncada, etapa fallida, error truncado sin secretos y enlace de administración). No contienen datos personales del postulante (PII), cédulas, teléfonos ni documentos.
+
+### Recuperación de Preinscripciones Fallidas (Runbook)
+
+1. **Captura y Retención:**
+   - Si un envío falla técnicamente al subir archivos a Google Drive o al insertar la fila en Google Sheets, la preinscripción no se pierde: los datos del postulante y los archivos temporales quedan retenidos en estado `failed` por un período de **7 días**.
+   - El postulante recibe un identificador de seguimiento seguro informando que la postulación fue recibida y se encuentra pendiente de procesamiento técnico.
+   - Si Telegram está configurado, se encola y despacha automáticamente una alerta al equipo.
+
+2. **Bandeja de Recuperación:**
+   - Acceder a `/admin/perfiles` pestaña `🛡️ Recuperación y Alertas`.
+   - Filtrar los incidentes por estado (`failed`, `processing`, `success`, `discarded`) y etapa (`drive`, `sheets`).
+   - **Ver detalle:** Inspecciona el estado de cada documento (si ya fue subido a Drive o sigue como archivo temporal) y el error operacional registrado.
+   - **Reintentar:** Acción idempotente que reclama el incidente mediante lease. Si los archivos de Drive ya habían sido confirmados, no los duplica y completa únicamente las etapas pendientes (ej. inserción en Sheets). Al completarse exitosamente, limpia los archivos temporales y despacha las notificaciones de bienvenida.
+   - **Descartar y eliminar:** Acción destructiva con confirmación explícita que purga definitivamente los datos del postulante, snapshots y archivos temporales asociados.
+
+3. **Limpieza Automática:**
+   - El worker de fondo ejecuta una limpieza periódica que elimina de forma segura e idempotente cualquier caso fallido que haya superado los 7 días de retención.
 
 No se configura ningún `GOOGLE_SHEETS_ID` en `.env.production`: la aplicación
 crea una planilla independiente por oferta o seminario y la guarda dentro de la
