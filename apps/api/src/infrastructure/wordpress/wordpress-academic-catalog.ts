@@ -28,17 +28,18 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
       return cached.targets.map((t) => this.mapTarget(t));
     }
 
-    // 2. Try fetching from upstream WordPress
+    // 2. Serve stale data immediately and refresh in the background.
+    // The public catalog must remain usable when WordPress is temporarily down.
+    const stale = await this.cache.getStale(this.cacheKey);
+    if (stale) {
+      void this.refreshTargets().catch(() => undefined);
+      return stale.targets.map((t) => this.mapTarget(t));
+    }
+
+    // 3. There is no cache yet, so the first request must reach WordPress.
     try {
-      const fresh = await this.client.getPreinscriptions();
-      await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
-      return fresh.targets.map((t) => this.mapTarget(t));
+      return await this.refreshTargets();
     } catch (err) {
-      // 3. Fallback to stale cache if available
-      const stale = await this.cache.getStale(this.cacheKey);
-      if (stale) {
-        return stale.targets.map((t) => this.mapTarget(t));
-      }
       throw err;
     }
   }
@@ -58,13 +59,17 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
 
   async revalidateTargets(): Promise<AcademicTarget[]> {
     // Bypass cache to get authoritative state from WordPress
-    const fresh = await this.client.getPreinscriptions();
-    await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
-    return fresh.targets.map((t) => this.mapTarget(t));
+    return this.refreshTargets();
   }
 
   async listAgreements(): Promise<AgreementOption[]> {
     return this.client.getAgreements();
+  }
+
+  private async refreshTargets(): Promise<AcademicTarget[]> {
+    const fresh = await this.client.getPreinscriptions();
+    await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
+    return fresh.targets.map((t) => this.mapTarget(t));
   }
 
   private mapTarget(raw: WordPressTarget): AcademicTarget {

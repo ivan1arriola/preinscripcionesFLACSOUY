@@ -113,6 +113,36 @@ describe('retryFailedSubmission', () => {
     expect(updated?.resolvedAt).toBeInstanceOf(Date);
   });
 
+  it('keeps the recovery pending when WordPress cannot revalidate the target', async () => {
+    const subRecord = await recoveryRepo.recordFailure({
+      submissionId: 'sub_wordpress_unavailable',
+      targetId: 'diplomado-salud-c2',
+      stage: 'sheets',
+      safeError: 'Error al conectar con Google Sheets.',
+      retentionDays: 7,
+    });
+
+    recoveryRepo.setDetails(subRecord.id, { values: {}, files: [] });
+    vi.spyOn(catalog, 'revalidateTarget').mockRejectedValue(new Error('WordPress timeout'));
+
+    const result = await retryFailedSubmission({
+      recoveryIdOrSubmissionId: subRecord.id,
+      adminEmail: 'admin@flacso.edu.uy',
+    }, {
+      recoveryRepository: recoveryRepo,
+      submissionRepository: submissionRepo,
+      catalog,
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      code: 'CONFIGURATION_ERROR',
+    }));
+    const updated = await recoveryRepo.findById(subRecord.id);
+    expect(updated?.status).toBe('pending');
+    expect(updated?.safeError).toContain('WordPress');
+  });
+
   it('skips already-stored drive files and only uploads pending files', async () => {
     const subRecord = await recoveryRepo.recordFailure({
       submissionId: 'sub_drive_partial',

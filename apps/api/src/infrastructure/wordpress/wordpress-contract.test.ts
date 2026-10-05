@@ -324,6 +324,44 @@ describe('WordPress Client & Contract Adapter', () => {
     expect(targets2[0]!.id).toBe('target_davia_c11');
   });
 
+  it('serves stale targets immediately while refreshing an unavailable upstream in the background', async () => {
+    let callCount = 0;
+    let resolveRefresh!: (response: Response) => void;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => simplifiedV1Response,
+        };
+      }
+      return new Promise<Response>((resolve) => {
+        resolveRefresh = resolve;
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const cache = new MemoryWordPressCache();
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+    const catalog = new WordPressAcademicCatalog(client, cache, { ttlSeconds: -1 });
+
+    await catalog.listTargets();
+    const staleTargets = await Promise.race([
+      catalog.listTargets(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('stale cache was not served immediately')), 100)),
+    ]);
+
+    expect(staleTargets).toHaveLength(3);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    resolveRefresh({
+      ok: false,
+      status: 504,
+      json: async () => ({}),
+    } as Response);
+  });
+
   it('rejects targets with invalid notificationEmail format', async () => {
     const invalidEmailResponse = {
       version: 1,

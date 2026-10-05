@@ -130,8 +130,33 @@ export async function retryFailedSubmission(
   const allFiles = recovery.files ?? [];
   const storedValues = recovery.values ?? {};
 
-  // 1. Revalidate target in academic catalog
-  const target = await dependencies.catalog.revalidateTarget(recovery.targetId);
+  // 1. Revalidate target in academic catalog. Upstream outages must leave the
+  // recovery case retryable instead of escaping the HTTP worker.
+  let target: Awaited<ReturnType<AcademicCatalog['revalidateTarget']>>;
+  try {
+    target = await dependencies.catalog.revalidateTarget(recovery.targetId);
+  } catch (err) {
+    const safeError = sanitizeSafeError(
+      err,
+      'No se pudo validar la oferta académica con WordPress. Intentá nuevamente cuando el catálogo esté disponible.'
+    );
+    await dependencies.recoveryRepository.markRetryResult(recovery.id, {
+      success: false,
+      stage: 'sheets',
+      safeError,
+      now,
+    });
+    if (dependencies.submissionRepository.recordProcessingFailure) {
+      await dependencies.submissionRepository.recordProcessingFailure(submissionId, 'sheets', safeError, 7);
+    } else {
+      await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
+    }
+    return {
+      ok: false,
+      code: 'CONFIGURATION_ERROR',
+      message: safeError,
+    };
+  }
   if (!target) {
     const safeError = `No se encontró el destino académico "${recovery.targetId}" para procesar la preinscripción.`;
     await dependencies.recoveryRepository.markRetryResult(recovery.id, {
