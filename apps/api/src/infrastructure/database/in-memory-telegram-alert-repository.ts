@@ -18,11 +18,15 @@ export class InMemoryTelegramAlertRepository implements TelegramAlertRepository 
     const created: TelegramAlertRecord[] = [];
 
     for (const item of items) {
+      const eventType = item.eventType ?? 'recovery';
+      const dedupeKey = item.dedupeKey ?? `${item.submissionId}:${item.chatId}:${eventType}`;
       const record: TelegramAlertRecord = {
         id: `tga_${crypto.randomUUID().replace(/-/g, '')}`,
         recoveryId: item.recoveryId ?? null,
         submissionId: item.submissionId,
         chatId: item.chatId,
+        eventType,
+        dedupeKey,
         message: item.message,
         status: 'pending',
         attemptCount: 0,
@@ -41,6 +45,50 @@ export class InMemoryTelegramAlertRepository implements TelegramAlertRepository 
     }
 
     return created;
+  }
+
+  async ensureForSubmission(
+    input: EnqueueTelegramAlertInput | EnqueueTelegramAlertInput[]
+  ): Promise<TelegramAlertRecord[]> {
+    const items = Array.isArray(input) ? input : [input];
+    const now = new Date();
+    const result: TelegramAlertRecord[] = [];
+
+    for (const item of items) {
+      const eventType = item.eventType ?? 'recovery';
+      const dedupeKey = item.dedupeKey ?? `${item.submissionId}:${item.chatId}:${eventType}`;
+
+      const existing = this.alerts.find((a) => a.dedupeKey === dedupeKey);
+      if (existing) {
+        result.push(existing);
+        continue;
+      }
+
+      const record: TelegramAlertRecord = {
+        id: `tga_${crypto.randomUUID().replace(/-/g, '')}`,
+        recoveryId: item.recoveryId ?? null,
+        submissionId: item.submissionId,
+        chatId: item.chatId,
+        eventType,
+        dedupeKey,
+        message: item.message,
+        status: 'pending',
+        attemptCount: 0,
+        maxAttempts: item.maxAttempts ?? 5,
+        availableAt: item.availableAt ?? now,
+        lockedUntil: null,
+        lockedBy: null,
+        providerMessageId: null,
+        lastError: null,
+        sentAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.alerts.push(record);
+      result.push(record);
+    }
+
+    return result;
   }
 
   async claimPending(
@@ -136,6 +184,9 @@ export class InMemoryTelegramAlertRepository implements TelegramAlertRepository 
     }
     if (filter?.submissionId) {
       result = result.filter((a) => a.submissionId === filter.submissionId);
+    }
+    if (filter?.eventType) {
+      result = result.filter((a) => a.eventType === filter.eventType);
     }
     result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     if (filter?.offset) {

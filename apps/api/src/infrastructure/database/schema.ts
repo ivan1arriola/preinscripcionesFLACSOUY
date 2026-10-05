@@ -215,6 +215,8 @@ export interface TelegramRecoveryAlertsTable {
   recovery_id: string | null;
   submission_id: string;
   chat_id: string;
+  event_type: Generated<'recovery' | 'preinscription'>;
+  dedupe_key: string;
   message: string;
   status: 'pending' | 'processing' | 'sent' | 'failed';
   attempt_count: Generated<number>;

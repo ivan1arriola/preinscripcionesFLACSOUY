@@ -1,10 +1,13 @@
 export type TelegramAlertStatus = 'pending' | 'processing' | 'sent' | 'failed';
+export type TelegramEventType = 'recovery' | 'preinscription';
 
 export interface TelegramAlertRecord {
   id: string;
   recoveryId?: string | null;
   submissionId: string;
   chatId: string;
+  eventType: TelegramEventType;
+  dedupeKey: string;
   message: string;
   status: TelegramAlertStatus;
   attemptCount: number;
@@ -24,6 +27,8 @@ export interface EnqueueTelegramAlertInput {
   submissionId: string;
   chatId: string;
   message: string;
+  eventType?: TelegramEventType;
+  dedupeKey?: string;
   availableAt?: Date;
   maxAttempts?: number;
 }
@@ -39,12 +44,14 @@ export interface TelegramAlertCounts {
 export interface TelegramAlertFilter {
   status?: TelegramAlertStatus;
   submissionId?: string;
+  eventType?: TelegramEventType;
   limit?: number;
   offset?: number;
 }
 
 export interface TelegramAlertRepository {
   enqueue(input: EnqueueTelegramAlertInput | EnqueueTelegramAlertInput[]): Promise<TelegramAlertRecord[]>;
+  ensureForSubmission(input: EnqueueTelegramAlertInput | EnqueueTelegramAlertInput[]): Promise<TelegramAlertRecord[]>;
   claimPending(limit: number, now: Date, leaseDurationMs?: number, lockedBy?: string): Promise<TelegramAlertRecord[]>;
   markSent(id: string, providerMessageId?: string, now?: Date): Promise<void>;
   markRetryableFailure(id: string, error: string, availableAt: Date, now?: Date): Promise<void>;

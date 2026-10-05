@@ -1,6 +1,7 @@
 import type { EncryptedSettingsService } from '../security/encrypted-settings.js';
 
 export const SETTING_TELEGRAM_RECOVERY_ENABLED = 'telegram_recovery_enabled';
+export const SETTING_TELEGRAM_PREINSCRIPTION_ENABLED = 'telegram_preinscription_enabled';
 export const SETTING_TELEGRAM_BOT_TOKEN = 'telegram_bot_token';
 export const SETTING_TELEGRAM_CHAT_IDS = 'telegram_chat_ids';
 export const SETTING_TELEGRAM_LAST_TESTED_AT = 'telegram_last_tested_at';
@@ -54,6 +55,7 @@ export function maskChatId(chatId: string): string {
 
 export interface TelegramConfig {
   enabled: boolean;
+  preinscriptionEnabled: boolean;
   botToken: string;
   chatIds: string[];
   lastTestedAt?: string | null;
@@ -64,6 +66,7 @@ export interface TelegramConfig {
 
 export interface MaskedTelegramConfig {
   enabled: boolean;
+  preinscriptionEnabled: boolean;
   hasToken: boolean;
   chatIdsCount: number;
   maskedChatIds: string[];
@@ -77,6 +80,7 @@ export async function loadTelegramConfig(
   service: EncryptedSettingsService
 ): Promise<TelegramConfig> {
   const enabledRaw = await service.getEncryptedSetting(SETTING_TELEGRAM_RECOVERY_ENABLED);
+  const preinscriptionEnabledRaw = await service.getEncryptedSetting(SETTING_TELEGRAM_PREINSCRIPTION_ENABLED);
   const botToken = (await service.getEncryptedSetting(SETTING_TELEGRAM_BOT_TOKEN)) ?? '';
   const rawChatIds = await service.getEncryptedSetting(SETTING_TELEGRAM_CHAT_IDS);
   const chatIds = parseChatIds(rawChatIds);
@@ -90,6 +94,7 @@ export async function loadTelegramConfig(
 
   return {
     enabled: enabledRaw === 'true',
+    preinscriptionEnabled: preinscriptionEnabledRaw === 'true',
     botToken,
     chatIds,
     lastTestedAt,
@@ -103,6 +108,7 @@ export async function saveTelegramConfig(
   service: EncryptedSettingsService,
   input: {
     enabled?: boolean;
+    preinscriptionEnabled?: boolean;
     botToken?: string;
     chatIds?: string[];
   },
@@ -112,6 +118,14 @@ export async function saveTelegramConfig(
     await service.setEncryptedSetting(
       SETTING_TELEGRAM_RECOVERY_ENABLED,
       input.enabled ? 'true' : 'false',
+      updatedBy
+    );
+  }
+
+  if (input.preinscriptionEnabled !== undefined) {
+    await service.setEncryptedSetting(
+      SETTING_TELEGRAM_PREINSCRIPTION_ENABLED,
+      input.preinscriptionEnabled ? 'true' : 'false',
       updatedBy
     );
   }
@@ -133,6 +147,7 @@ export async function saveTelegramConfig(
 export function maskTelegramConfig(config: TelegramConfig): MaskedTelegramConfig {
   return {
     enabled: config.enabled,
+    preinscriptionEnabled: config.preinscriptionEnabled,
     hasToken: config.botToken.length > 0,
     chatIdsCount: config.chatIds.length,
     maskedChatIds: config.chatIds.map(maskChatId),

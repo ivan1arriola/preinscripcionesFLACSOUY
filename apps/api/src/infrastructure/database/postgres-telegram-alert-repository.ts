@@ -10,11 +10,14 @@ import type {
 } from '../../ports/telegram-alert-repository.js';
 
 function mapRow(row: Selectable<TelegramRecoveryAlertsTable>): TelegramAlertRecord {
+  const eventType = (row.event_type as TelegramEventType) ?? 'recovery';
   return {
     id: row.id,
     recoveryId: row.recovery_id,
     submissionId: row.submission_id,
     chatId: row.chat_id,
+    eventType,
+    dedupeKey: row.dedupe_key ?? `${row.submission_id}:${row.chat_id}:${eventType}`,
     message: row.message,
     status: row.status,
     attemptCount: row.attempt_count,
@@ -45,6 +48,8 @@ export class PostgresTelegramAlertRepository implements TelegramAlertRepository 
     await this.db.transaction().execute(async (trx) => {
       for (const item of items) {
         const id = `tga_${crypto.randomUUID().replace(/-/g, '')}`;
+        const eventType = item.eventType ?? 'recovery';
+        const dedupeKey = item.dedupeKey ?? `${item.submissionId}:${item.chatId}:${eventType}`;
         createdIds.push(id);
         await trx
           .insertInto('telegram_recovery_alerts')
@@ -53,6 +58,8 @@ export class PostgresTelegramAlertRepository implements TelegramAlertRepository 
             recovery_id: item.recoveryId ?? null,
             submission_id: item.submissionId,
             chat_id: item.chatId,
+            event_type: eventType,
+            dedupe_key: dedupeKey,
             message: item.message,
             status: 'pending',
             attempt_count: 0,
@@ -74,6 +81,57 @@ export class PostgresTelegramAlertRepository implements TelegramAlertRepository 
       .selectFrom('telegram_recovery_alerts')
       .selectAll()
       .where('id', 'in', createdIds)
+      .execute();
+
+    return rows.map(mapRow);
+  }
+
+  async ensureForSubmission(
+    input: EnqueueTelegramAlertInput | EnqueueTelegramAlertInput[]
+  ): Promise<TelegramAlertRecord[]> {
+    const items = Array.isArray(input) ? input : [input];
+    if (items.length === 0) return [];
+
+    const now = new Date();
+    const dedupeKeys: string[] = [];
+
+    await this.db.transaction().execute(async (trx) => {
+      for (const item of items) {
+        const id = `tga_${crypto.randomUUID().replace(/-/g, '')}`;
+        const eventType = item.eventType ?? 'recovery';
+        const dedupeKey = item.dedupeKey ?? `${item.submissionId}:${item.chatId}:${eventType}`;
+        dedupeKeys.push(dedupeKey);
+        await trx
+          .insertInto('telegram_recovery_alerts')
+          .values({
+            id,
+            recovery_id: item.recoveryId ?? null,
+            submission_id: item.submissionId,
+            chat_id: item.chatId,
+            event_type: eventType,
+            dedupe_key: dedupeKey,
+            message: item.message,
+            status: 'pending',
+            attempt_count: 0,
+            max_attempts: item.maxAttempts ?? 5,
+            available_at: item.availableAt ?? now,
+            locked_until: null,
+            locked_by: null,
+            provider_message_id: null,
+            last_error: null,
+            sent_at: null,
+            created_at: now,
+            updated_at: now,
+          })
+          .onConflict((oc) => oc.column('dedupe_key').doNothing())
+          .execute();
+      }
+    });
+
+    const rows = await this.db
+      .selectFrom('telegram_recovery_alerts')
+      .selectAll()
+      .where('dedupe_key', 'in', dedupeKeys)
       .execute();
 
     return rows.map(mapRow);
@@ -229,6 +287,9 @@ export class PostgresTelegramAlertRepository implements TelegramAlertRepository 
     }
     if (filter?.submissionId) {
       query = query.where('submission_id', '=', filter.submissionId);
+    }
+    if (filter?.eventType) {
+      query = query.where('event_type', '=', filter.eventType);
     }
 
     query = query.orderBy('created_at', 'desc');

@@ -57,4 +57,36 @@ describe('telegram-config', () => {
     const rawToken = await repo.getSetting('telegram_bot_token');
     expect(rawToken).toMatch(/^enc:v1:/);
   });
+
+  it('manages recoveryEnabled and preinscriptionEnabled independently', async () => {
+    const repo = new MemorySystemSettingsRepository();
+    const service = new EncryptedSettingsService(repo, 'a'.repeat(64));
+
+    await saveTelegramConfig(service, {
+      enabled: false,
+      preinscriptionEnabled: true,
+      botToken: '123456:ABC-DEF_ghi',
+      chatIds: ['10000001'],
+    });
+
+    let config = await loadTelegramConfig(service);
+    expect(config.enabled).toBe(false);
+    expect(config.preinscriptionEnabled).toBe(true);
+
+    let masked = maskTelegramConfig(config);
+    expect(masked.enabled).toBe(false);
+    expect(masked.preinscriptionEnabled).toBe(true);
+
+    // Now update only recovery enabled
+    await saveTelegramConfig(service, { enabled: true });
+    config = await loadTelegramConfig(service);
+    expect(config.enabled).toBe(true);
+    expect(config.preinscriptionEnabled).toBe(true);
+
+    // Update only preinscription enabled
+    await saveTelegramConfig(service, { preinscriptionEnabled: false });
+    config = await loadTelegramConfig(service);
+    expect(config.enabled).toBe(true);
+    expect(config.preinscriptionEnabled).toBe(false);
+  });
 });
