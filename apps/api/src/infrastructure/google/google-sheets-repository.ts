@@ -74,9 +74,6 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
       }
     }
 
-    const range = `${toSheetRange(actualSheetName)}!A:A`;
-    const res = await this.client.appendValues(spreadsheetId, range, [buildResult.row]);
-
     let sheetId = 0;
     if (this.client.getSheetMetadata) {
       try {
@@ -89,15 +86,20 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
       }
     }
 
-    const rowUrl = buildSpreadsheetRowUrl(spreadsheetId, sheetId, res.updatedRange);
+    await this.client.insertRows(spreadsheetId, sheetId, 1, 2);
+
+    const rowRange = `${toSheetRange(actualSheetName)}!A2:${columnName(buildResult.row.length)}2`;
+    await this.client.updateValues(spreadsheetId, rowRange, [buildResult.row], 'USER_ENTERED');
+
+    const rowUrl = buildSpreadsheetRowUrl(spreadsheetId, sheetId, rowRange);
 
     return {
       spreadsheetId,
       sheetName: actualSheetName,
       sheetId,
-      updatedRange: res.updatedRange,
+      updatedRange: rowRange,
       rowUrl,
-      updatedRows: res.updatedRows,
+      updatedRows: 1,
     };
   }
 
@@ -143,6 +145,17 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
       return requestedSheetName;
     }
   }
+}
+
+function columnName(columnNumber: number): string {
+  let current = columnNumber;
+  let result = '';
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    current = Math.floor((current - 1) / 26);
+  }
+  return result || 'A';
 }
 
 function toSheetRange(sheetName: string): string {

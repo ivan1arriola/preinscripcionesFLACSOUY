@@ -10,6 +10,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Apellido', 'Correo electrónico']]),
       updateValues: vi.fn(),
+      insertRows: vi.fn(),
       appendValues: vi.fn(),
     };
 
@@ -24,6 +25,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre']]),
       updateValues: vi.fn(),
+      insertRows: vi.fn(),
       appendValues: vi.fn(),
     };
 
@@ -37,6 +39,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre']]),
       updateValues: vi.fn(),
+      insertRows: vi.fn(),
       appendValues: vi.fn(),
       getSheetMetadata: vi.fn().mockResolvedValue({
         sheetId: 0,
@@ -52,16 +55,14 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', "'Hoja 1'!A1:ZZ1");
   });
 
-  it('appends a row by header names and preserves manual columns as empty slots', async () => {
+  it('inserts a row below the header by header names and preserves manual columns as empty slots', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([
         ['Marca temporal', 'Observaciones Asistente', 'Nombre', 'Apellido', 'Documento'],
       ]),
       updateValues: vi.fn(),
-      appendValues: vi.fn().mockResolvedValue({
-        updatedRange: 'Respuestas!A5:E5',
-        updatedRows: 1,
-      }),
+      insertRows: vi.fn().mockResolvedValue(undefined),
+      appendValues: vi.fn(),
     };
 
     const repo = new GoogleSheetsRepository(mockClient);
@@ -78,25 +79,25 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
       'Respuestas'
     );
 
-    expect(result.updatedRange).toBe('Respuestas!A5:E5');
+    expect(result.updatedRange).toBe('Respuestas!A2:E2');
     expect(result.updatedRows).toBe(1);
     expect(result.sheetName).toBe('Respuestas');
     expect(result.sheetId).toBe(0);
-    expect(result.rowUrl).toBe('https://docs.google.com/spreadsheets/d/sheet_123/edit#gid=0&range=A5:E5');
+    expect(result.rowUrl).toBe('https://docs.google.com/spreadsheets/d/sheet_123/edit#gid=0&range=A2:E2');
 
-    expect(mockClient.appendValues).toHaveBeenCalledWith('sheet_123', 'Respuestas!A:A', [
+    expect(mockClient.insertRows).toHaveBeenCalledWith('sheet_123', 0, 1, 2);
+    expect(mockClient.updateValues).toHaveBeenCalledWith('sheet_123', 'Respuestas!A2:E2', [
       ['2026-10-02 12:00:00', '', 'Lucía', 'Pérez', '3.210.987-6'],
-    ]);
+    ], 'USER_ENTERED');
+    expect(mockClient.appendValues).not.toHaveBeenCalled();
   });
 
   it('resolves real sheetId from getSheetMetadata and constructs accurate direct row URL', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]),
       updateValues: vi.fn(),
-      appendValues: vi.fn().mockResolvedValue({
-        updatedRange: "'Inscripciones 2026'!A12:B12",
-        updatedRows: 1,
-      }),
+      insertRows: vi.fn().mockResolvedValue(undefined),
+      appendValues: vi.fn(),
       getSheetMetadata: vi.fn().mockResolvedValue({
         sheetId: 987654321,
         title: 'Inscripciones 2026',
@@ -116,7 +117,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(result.sheetId).toBe(987654321);
     expect(result.sheetName).toBe('Inscripciones 2026');
     expect(result.rowUrl).toBe(
-      'https://docs.google.com/spreadsheets/d/sheet_custom_id/edit#gid=987654321&range=A12:B12'
+      'https://docs.google.com/spreadsheets/d/sheet_custom_id/edit#gid=987654321&range=A2:B2'
     );
   });
 
@@ -126,10 +127,8 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
         ['Timestamp', 'Observaciones Asistente', 'Nombre', 'País de residencia'],
       ]),
       updateValues: vi.fn().mockResolvedValue(undefined),
-      appendValues: vi.fn().mockResolvedValue({
-        updatedRange: 'Inscripciones!A2:E2',
-        updatedRows: 1,
-      }),
+      insertRows: vi.fn().mockResolvedValue(undefined),
+      appendValues: vi.fn(),
     };
 
     const repo = new GoogleSheetsRepository(mockClient);
@@ -153,11 +152,13 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
       [['Timestamp', 'Observaciones Asistente', 'Nombre', 'País de residencia', 'Ciudad de residencia']]
     );
 
-    // Row appended using the updated header layout
-    expect(mockClient.appendValues).toHaveBeenCalledWith(
+    // Row inserted below the header using the updated header layout
+    expect(mockClient.insertRows).toHaveBeenCalledWith('sheet_123', 0, 1, 2);
+    expect(mockClient.updateValues).toHaveBeenLastCalledWith(
       'sheet_123',
-      'Inscripciones!A:A',
-      [['2026-10-04 12:00:00', '', 'Carlos', 'Uruguay', 'Montevideo']]
+      'Inscripciones!A2:E2',
+      [['2026-10-04 12:00:00', '', 'Carlos', 'Uruguay', 'Montevideo']],
+      'USER_ENTERED',
     );
 
     expect(result.updatedRange).toBe('Inscripciones!A2:E2');
@@ -168,6 +169,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]), // Missing Apellido
       updateValues: vi.fn().mockRejectedValue(new Error('Permission denied on header write')),
+      insertRows: vi.fn(),
       appendValues: vi.fn(),
     };
 
@@ -189,6 +191,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Apellido', 'Columna Extra']]),
       updateValues: vi.fn(),
+      insertRows: vi.fn(),
       appendValues: vi.fn(),
     };
 
@@ -206,6 +209,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockRejectedValue(new Error('Permission denied')),
       updateValues: vi.fn(),
+      insertRows: vi.fn(),
       appendValues: vi.fn(),
     };
 
@@ -248,10 +252,8 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]),
       updateValues: vi.fn(),
-      appendValues: vi.fn().mockResolvedValue({
-        updatedRange: "'Inscripciones'!A7:B7",
-        updatedRows: 1,
-      }),
+      insertRows: vi.fn().mockResolvedValue(undefined),
+      appendValues: vi.fn(),
       getSheetMetadata: vi.fn().mockResolvedValue({
         sheetId: 78910,
         title: 'Inscripciones',
@@ -270,9 +272,10 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(result.spreadsheetId).toBe('sheet_meta_1');
     expect(result.sheetName).toBe('Inscripciones');
     expect(result.sheetId).toBe(78910);
-    expect(result.updatedRange).toBe("'Inscripciones'!A7:B7");
-    expect(result.rowUrl).toBe('https://docs.google.com/spreadsheets/d/sheet_meta_1/edit#gid=78910&range=A7:B7');
+    expect(result.updatedRange).toBe('Inscripciones!A2:B2');
+    expect(result.rowUrl).toBe('https://docs.google.com/spreadsheets/d/sheet_meta_1/edit#gid=78910&range=A2:B2');
     expect(result.updatedRows).toBe(1);
+    expect(mockClient.insertRows).toHaveBeenCalledWith('sheet_meta_1', 78910, 1, 2);
     expect(mockClient.getSheetMetadata).toHaveBeenCalledWith('sheet_meta_1', 'Inscripciones');
   });
 });

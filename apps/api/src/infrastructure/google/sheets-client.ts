@@ -13,7 +13,13 @@ export interface SheetMetadata {
 
 export interface SheetsClient {
   getValues(spreadsheetId: string, range: string): Promise<string[][]>;
-  updateValues(spreadsheetId: string, range: string, values: string[][]): Promise<void>;
+  updateValues(
+    spreadsheetId: string,
+    range: string,
+    values: string[][],
+    valueInputOption?: 'RAW' | 'USER_ENTERED',
+  ): Promise<void>;
+  insertRows(spreadsheetId: string, sheetId: number, startIndex: number, endIndex: number): Promise<void>;
   appendValues(
     spreadsheetId: string,
     range: string,
@@ -139,11 +145,64 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     };
   }
 
-  async updateValues(spreadsheetId: string, range: string, values: string[][]): Promise<void> {
+  async insertRows(
+    spreadsheetId: string,
+    sheetId: number,
+    startIndex: number,
+    endIndex: number,
+  ): Promise<void> {
+    const token = await this.tokenProvider();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`;
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          requests: [{
+            insertDimension: {
+              range: {
+                sheetId,
+                dimension: 'ROWS',
+                startIndex,
+                endIndex,
+              },
+              inheritFromBefore: false,
+            },
+          }],
+        }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (err) {
+      throw new GoogleSheetsClientError(
+        `Error de red al insertar una fila en Google Sheets: ${err instanceof Error ? err.message : 'timeout'}`
+      );
+    }
+
+    if (!res.ok) {
+      const details = await readGoogleApiError(res);
+      throw new GoogleSheetsClientError(
+        `Google Sheets API respondió con error HTTP ${res.status} al insertar una fila${details ? `: ${details}` : ''}`,
+        res.status
+      );
+    }
+  }
+
+  async updateValues(
+    spreadsheetId: string,
+    range: string,
+    values: string[][],
+    valueInputOption: 'RAW' | 'USER_ENTERED' = 'RAW',
+  ): Promise<void> {
     const token = await this.tokenProvider();
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
       spreadsheetId
-    )}/values/${encodeURIComponent(range)}?valueInputOption=RAW`;
+    )}/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`;
 
     let res: Response;
     try {

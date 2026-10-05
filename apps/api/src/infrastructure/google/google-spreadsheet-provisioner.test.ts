@@ -11,6 +11,7 @@ describe('GoogleSpreadsheetProvisioner', () => {
       getValues: vi.fn(),
       appendValues: vi.fn(),
       updateValues: vi.fn().mockResolvedValue(undefined),
+      insertRows: vi.fn(),
     };
     const provisioner = new GoogleSpreadsheetProvisioner({
       accessTokenOrProvider: 'token-1',
@@ -63,6 +64,7 @@ describe('GoogleSpreadsheetProvisioner', () => {
         getValues: async () => [],
         appendValues: async () => ({ updatedRange: 'unused', updatedRows: 0 }),
         updateValues: async () => undefined,
+        insertRows: async () => undefined,
       },
       fetchImpl: async () => new Response(JSON.stringify({
         error: {
