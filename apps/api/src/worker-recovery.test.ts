@@ -111,4 +111,3 @@ describe('Worker Recovery & Telegram Alerts', () => {
     expect(await recoveryRepo.findById(expired.id)).toBeNull();
   });
 });
-

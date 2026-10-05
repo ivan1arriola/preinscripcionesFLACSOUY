@@ -253,5 +253,3 @@ export interface DatabaseSchema {
   submission_recoveries: SubmissionRecoveriesTable;
   telegram_recovery_alerts: TelegramRecoveryAlertsTable;
 }
-
-

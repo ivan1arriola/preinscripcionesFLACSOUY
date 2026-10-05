@@ -526,4 +526,3 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
     </div>
   );
 };
-

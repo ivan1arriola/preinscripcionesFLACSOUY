@@ -314,4 +314,3 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
     </div>
   );
 };
-

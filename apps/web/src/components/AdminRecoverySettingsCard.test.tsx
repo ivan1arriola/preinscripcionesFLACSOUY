@@ -140,4 +140,3 @@ describe('AdminRecoverySettingsCard Component', () => {
     });
   });
 });
-

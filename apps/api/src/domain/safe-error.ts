@@ -10,4 +10,3 @@ export function sanitizeSafeError(err: unknown, fallback: string): string {
   }
   return fallback;
 }
-

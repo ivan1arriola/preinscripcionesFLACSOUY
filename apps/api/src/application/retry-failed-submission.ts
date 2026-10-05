@@ -339,4 +339,3 @@ export async function retryFailedSubmission(
     message: 'La preinscripción fue procesada y recuperada con éxito.',
   };
 }
-
