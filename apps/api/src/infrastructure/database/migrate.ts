@@ -13,6 +13,7 @@ import * as academicDocumentLayoutSchema from './migrations/011_normalize_academ
 import * as targetSpreadsheetsReconciliationSchema from './migrations/012_target_spreadsheets_reconciliation.js';
 import * as emailNotificationsSchema from './migrations/013_email_notifications.js';
 import * as smtpEmailSettingsSchema from './migrations/014_smtp_email_settings.js';
+import * as submissionRecoverySchema from './migrations/015_submission_recovery.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -30,6 +31,7 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await targetSpreadsheetsReconciliationSchema.up(db);
   await emailNotificationsSchema.up(db);
   await smtpEmailSettingsSchema.up(db);
+  await submissionRecoverySchema.up(db);
   console.log('Migrations complete.');
 }
 

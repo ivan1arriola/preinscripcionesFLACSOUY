@@ -189,6 +189,27 @@ export interface EmailNotificationsTable {
   updated_at: Generated<Date>;
 }
 
+export interface SubmissionRecoveriesTable {
+  id: string;
+  submission_id: string;
+  target_id: string;
+  stage: 'drive' | 'sheets' | 'notifications' | 'unknown';
+  status: 'pending' | 'retrying' | 'resolved' | 'discarded';
+  safe_error: string;
+  attempt_count: number;
+  first_failed_at: Generated<Date>;
+  last_attempt_at: Generated<Date>;
+  retention_expires_at: Date;
+  locked_until: Date | null;
+  locked_by: string | null;
+  discarded_at: Date | null;
+  discarded_by: string | null;
+  discard_reason: string | null;
+  resolved_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -210,5 +231,7 @@ export interface DatabaseSchema {
   form_profile_versions: FormProfileVersionsTable;
   form_profile_audit_events: FormProfileAuditEventsTable;
   email_notifications: EmailNotificationsTable;
+  submission_recoveries: SubmissionRecoveriesTable;
 }
+
 
