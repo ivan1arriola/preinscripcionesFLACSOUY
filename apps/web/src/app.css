@@ -290,6 +290,7 @@ input:hover, select:hover, textarea:hover { border-color: #aebfd5; }
 .admin-login-error { margin: 0 0 1.25rem; padding: .8rem .9rem; border: 1px solid #f3c5bf; border-radius: .65rem; background: #fff4f2; color: #9b2c23; font-size: .86rem; text-align: left; }
 
 @media (max-width: 640px) {
+  html, body { max-width: 100%; overflow-x: hidden; }
   .px-4 { padding-left: .875rem; padding-right: .875rem; }
   .py-8 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
   .p-8 { padding: 1.25rem; }
@@ -320,12 +321,14 @@ input:hover, select:hover, textarea:hover { border-color: #aebfd5; }
   .target-card-primary-action, .target-card-disabled { width: 100%; }
   .target-card-secondary-action { padding: .3rem 0; }
   .target-page-heading { padding-top: .9rem; }
-  .wizard-progress-list { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .45rem; }
-  .wizard-progress-item { flex: 0 0 9.5rem; }
-  .wizard-progress-button { min-height: 4.4rem; padding: .65rem; }
+  .wizard-progress-list { display: none; }
+  .wizard-progress-item { min-width: 0; }
+  .wizard-progress-button { min-height: 2.75rem; padding: .65rem; }
   .form-step-card { padding: 1.25rem; border-radius: .95rem; }
-  .wizard-navigation { gap: .75rem; }
-  .wizard-navigation button { flex: 1; }
+  .form-step-card input, .form-step-card select, .form-step-card textarea { min-height: 2.75rem; font-size: 1rem; }
+  .wizard-navigation { gap: .75rem; margin-top: 1rem; }
+  .wizard-navigation button { min-height: 2.75rem; }
+  .document-upload-card { overflow: hidden; }
   .admin-login-page { margin: .75rem auto; }
   .admin-login-card { padding: 2rem 1.35rem; border-radius: 1rem; }
   .admin-login-title { font-size: 1.65rem; }
