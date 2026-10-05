@@ -476,6 +476,81 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(rawSecret!.startsWith('enc:v1:')).toBe(true);
     });
 
+    it('PUT /email rejects invalid fromEmail with structured error details', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromEmail: 'not-a-valid-email',
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error.code).toBe('INVALID_REQUEST');
+      expect(body.error.field).toBe('fromEmail');
+      expect(body.error.reason).toContain('remitente');
+      expect(body.error.action).toBeDefined();
+    });
+
+    it('PUT /email rejects invalid replyToEmail with structured error details', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          replyToEmail: 'invalid-reply-to',
+        }),
+      });
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error.code).toBe('INVALID_REQUEST');
+      expect(body.error.field).toBe('replyToEmail');
+      expect(body.error.reason).toContain('respuesta');
+      expect(body.error.action).toBeDefined();
+    });
+
+    it('PUT /email preserves existing email_from and email_reply_to when masked values are submitted', async () => {
+      await fetch(`${baseUrl}/api/admin/settings/email`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromEmail: 'preinscripciones@flacso.edu.uy',
+          replyToEmail: 'consultas@flacso.edu.uy',
+        }),
+      });
+
+      const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
+        method: 'PUT',
+        headers: {
+          Cookie: validCookie,
+          'x-csrf-token': csrfToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromEmail: 'pr***s@flacso.edu.uy',
+          replyToEmail: 'co***s@flacso.edu.uy',
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.smtp.fromEmail).toBe('pr***s@flacso.edu.uy');
+      expect(body.smtp.replyToEmail).toBe('co***s@flacso.edu.uy');
+
+      const rawStoredFrom = await encryptedSettingsService.getEncryptedSetting('email_from');
+      expect(rawStoredFrom).toBe('preinscripciones@flacso.edu.uy');
+    });
+
     it('GET /email returns masked credentials after configuration without plaintext secrets', async () => {
       const res = await fetch(`${baseUrl}/api/admin/settings/email`, {
         headers: { Cookie: validCookie },

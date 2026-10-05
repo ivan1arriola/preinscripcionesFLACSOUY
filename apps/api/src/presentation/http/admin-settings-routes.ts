@@ -20,6 +20,8 @@ import {
   serializeMasterEmails,
   invalidateSmtpVerificationStatus,
   safeSmtpVerificationError,
+  isMaskedEmail,
+  isValidEmailOrMasked,
   SETTING_EMAIL_NOTIFICATIONS_ENABLED,
   SETTING_EMAIL_PROVIDER,
   SETTING_NOTIFICATION_MASTER_EMAILS,
@@ -75,22 +77,44 @@ const RetryNotificationSchema = z.object({
   recipientEmail: z.string().email('Dirección de correo destinatario inválida').optional(),
 });
 
-const UpdateEmailSettingsSchema = z.object({
-  enabled: z.boolean().optional(),
-  masterEmails: z.array(z.string().email('Formato de correo inválido')).optional(),
-  host: z.string().min(1).optional(),
-  port: z.number().int().min(1).max(65535).optional(),
-  security: z.enum(['starttls', 'tls']).optional(),
-  username: z.string().min(1).optional(),
-  password: z.string().min(1).optional(),
-  replacePassword: z.boolean().optional(),
-  fromEmail: z.string().email('Formato de correo remitente inválido').optional(),
-  replyToEmail: z.string().email('Formato de correo reply-to inválido').nullable().optional(),
-}).superRefine((value, context) => {
-  if (value.replacePassword && !value.password) {
-    context.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'Ingresá la nueva contraseña SMTP.' });
-  }
-});
+const UpdateEmailSettingsSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    masterEmails: z.array(z.string().email('Formato de correo inválido')).optional(),
+    host: z.string().min(1).optional(),
+    port: z.number().int().min(1).max(65535).optional(),
+    security: z.enum(['starttls', 'tls']).optional(),
+    username: z.string().min(1).optional(),
+    password: z.string().min(1).optional(),
+    replacePassword: z.boolean().optional(),
+    fromEmail: z.string().optional(),
+    replyToEmail: z.string().nullable().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.replacePassword && !value.password) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'Ingresá la nueva contraseña SMTP.' });
+    }
+    if (value.fromEmail !== undefined && value.fromEmail !== '') {
+      const trimmed = value.fromEmail.trim();
+      if (!isValidEmailOrMasked(trimmed)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['fromEmail'],
+          message: 'El remitente debe ser una dirección de correo válida.',
+        });
+      }
+    }
+    if (value.replyToEmail !== undefined && value.replyToEmail !== null && value.replyToEmail !== '') {
+      const trimmed = value.replyToEmail.trim();
+      if (!isValidEmailOrMasked(trimmed)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['replyToEmail'],
+          message: 'La dirección de respuesta (reply-to) debe ser un correo válido.',
+        });
+      }
+    }
+  });
 
 const ListRecoveriesQuerySchema = z.object({
   status: z.string().optional(),
@@ -382,10 +406,29 @@ export function createAdminSettingsRoutes(
 
     const parsed = UpdateEmailSettingsSchema.safeParse(req.body);
     if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      const field = firstIssue?.path[0] ? String(firstIssue.path[0]) : undefined;
+      let reason = firstIssue?.message || 'Datos de configuración de correo inválidos.';
+      let action = 'Verifique los campos ingresados.';
+
+      if (field === 'fromEmail') {
+        reason = 'El remitente debe ser una dirección de correo válida.';
+        action = 'Verifique el formato del remitente (ej. notificaciones@flacso.edu.uy).';
+      } else if (field === 'replyToEmail') {
+        reason = 'La dirección de respuesta (reply-to) debe ser un correo válido.';
+        action = 'Verifique el formato o deje el campo vacío si no desea configurar reply-to.';
+      } else if (field === 'host') {
+        reason = 'El servidor SMTP no puede estar vacío.';
+        action = 'Ingrese el host o nombre de dominio del servidor SMTP (ej. smtp.flacso.edu.uy).';
+      }
+
       res.status(400).json({
         error: {
           code: 'INVALID_REQUEST',
-          message: 'Datos de configuración de correo inválidos.',
+          message: reason,
+          field,
+          reason,
+          action,
           issues: parsed.error.issues,
         },
       });
@@ -414,11 +457,40 @@ export function createAdminSettingsRoutes(
         );
       }
 
-      const fields: Array<[string, string | undefined]> = [[SETTING_SMTP_HOST, parsed.data.host], [SETTING_SMTP_PORT, parsed.data.port?.toString()], [SETTING_SMTP_SECURITY, parsed.data.security], [SETTING_SMTP_USERNAME, parsed.data.username], [SETTING_EMAIL_FROM, parsed.data.fromEmail]];
-      for (const [key, value] of fields) if (value !== undefined) await encryptedSettingsService.setEncryptedSetting(key, value.trim(), actor);
-      if (parsed.data.replyToEmail !== undefined) await encryptedSettingsService.setEncryptedSetting(SETTING_EMAIL_REPLY_TO, parsed.data.replyToEmail?.trim() || '', actor);
-      if (parsed.data.replacePassword) await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_PASSWORD, parsed.data.password!.trim(), actor);
-      if (parsed.data.host !== undefined || parsed.data.port !== undefined || parsed.data.security !== undefined || parsed.data.username !== undefined || parsed.data.password !== undefined) await invalidateSmtpVerificationStatus(encryptedSettingsService, actor);
+      const fields: Array<[string, string | undefined]> = [
+        [SETTING_SMTP_HOST, parsed.data.host],
+        [SETTING_SMTP_PORT, parsed.data.port?.toString()],
+        [SETTING_SMTP_SECURITY, parsed.data.security],
+        [SETTING_SMTP_USERNAME, parsed.data.username],
+      ];
+      for (const [key, value] of fields) {
+        if (value !== undefined) await encryptedSettingsService.setEncryptedSetting(key, value.trim(), actor);
+      }
+
+      if (parsed.data.fromEmail !== undefined) {
+        const trimmed = parsed.data.fromEmail.trim();
+        if (trimmed && !isMaskedEmail(trimmed)) {
+          await encryptedSettingsService.setEncryptedSetting(SETTING_EMAIL_FROM, trimmed.toLowerCase(), actor);
+        }
+      }
+
+      if (parsed.data.replyToEmail !== undefined) {
+        if (parsed.data.replyToEmail === null || parsed.data.replyToEmail.trim() === '') {
+          await encryptedSettingsService.setEncryptedSetting(SETTING_EMAIL_REPLY_TO, '', actor);
+        } else {
+          const trimmed = parsed.data.replyToEmail.trim();
+          if (trimmed && !isMaskedEmail(trimmed)) {
+            await encryptedSettingsService.setEncryptedSetting(SETTING_EMAIL_REPLY_TO, trimmed.toLowerCase(), actor);
+          }
+        }
+      }
+
+      if (parsed.data.replacePassword && parsed.data.password) {
+        await encryptedSettingsService.setEncryptedSetting(SETTING_SMTP_PASSWORD, parsed.data.password.trim(), actor);
+      }
+      if (parsed.data.host !== undefined || parsed.data.port !== undefined || parsed.data.security !== undefined || parsed.data.username !== undefined || parsed.data.password !== undefined) {
+        await invalidateSmtpVerificationStatus(encryptedSettingsService, actor);
+      }
       res.json(await emailSettingsResponse());
     } catch (error) {
       res.status(503).json({

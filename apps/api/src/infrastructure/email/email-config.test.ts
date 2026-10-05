@@ -6,6 +6,9 @@ import {
   serializeMasterEmails,
   loadEmailConfig,
   smtpSettingsRequireReverification,
+  maskEmail,
+  isMaskedEmail,
+  isValidEmailOrMasked,
   SETTING_EMAIL_NOTIFICATIONS_ENABLED,
   SETTING_NOTIFICATION_MASTER_EMAILS,
 } from './email-config.js';
@@ -37,6 +40,28 @@ describe('email-config', () => {
       expect(JSON.parse(serialized)).toEqual(['admin@flacso.edu.uy', 'info@flacso.edu.uy']);
 
       expect(() => serializeMasterEmails(['bad-email'])).toThrow(/inválido/);
+    });
+  });
+
+  describe('masking and validation helpers', () => {
+    it('masks emails correctly according to local-part length', () => {
+      expect(maskEmail('a@flacso.edu.uy')).toBe('a***@flacso.edu.uy');
+      expect(maskEmail('ab@flacso.edu.uy')).toBe('a***@flacso.edu.uy');
+      expect(maskEmail('notificaciones@flacso.edu.uy')).toBe('no***s@flacso.edu.uy');
+      expect(maskEmail('invalid')).toBe('***');
+    });
+
+    it('identifies masked email strings', () => {
+      expect(isMaskedEmail('no***s@flacso.edu.uy')).toBe(true);
+      expect(isMaskedEmail('***')).toBe(true);
+      expect(isMaskedEmail('real@flacso.edu.uy')).toBe(false);
+    });
+
+    it('validates plain and masked email strings', () => {
+      expect(isValidEmailOrMasked('valid@flacso.edu.uy')).toBe(true);
+      expect(isValidEmailOrMasked('no***s@flacso.edu.uy')).toBe(true);
+      expect(isValidEmailOrMasked('invalid-email')).toBe(false);
+      expect(isValidEmailOrMasked('not an email@flacso')).toBe(false);
     });
   });
 

@@ -85,17 +85,36 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
         </p>
       </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          id="toggle-sin-titulo"
-          type="checkbox"
-          checked={isAbsent}
-          disabled={disabled}
-          onChange={handleToggleAbsence}
-          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-        />
-        <label htmlFor="toggle-sin-titulo" className="text-sm font-medium text-gray-700">
-          No poseo actualmente título
+      {/* Decision card for title possession */}
+      <div
+        className={`p-3.5 rounded-lg border transition-colors ${
+          isAbsent
+            ? 'bg-amber-50/70 border-amber-300'
+            : 'bg-white border-gray-200 hover:border-gray-300'
+        }`}
+      >
+        <label
+          htmlFor="toggle-sin-titulo"
+          className="flex items-start gap-3 cursor-pointer select-none"
+        >
+          <input
+            id="toggle-sin-titulo"
+            type="checkbox"
+            checked={isAbsent}
+            disabled={disabled}
+            onChange={handleToggleAbsence}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+          />
+          <div className="space-y-0.5">
+            <span className="block text-sm font-semibold text-gray-900">
+              No poseo actualmente título
+            </span>
+            <p className="text-xs text-gray-600">
+              {isAbsent
+                ? 'Ha declarado no poseer título. Se omitirá la denominación y la carga del comprobante.'
+                : 'Marque esta opción únicamente si no cuenta con un título de grado o terciario finalizado.'}
+            </p>
+          </div>
         </label>
       </div>
 

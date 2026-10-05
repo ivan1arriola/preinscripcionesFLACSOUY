@@ -16,6 +16,12 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [structuredError, setStructuredError] = useState<{
+    message: string;
+    field?: string;
+    reason?: string;
+    action?: string;
+  } | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Form fields
@@ -104,6 +110,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setStructuredError(null);
     setSuccess(null);
 
     const parsedMasters = masterEmailsText
@@ -130,9 +137,25 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
 
       setSettings(updated);
       setPassword('');
-      setSuccess('Configuración SMTP y destinatarios maestros guardada con éxito.');
+      setFromEmail('');
+      setReplyToEmail('');
+      if (!enabled) {
+        setSuccess('Configuración SMTP guardada correctamente. Nota: el envío automático se encuentra deshabilitado.');
+      } else {
+        setSuccess('Configuración SMTP y destinatarios maestros guardada con éxito.');
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Error al guardar la configuración');
+      if (err instanceof ApiError) {
+        setStructuredError({
+          message: err.message,
+          field: err.field,
+          reason: err.reason,
+          action: err.action,
+        });
+        setError(err.message);
+      } else {
+        setError('Error al guardar la configuración');
+      }
     } finally {
       setSaving(false);
     }
@@ -230,9 +253,15 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
           </div>
         </div>
 
-        {error && (
-          <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
-            {error}
+        {(structuredError || error) && (
+          <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm space-y-1" role="alert">
+            <p className="font-semibold">{structuredError?.message || error}</p>
+            {structuredError?.reason && structuredError.reason !== (structuredError?.message || error) && (
+              <p className="text-xs text-red-700"><strong>Motivo:</strong> {structuredError.reason}</p>
+            )}
+            {structuredError?.action && (
+              <p className="text-xs text-red-700"><strong>Acción sugerida:</strong> {structuredError.action}</p>
+            )}
           </div>
         )}
 
@@ -262,107 +291,204 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
             </div>
           </div>
 
-          {/* SMTP connection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Servidor SMTP
-              </label>
-              <input
-                type="text"
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                placeholder="smtp.flacso.edu.uy"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                required
-              />
+          {/* Section 1: Conexión SMTP */}
+          <div className="border border-gray-200 rounded-lg p-5 bg-white space-y-4 shadow-xs">
+            <div className="border-b border-gray-100 pb-2">
+              <h3 className="text-sm font-bold text-gray-900">1. Conexión SMTP</h3>
+              <p className="text-xs text-gray-500">Parámetros de red y protocolo del servidor de correo.</p>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="smtp-host-input" className="block text-xs font-semibold text-gray-700 mb-1">
+                  Servidor SMTP
+                </label>
+                <input
+                  id="smtp-host-input"
+                  type="text"
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  placeholder="smtp.flacso.edu.uy"
+                  className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    structuredError?.field === 'host' ? 'border-red-500 bg-red-50/30' : 'border-gray-300'
+                  }`}
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Puerto
-              </label>
-              <input
-                type="number"
-                value={port}
-                onChange={(e) => setPort(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                required
-              />
+              <div>
+                <label htmlFor="smtp-port-input" className="block text-xs font-semibold text-gray-700 mb-1">
+                  Puerto
+                </label>
+                <input
+                  id="smtp-port-input"
+                  type="number"
+                  value={port}
+                  onChange={(e) => setPort(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="smtp-security-select" className="block text-xs font-semibold text-gray-700 mb-1">
+                  Seguridad
+                </label>
+                <select
+                  id="smtp-security-select"
+                  value={security}
+                  onChange={(e) => setSecurity(e.target.value as 'starttls' | 'tls')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md"
+                >
+                  <option value="starttls">STARTTLS (recomendado, puerto 587)</option>
+                  <option value="tls">TLS directo (puerto 465)</option>
+                </select>
+              </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Seguridad</label>
-              <select value={security} onChange={(e) => setSecurity(e.target.value as 'starttls' | 'tls')} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md">
-                <option value="starttls">STARTTLS</option>
-                <option value="tls">TLS directo</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Usuario SMTP</label>
-              <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" required />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Contraseña SMTP</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={settings?.smtp.hasPassword ? 'Dejar vacío para conservarla' : 'Contraseña SMTP'} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md" />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Remitente (From Email)
-              </label>
-              <input
-                type="email"
-                value={fromEmail}
-                onChange={(e) => setFromEmail(e.target.value)}
-                placeholder={settings?.smtp.fromEmail || 'preinscripciones@flacso.edu.uy'}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                required={enabled && !settings?.smtp.fromEmail}
-              />
-              {settings?.smtp.fromEmail && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Actual: <span className="font-mono">{settings.smtp.fromEmail}</span>
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Responder a (Reply-To Email, opcional)
-              </label>
-              <input
-                type="email"
-                value={replyToEmail}
-                onChange={(e) => setReplyToEmail(e.target.value)}
-                placeholder={settings?.smtp.replyToEmail || 'consultas@flacso.edu.uy'}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              {settings?.smtp.replyToEmail && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Actual: <span className="font-mono">{settings.smtp.replyToEmail}</span>
-                </p>
-              )}
-            </div>
-
           </div>
 
-          {/* Master Emails */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">
-              Destinatarios Maestros (uno por línea o separados por coma)
-            </label>
-            <textarea
-              rows={3}
-              value={masterEmailsText}
-              onChange={(e) => setMasterEmailsText(e.target.value)}
-              placeholder="preinscripciones@flacso.edu.uy&#10;direccion@flacso.edu.uy"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Estos correos recibirán una copia operativa completa (con enlaces a Sheets y Drive) de cada preinscripción de cualquier programa.
-            </p>
+          {/* Section 2: Credenciales */}
+          <div className="border border-gray-200 rounded-lg p-5 bg-white space-y-4 shadow-xs">
+            <div className="border-b border-gray-100 pb-2">
+              <h3 className="text-sm font-bold text-gray-900">2. Credenciales</h3>
+              <p className="text-xs text-gray-500">Autenticación cifrada para el servidor SMTP.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="smtp-username-input" className="block text-xs font-semibold text-gray-700 mb-1">
+                  Usuario SMTP
+                </label>
+                <input
+                  id="smtp-username-input"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="usuario_smtp"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="smtp-password-input" className="block text-xs font-semibold text-gray-700 mb-1">
+                  Contraseña SMTP
+                </label>
+                <input
+                  id="smtp-password-input"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={
+                    settings?.smtp.hasPassword
+                      ? 'Dejar vacío para conservar la contraseña actual'
+                      : 'Contraseña SMTP'
+                  }
+                  className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    structuredError?.field === 'password' ? 'border-red-500 bg-red-50/30' : 'border-gray-300'
+                  }`}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {settings?.smtp.hasPassword
+                    ? 'Dejar vacío para conservar la contraseña actual.'
+                    : 'Ingrese la contraseña proporcionada por el servidor SMTP.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Remitente y respuesta */}
+          <div className="border border-gray-200 rounded-lg p-5 bg-white space-y-4 shadow-xs">
+            <div className="border-b border-gray-100 pb-2">
+              <h3 className="text-sm font-bold text-gray-900">3. Remitente y respuesta</h3>
+              <p className="text-xs text-gray-500">Direcciones de envío y respuestas de los postulantes.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="smtp-from-email-input" className="block text-xs font-semibold text-gray-700 mb-1">
+                  Remitente (From Email)
+                </label>
+                <div className="mb-2 p-2 bg-gray-50 rounded border border-gray-200 text-xs">
+                  <span className="text-gray-500">Valor actual: </span>
+                  <span className="font-mono text-gray-800 font-semibold">
+                    {settings?.smtp.fromEmail || '(No configurado)'}
+                  </span>
+                </div>
+                <input
+                  id="smtp-from-email-input"
+                  type="email"
+                  value={fromEmail}
+                  onChange={(e) => setFromEmail(e.target.value)}
+                  placeholder={
+                    settings?.smtp.fromEmail
+                      ? 'Dejar vacío para conservar el remitente actual'
+                      : 'ej. preinscripciones@flacso.edu.uy'
+                  }
+                  className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    structuredError?.field === 'fromEmail' ? 'border-red-500 bg-red-50/30' : 'border-gray-300'
+                  }`}
+                  required={enabled && !settings?.smtp.fromEmail}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {settings?.smtp.fromEmail
+                    ? 'Dejar vacío para conservar el remitente actual.'
+                    : 'Dirección desde la cual se enviarán los correos.'}
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="smtp-reply-to-email-input" className="block text-xs font-semibold text-gray-700 mb-1">
+                  Responder a (Reply-To Email, opcional)
+                </label>
+                <div className="mb-2 p-2 bg-gray-50 rounded border border-gray-200 text-xs">
+                  <span className="text-gray-500">Valor actual: </span>
+                  <span className="font-mono text-gray-800 font-semibold">
+                    {settings?.smtp.replyToEmail || '(No configurado)'}
+                  </span>
+                </div>
+                <input
+                  id="smtp-reply-to-email-input"
+                  type="email"
+                  value={replyToEmail}
+                  onChange={(e) => setReplyToEmail(e.target.value)}
+                  placeholder={
+                    settings?.smtp.replyToEmail
+                      ? 'Dejar vacío para conservar la dirección de respuesta actual'
+                      : 'ej. consultas@flacso.edu.uy'
+                  }
+                  className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                    structuredError?.field === 'replyToEmail' ? 'border-red-500 bg-red-50/30' : 'border-gray-300'
+                  }`}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {settings?.smtp.replyToEmail
+                    ? 'Dejar vacío para conservar la dirección de respuesta actual.'
+                    : 'Dirección a la cual responderán los postulantes en caso de dudas.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Destinatarios maestros */}
+          <div className="border border-gray-200 rounded-lg p-5 bg-white space-y-4 shadow-xs">
+            <div className="border-b border-gray-100 pb-2">
+              <h3 className="text-sm font-bold text-gray-900">4. Destinatarios maestros</h3>
+              <p className="text-xs text-gray-500">Copias institucionales de auditoría y respaldo de todas las ofertas.</p>
+            </div>
+            <div>
+              <label htmlFor="smtp-master-emails-textarea" className="block text-xs font-semibold text-gray-700 mb-1">
+                Destinatarios Maestros (uno por línea o separados por coma)
+              </label>
+              <textarea
+                id="smtp-master-emails-textarea"
+                rows={3}
+                value={masterEmailsText}
+                onChange={(e) => setMasterEmailsText(e.target.value)}
+                placeholder="preinscripciones@flacso.edu.uy&#10;direccion@flacso.edu.uy"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Estos correos recibirán una copia operativa completa (con enlaces a Sheets y Drive) de cada preinscripción de cualquier programa.
+              </p>
+            </div>
           </div>
 
           <div className="flex justify-end pt-2">

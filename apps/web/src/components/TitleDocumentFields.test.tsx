@@ -111,4 +111,50 @@ describe('TitleDocumentFields Component', () => {
 
     expect(onChange).toHaveBeenCalledWith('sinTituloActual', 'No');
   });
+
+  it('renders accessible decision card with descriptive guidance and clickable description', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <TitleDocumentFields
+        document={tituloDoc}
+        values={{ sinTituloActual: 'No' }}
+        errors={{}}
+        files={[]}
+        disabled={false}
+        onChange={onChange}
+        onUpload={vi.fn()}
+        onFileToken={vi.fn()}
+        onRemoveToken={vi.fn()}
+      />
+    );
+
+    const checkbox = screen.getByRole('checkbox', { name: /No poseo actualmente título/i });
+    expect(checkbox).not.toBeChecked();
+    expect(
+      screen.getByText(/Marque esta opción únicamente si no cuenta con un título de grado/i)
+    ).toBeInTheDocument();
+
+    // Clicking the description triggers toggle
+    fireEvent.click(screen.getByText(/Marque esta opción únicamente si no cuenta con un título de grado/i));
+    expect(onChange).toHaveBeenCalledWith('sinTituloActual', 'Si');
+
+    // Rerender as checked/absent
+    rerender(
+      <TitleDocumentFields
+        document={tituloDoc}
+        values={{ sinTituloActual: 'Si' }}
+        errors={{}}
+        files={[]}
+        disabled={false}
+        onChange={onChange}
+        onUpload={vi.fn()}
+        onFileToken={vi.fn()}
+        onRemoveToken={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText(/Ha declarado no poseer título. Se omitirá la denominación y la carga del comprobante./i)
+    ).toBeInTheDocument();
+  });
 });

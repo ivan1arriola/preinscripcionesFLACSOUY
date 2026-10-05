@@ -80,6 +80,15 @@ export function maskEmail(email: string): string {
   return `${local.slice(0, 2)}***${local.slice(-1)}@${domain}`;
 }
 
+export function isMaskedEmail(value: string): boolean {
+  return value.includes('***');
+}
+
+export function isValidEmailOrMasked(value: string): boolean {
+  if (isMaskedEmail(value)) return true;
+  return EMAIL_REGEX.test(value.trim());
+}
+
 export function maskString(str: string): string {
   if (str.length <= 4) return '****';
   return `${str.slice(0, 2)}****${str.slice(-2)}`;

@@ -6,7 +6,10 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly fieldErrors?: Record<string, string[]>,
-    public readonly issues?: string[]
+    public readonly issues?: string[],
+    public readonly field?: string,
+    public readonly reason?: string,
+    public readonly action?: string
   ) {
     super(message);
     this.name = 'ApiError';
@@ -322,7 +325,16 @@ export const apiClient = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, err.error?.code || 'UPDATE_EMAIL_SETTINGS_ERROR', err.error?.message || 'Error al actualizar configuración de correo');
+      throw new ApiError(
+        res.status,
+        err.error?.code || 'UPDATE_EMAIL_SETTINGS_ERROR',
+        err.error?.message || 'Error al actualizar configuración de correo',
+        undefined,
+        err.error?.issues?.map((i: any) => (typeof i === 'string' ? i : i.message)),
+        err.error?.field,
+        err.error?.reason,
+        err.error?.action
+      );
     }
     return res.json();
   },
