@@ -1,6 +1,7 @@
-import type { AcademicTarget } from '@flacso/contracts';
-import { SUPPORTED_SPECIFIC_INPUTS, UNIVERSAL_INPUTS } from '../domain/form-definition.js';
+import type { AcademicTarget, AgreementOption } from '@flacso/contracts';
 import { isSupportedOfferType } from '../domain/form-profiles.js';
+import { getCanonicalFormDefinition } from '../domain/canonical-forms.js';
+import { buildSpreadsheetSchema } from '../domain/spreadsheet-schema.js';
 import type {
   TargetSpreadsheetConfiguration,
   TargetSpreadsheetRepository,
@@ -39,12 +40,16 @@ export interface TargetsReconciliationResult {
   targets: TargetReconciliationItem[];
 }
 
-export function buildSpreadsheetHeaders(): string[] {
-  const headers = [
-    ...UNIVERSAL_INPUTS,
-    ...Object.values(SUPPORTED_SPECIFIC_INPUTS),
-  ].map((input) => input.spreadsheetColumn ?? input.label);
-  return [...new Set(headers)];
+export interface SpreadsheetSchemaSynchronizer {
+  synchronizeSchema(spreadsheetId: string, sheetName: string, headers: string[], agreements?: AgreementOption[]): Promise<void>;
+}
+
+export function buildSpreadsheetHeaders(target: AcademicTarget): string[] {
+  const composition = getCanonicalFormDefinition(target);
+  if (!composition.ok) {
+    throw new Error(composition.error.message);
+  }
+  return buildSpreadsheetSchema(composition.value).headers;
 }
 
 export function canProvisionTargetSpreadsheet(target: AcademicTarget): boolean {
@@ -63,6 +68,7 @@ export class TargetSpreadsheetService {
     private readonly driveRootProvider: () => Promise<string | null>,
     discoveryPortOrSheetName?: SpreadsheetDiscoveryPort | string,
     discoveryPort?: SpreadsheetDiscoveryPort,
+    private readonly schemaSynchronizer?: SpreadsheetSchemaSynchronizer,
   ) {
     if (typeof discoveryPortOrSheetName === 'string') {
       this.sheetName = discoveryPortOrSheetName;
@@ -110,7 +116,7 @@ export class TargetSpreadsheetService {
     return detached;
   }
 
-  async reconcileTargets(targets: AcademicTarget[]): Promise<TargetsReconciliationResult> {
+  async reconcileTargets(targets: AcademicTarget[], agreements: AgreementOption[] = []): Promise<TargetsReconciliationResult> {
     const items: TargetReconciliationItem[] = [];
     let hasBlocked = false;
 
@@ -118,6 +124,14 @@ export class TargetSpreadsheetService {
       if (!canProvisionTargetSpreadsheet(target)) continue;
       try {
         const config = await this.ensureForTarget(target);
+        if (this.schemaSynchronizer) {
+          await this.schemaSynchronizer.synchronizeSchema(
+            config.spreadsheetId,
+            config.sheetName,
+            buildSpreadsheetHeaders(target),
+            agreements,
+          );
+        }
         items.push({
           targetId: target.id,
           status: config.status ?? 'reconciled',
@@ -253,7 +267,7 @@ export class TargetSpreadsheetService {
         title: target.title,
         folderId: targetFolderId,
         sheetName: this.sheetName,
-        headers: buildSpreadsheetHeaders(),
+        headers: buildSpreadsheetHeaders(target),
       });
 
       const configuration: TargetSpreadsheetConfiguration = {
@@ -281,7 +295,7 @@ export class TargetSpreadsheetService {
       title: target.title,
       folderId: rootFolderId,
       sheetName: this.sheetName,
-      headers: buildSpreadsheetHeaders(),
+      headers: buildSpreadsheetHeaders(target),
     });
 
     const configuration: TargetSpreadsheetConfiguration = {

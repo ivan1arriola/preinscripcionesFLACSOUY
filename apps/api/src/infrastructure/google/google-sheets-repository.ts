@@ -1,3 +1,4 @@
+import type { AgreementOption } from '@flacso/contracts';
 import type {
   SpreadsheetRepository,
   AppendResult,
@@ -8,6 +9,7 @@ import {
   resolveAdditiveHeaders,
   validateSpreadsheetHeaders,
 } from '../../domain/spreadsheet-row.js';
+import { collapseLegacySpreadsheetRow } from '../../domain/spreadsheet-schema.js';
 import { type SheetsClient, buildSpreadsheetRowUrl } from './sheets-client.js';
 
 export class IncompatibleSpreadsheetError extends Error {
@@ -132,6 +134,33 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
         },
         error: err instanceof Error ? err.message : 'Error desconocido al acceder al Spreadsheet',
       };
+    }
+  }
+
+  async synchronizeSchema(
+    spreadsheetId: string,
+    sheetName: string,
+    headers: string[],
+    agreements: AgreementOption[] = [],
+  ): Promise<void> {
+    const actualSheetName = await this.resolveSheetName(spreadsheetId, sheetName);
+    const currentRows = await this.client.getValues(spreadsheetId, `${toSheetRange(actualSheetName)}!A1:ZZ`);
+    const currentHeaders = currentRows[0] ?? [];
+    const dataRows = currentRows
+      .slice(1)
+      .map((row) => collapseLegacySpreadsheetRow(currentHeaders, row, headers, agreements));
+    const output = [headers, ...dataRows];
+    const lastRow = Math.max(output.length, 1);
+    const targetRange = `${toSheetRange(actualSheetName)}!A1:${columnName(headers.length)}${lastRow}`;
+
+    await this.client.updateValues(spreadsheetId, targetRange, output, 'USER_ENTERED');
+
+    if (currentHeaders.length > headers.length) {
+      const obsoleteRange = `${toSheetRange(actualSheetName)}!${columnName(headers.length + 1)}1:${columnName(currentHeaders.length)}${lastRow}`;
+      if (!this.client.clearValues) {
+        throw new Error('El cliente de Google Sheets no permite limpiar columnas obsoletas.');
+      }
+      await this.client.clearValues(spreadsheetId, obsoleteRange);
     }
   }
 

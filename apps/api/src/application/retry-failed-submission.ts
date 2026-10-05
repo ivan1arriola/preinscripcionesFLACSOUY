@@ -13,6 +13,7 @@ import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import { sanitizeSafeError } from '../domain/safe-error.js';
 import { createPreinscriptionNotifications } from './create-preinscription-notifications.js';
 import { enqueuePreinscriptionTelegramNotifications } from './preinscription-telegram-notification.js';
+import { buildSpreadsheetSchema, buildSpreadsheetValues } from '../domain/spreadsheet-schema.js';
 
 export interface RetrySubmissionDependencies {
   recoveryRepository: SubmissionRecoveryRepository;
@@ -285,15 +286,9 @@ export async function retryFailedSubmission(
   let spreadsheetRowUrl = '';
   if (dependencies.spreadsheetDependencies) {
     try {
-      const valuesByColumnName = Object.fromEntries(
-        (form.inputs ?? []).map((input: any) => [
-          input.spreadsheetColumn ?? input.label,
-          normalizedValues[input.key] ?? '',
-        ])
-      );
-      const requiredColumns = (form.inputs ?? [])
-        .filter((input: any) => input.required)
-        .map((input: any) => input.spreadsheetColumn ?? input.label);
+      const spreadsheetSchema = buildSpreadsheetSchema(form);
+      const valuesByColumnName = buildSpreadsheetValues(form, normalizedValues, recovery.submissionId);
+      const requiredColumns = spreadsheetSchema.requiredColumns;
 
       const spreadsheet = await dependencies.spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);
       const appendRes = await dependencies.spreadsheetDependencies.repository.appendByHeaders(

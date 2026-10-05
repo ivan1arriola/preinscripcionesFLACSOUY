@@ -117,6 +117,8 @@ const targetSpreadsheetService = spreadsheetProvisioner
       spreadsheetProvisioner,
       async () => systemSettingsRepository.getSetting('google_drive_folder_id'),
       googleDriveRepository as any,
+      undefined,
+      googleSheetsRepository,
     )
   : undefined;
 

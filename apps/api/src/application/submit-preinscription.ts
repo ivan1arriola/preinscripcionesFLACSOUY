@@ -6,6 +6,7 @@ import { normalizeIdentityValues } from '../domain/identity-validation.js';
 import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
 import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import type { AcademicTarget, FormDefinition, SubmissionFileToken } from '@flacso/contracts';
+import { buildSpreadsheetSchema, buildSpreadsheetValues } from '../domain/spreadsheet-schema.js';
 
 export interface SubmitPreinscriptionCommand {
   clientSubmissionId?: string;
@@ -135,19 +136,14 @@ export async function submitPreinscription(
     profileSnapshot: form as any,
   });
 
+  const spreadsheetSchema = buildSpreadsheetSchema(form);
+
   return {
     ok: true,
     submissionId: saved.id,
     spreadsheet: {
-      valuesByColumnName: Object.fromEntries(
-        form.inputs.map((input) => [
-          input.spreadsheetColumn ?? input.label,
-          normalizedValues[input.key] ?? '',
-        ]),
-      ),
-      requiredColumns: form.inputs
-        .filter((input) => input.required)
-        .map((input) => input.spreadsheetColumn ?? input.label),
+      valuesByColumnName: buildSpreadsheetValues(form, normalizedValues, saved.id),
+      requiredColumns: spreadsheetSchema.requiredColumns,
     },
     driveTarget: driveTargetDescriptor(target),
     target,

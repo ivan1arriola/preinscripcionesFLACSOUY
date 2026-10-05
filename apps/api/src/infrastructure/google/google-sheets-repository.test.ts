@@ -278,4 +278,39 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(mockClient.insertRows).toHaveBeenCalledWith('sheet_meta_1', 78910, 1, 2);
     expect(mockClient.getSheetMetadata).toHaveBeenCalledWith('sheet_meta_1', 'Inscripciones');
   });
+
+  it('migrates existing rows to the target schema and clears obsolete columns', async () => {
+    const mockClient: SheetsClient = {
+      getValues: vi.fn().mockResolvedValue([
+        ['Nombre', '¿Cursó posgrado en FLACSO?', 'Cuál posgrado', '¿Te corresponde algún convenio?', 'Convenio', 'Columna obsoleta'],
+        ['Iván', 'Si', 'Maestría en Educación', 'Si', 'Convenio FLACSO - Udelar', 'legacy'],
+        ['Ana', 'No', '', 'No', '', 'legacy'],
+      ]),
+      updateValues: vi.fn().mockResolvedValue(undefined),
+      clearValues: vi.fn().mockResolvedValue(undefined),
+      insertRows: vi.fn(),
+      appendValues: vi.fn(),
+    };
+    const repo = new GoogleSheetsRepository(mockClient);
+
+    await repo.synchronizeSchema!('sheet_123', 'Inscripciones', [
+      'ID de seguimiento',
+      'Fecha de preinscripción',
+      'Nombre',
+      'Posgrado en FLACSO',
+      'Convenio',
+    ]);
+
+    expect(mockClient.updateValues).toHaveBeenCalledWith(
+      'sheet_123',
+      'Inscripciones!A1:E3',
+      [
+        ['ID de seguimiento', 'Fecha de preinscripción', 'Nombre', 'Posgrado en FLACSO', 'Convenio'],
+        ['', '', 'Iván', 'Maestría en Educación', 'Convenio FLACSO - Udelar'],
+        ['', '', 'Ana', 'No', 'No'],
+      ],
+      'USER_ENTERED',
+    );
+    expect(mockClient.clearValues).toHaveBeenCalledWith('sheet_123', 'Inscripciones!F1:F3');
+  });
 });

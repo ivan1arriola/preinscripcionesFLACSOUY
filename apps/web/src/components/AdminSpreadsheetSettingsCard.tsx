@@ -39,7 +39,7 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
         const result = await apiClient.provisionAdminSpreadsheets(csrfToken);
         setSummary(result?.reconciliation?.status === 'blocked'
           ? 'La aplicación preparó las planillas disponibles. Algunas requieren revisar los permisos de la carpeta en Google Drive.'
-          : 'La aplicación preparó automáticamente las planillas de las ofertas disponibles.');
+          : 'La aplicación sincronizó el formato de las planillas existentes y preparó las nuevas.');
         const refreshed = await apiClient.getAdminSpreadsheets();
         setTargets(refreshed.targets);
       }
@@ -62,7 +62,7 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
       if (res.reconciliation?.status === 'blocked') {
         setError('Algunas planillas no pudieron crearse porque la cuenta de servicio no tiene acceso suficiente a Google Drive. Revisá la carpeta en “Almacenamiento Google Drive”.');
       } else {
-        setSummary('Planillas preparadas correctamente.');
+        setSummary('Planillas sincronizadas con el formato del formulario.');
       }
       await load(false);
     } catch (err) {
@@ -119,7 +119,7 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
           disabled={loading || provisioning}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium text-xs rounded-lg transition-colors shadow-sm"
         >
-          {provisioning ? 'Preparando planillas...' : 'Reintentar preparación'}
+          {provisioning ? 'Sincronizando planillas...' : 'Sincronizar formato'}
         </button>
       </div>
 

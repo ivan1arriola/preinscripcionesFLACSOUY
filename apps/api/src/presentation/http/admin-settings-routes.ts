@@ -290,7 +290,11 @@ export function createAdminSettingsRoutes(
     let ok = true;
     if (catalog && targetSpreadsheetService) {
       const targets = (await catalog.listTargets()).filter(canProvisionTargetSpreadsheet);
-      reconciliationResult = await targetSpreadsheetService.reconcileTargets(targets);
+      let agreements = [];
+      if (catalog.listAgreements) {
+        try { agreements = await catalog.listAgreements(); } catch { /* migration can preserve legacy IDs */ }
+      }
+      reconciliationResult = await targetSpreadsheetService.reconcileTargets(targets, agreements);
       ok = reconciliationResult.status === 'completed';
     }
 
@@ -328,7 +332,11 @@ export function createAdminSettingsRoutes(
     }
     try {
       const targets = (await catalog.listTargets()).filter(canProvisionTargetSpreadsheet);
-      const reconciliation = await targetSpreadsheetService.reconcileTargets(targets);
+      let agreements = [];
+      if (catalog.listAgreements) {
+        try { agreements = await catalog.listAgreements(); } catch { /* migration can preserve legacy IDs */ }
+      }
+      const reconciliation = await targetSpreadsheetService.reconcileTargets(targets, agreements);
       const configurations = await targetSpreadsheetService.ensureForTargets(targets);
       res.json({
         ok: reconciliation.status === 'completed',

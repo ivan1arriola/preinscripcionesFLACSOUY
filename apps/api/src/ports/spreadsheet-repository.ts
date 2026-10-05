@@ -30,4 +30,5 @@ export interface SpreadsheetRepository {
     requiredColumns: string[],
     sheetName?: string
   ): Promise<SpreadsheetDiagnostic>;
+  synchronizeSchema?(spreadsheetId: string, sheetName: string, headers: string[]): Promise<void>;
 }

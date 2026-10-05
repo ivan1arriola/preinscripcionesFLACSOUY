@@ -19,6 +19,7 @@ export interface SheetsClient {
     values: string[][],
     valueInputOption?: 'RAW' | 'USER_ENTERED',
   ): Promise<void>;
+  clearValues?(spreadsheetId: string, range: string): Promise<void>;
   insertRows(spreadsheetId: string, sheetId: number, startIndex: number, endIndex: number): Promise<void>;
   appendValues(
     spreadsheetId: string,
@@ -226,6 +227,38 @@ export class HttpGoogleSheetsClient implements SheetsClient {
       const details = await readGoogleApiError(res);
       throw new GoogleSheetsClientError(
         `Google Sheets API respondió con error HTTP ${res.status} al crear los encabezados${details ? `: ${details}` : ''}`,
+        res.status
+      );
+    }
+  }
+
+  async clearValues(spreadsheetId: string, range: string): Promise<void> {
+    const token = await this.tokenProvider();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+      spreadsheetId
+    )}/values/${encodeURIComponent(range)}:clear`;
+
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        body: '{}',
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+    } catch (err) {
+      throw new GoogleSheetsClientError(
+        `Error de red al limpiar columnas obsoletas de Google Sheets: ${err instanceof Error ? err.message : 'timeout'}`
+      );
+    }
+
+    if (!res.ok) {
+      const details = await readGoogleApiError(res);
+      throw new GoogleSheetsClientError(
+        `Google Sheets API respondió con error HTTP ${res.status} al limpiar columnas obsoletas${details ? `: ${details}` : ''}`,
         res.status
       );
     }
