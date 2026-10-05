@@ -54,6 +54,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await page.getByTestId('offer-group-maestria').locator('summary').click();
     const maestriaCard = page.getByTestId('target-card-maestria-genero-c9');
     await maestriaCard.getByRole('button', { name: /Completar preinscripción/i }).click();
+    await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();
 
     await expect(page.getByText('Maestría en Género, Sociedad y Políticas - Cohorte 9')).toBeVisible();
 
@@ -132,13 +133,13 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await expect(page.getByRole('heading', { name: 'Revisión de datos antes de enviar' })).toBeVisible();
     await expect(page.getByText('Laura', { exact: true })).toBeVisible();
     await expect(page.getByText('Gómez', { exact: true })).toBeVisible();
-    await expect(page.getByText('Género y Políticas Públicas')).toBeVisible();
+    await expect(page.getByText('Género y Políticas Públicas').first()).toBeVisible();
 
     await page.getByRole('button', { name: /Confirmar y enviar/i }).click({ noWaitAfter: true });
 
     // Verification screen
     await expect(page.getByText('¡Preinscripción enviada con éxito!')).toBeVisible();
-    await expect(page.getByText(/Código de seguimiento:/i)).toBeVisible();
+    await expect(page.getByText(/Código de seguimiento/i)).toBeVisible();
   });
 
   test('completes wizard for diplomado with only mentions', async ({ page }) => {
@@ -147,6 +148,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await page.getByTestId('offer-group-diplomado').locator('summary').click();
     const diplomadoCard = page.getByTestId('target-card-diplomado-salud-c2');
     await diplomadoCard.getByRole('button', { name: /Completar preinscripción/i }).click();
+    await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();
 
     await expect(page.getByText('Diplomado en Salud Colectiva - Cohorte 2')).toBeVisible();
 
@@ -206,7 +208,8 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
       seminarCard.locator('button.target-card-primary-action').evaluate((button) => (button as HTMLElement).click()),
     ]);
 
-    await expect(page.getByText('Seminario de Investigación Cualitativa - Edición 2026-03')).toBeVisible();
+    await expect(page.getByText('Seminario de Investigación Cualitativa - Edición 2026-03').first()).toBeVisible();
+    await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();
 
     // Seminar progress includes the common document step, without motivation or recommendations.
     await expect(page.getByText('Documentación requerida')).toBeVisible();
@@ -313,7 +316,8 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     });
 
     await page.goto('/seminario/diseno-de-cursos-virtuales/');
-    await expect(page.getByText('Seminario de Investigación Cualitativa - Edición 2026-03')).toBeVisible();
+    await expect(page.getByText('Seminario de Investigación Cualitativa - Edición 2026-03').first()).toBeVisible();
+    await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();
     await expect(page.getByRole('heading', { name: 'Datos personales y demográficos' })).toBeVisible();
 
     // 2. Both editions closed: displays closed notice

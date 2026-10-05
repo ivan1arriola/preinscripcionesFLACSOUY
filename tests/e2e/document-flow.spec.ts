@@ -37,6 +37,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.getByTestId('offer-group-diploma').locator('summary').click();
     const daviaCard = page.getByTestId('target-card-davia-c11');
     await daviaCard.getByRole('button', { name: /Completar preinscripción/i }).click();
+    await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();
 
     await expect(page.getByText(/Diploma Superior en Aprendizaje Visual e Inteligencia Artificial/i)).toBeVisible();
 
@@ -102,6 +103,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.getByTestId('offer-group-maestria').locator('summary').click();
     const maestriaCard = page.getByTestId('target-card-maestria-genero-c9');
     await maestriaCard.getByRole('button', { name: /Completar preinscripción/i }).click();
+    await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();
 
     // Step 1
     await page.locator('#input-nombre1').fill('Laura');
@@ -159,6 +161,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.getByTestId('offer-group-maestria').locator('summary').click();
     const maestriaCard = page.getByTestId('target-card-maestria-genero-c9');
     await maestriaCard.getByRole('button', { name: /Completar preinscripción/i }).click();
+    await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();
 
     // Step 1
     await page.locator('#input-nombre1').fill('Martina');
@@ -219,6 +222,7 @@ test.describe('Document Flow End-to-End', () => {
       page.waitForResponse((response) => response.url().endsWith('/api/targets/seminario-metodologia-ed3') && response.status() === 200),
       seminarCard.locator('button.target-card-primary-action').evaluate((button) => (button as HTMLElement).click()),
     ]);
+    await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();
 
     // Step 1
     await page.locator('#input-nombre1').fill('Mateo');
