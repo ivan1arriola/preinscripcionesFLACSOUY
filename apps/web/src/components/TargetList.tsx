@@ -18,29 +18,29 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
           <div
             key={target.id}
             data-testid={`target-card-${target.id}`}
-            className="target-list-card border rounded-lg p-5 bg-white shadow-sm hover:shadow transition"
+            className="target-list-card"
           >
-            <div className="target-list-card-main flex items-start justify-between">
+            <div className="target-list-card-main">
               <div>
-                <span className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                <span className="target-list-card-kind">
                   {target.kind === 'academic_offer' ? 'Oferta Académica' : 'Seminario'}
                 </span>
-                <h3 className="text-lg font-bold text-gray-900 mt-1">{target.title}</h3>
+                <h3>{target.title}</h3>
               </div>
 
-              <div>
+              <div className="target-list-card-status">
                 {isOperational && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <span className="target-status target-status-open">
                     Abierta
                   </span>
                 )}
                 {isClosed && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  <span className="target-status target-status-closed">
                     Cerrada
                   </span>
                 )}
                 {isIncompatible && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  <span className="target-status target-status-incompatible">
                     Incompatible
                   </span>
                 )}
@@ -48,7 +48,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
             </div>
 
             {isIncompatible && (
-              <div className="mt-3 p-3 bg-red-50 text-red-700 text-xs rounded border border-red-200">
+              <div className="target-list-card-warning">
                 <p className="font-semibold">Destino no operativo debido a incompatibilidad:</p>
                 <ul className="list-disc list-inside mt-1">
                   {target.issues.map((issue, idx) => (
@@ -58,12 +58,12 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
               </div>
             )}
 
-            <div className="target-list-card-actions mt-4 flex items-center justify-between">
+            <div className="target-list-card-actions">
               {isIncompatible ? (
                 <button
                   type="button"
                   disabled
-                  className="px-4 py-2 text-sm rounded bg-gray-200 text-gray-500 cursor-not-allowed"
+                  className="target-card-disabled"
                 >
                   Formulario no disponible
                 </button>
@@ -71,7 +71,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
                 <button
                   type="button"
                   onClick={() => onSelectTarget(target)}
-                  className="target-card-primary-action text-sm rounded bg-blue-600 text-white hover:bg-blue-700 font-medium"
+                  className="target-card-primary-action"
                 >
                   {isOperational ? 'Completar preinscripción' : 'Ver información del destino'}
                 </button>

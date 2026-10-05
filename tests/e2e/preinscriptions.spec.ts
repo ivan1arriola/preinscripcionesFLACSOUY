@@ -4,7 +4,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
   test('lists all catalog targets with their compatibility status', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByText('Preinscripciones FLACSO Uruguay')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Elegí tu próxima propuesta de formación' })).toBeVisible();
 
     // Expand all accordion groups so all cards are visible
     const groups = page.locator('details');

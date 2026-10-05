@@ -105,17 +105,24 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Cargando destinos académicos...</p>
+      <div className="home-state home-state-loading" role="status" aria-live="polite">
+        <span className="home-state-icon" aria-hidden="true" />
+        <div>
+          <strong>Estamos preparando la oferta</strong>
+          <p>Un momento, por favor. Enseguida vas a poder elegir tu propuesta.</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 text-red-700 rounded border border-red-200" role="alert">
-        <p className="font-medium">Error de conexión</p>
-        <p>{error}</p>
+      <div className="home-state home-state-error" role="alert">
+        <span className="home-state-icon" aria-hidden="true">!</span>
+        <div>
+          <strong>No pudimos cargar la oferta</strong>
+          <p>{error}</p>
+        </div>
       </div>
     );
   }
@@ -128,6 +135,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
     !normalizedQuery || target.title.toLocaleLowerCase('es-UY').includes(normalizedQuery);
   const visibleAcademicOffers = academicOffers.filter(matchesQuery);
   const visibleSeminars = seminars.filter(matchesQuery);
+  const availableCount = targets.filter((target) => target.status === 'operational').length;
 
   const selectTab = (tab: 'academic' | 'seminars') => {
     setActiveTab(tab);
@@ -185,12 +193,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
 
   return (
     <div className="home-page">
-      <div className="home-hero mb-6">
-        <span className="home-eyebrow">Formación FLACSO Uruguay</span>
-        <h2 className="text-2xl font-bold text-gray-900">Preinscripciones FLACSO Uruguay</h2>
-        <p className="text-gray-600 mt-1">
-          Seleccione una propuesta académica o seminario para iniciar su preinscripción.
-        </p>
+      <div className="home-hero">
+        <div className="home-hero-copy">
+          <span className="home-eyebrow">Formación FLACSO Uruguay</span>
+          <h2>Elegí tu próxima propuesta de formación</h2>
+          <p>
+            Explorá la oferta académica y los seminarios disponibles. Cuando encuentres una propuesta,
+            podés comenzar tu preinscripción en pocos pasos.
+          </p>
+        </div>
+        <div className="home-hero-summary" aria-label={`${availableCount} ${availableCount === 1 ? 'propuesta disponible' : 'propuestas disponibles'}`}>
+          <span className="home-hero-summary-value">{availableCount}</span>
+          <span className="home-hero-summary-label">{availableCount === 1 ? 'propuesta disponible' : 'propuestas disponibles'}</span>
+        </div>
       </div>
 
       <div className="catalog-controls">
@@ -229,13 +244,15 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
         </label>
       </div>
 
-      <div className="catalog-panel" role="tabpanel">
-        {activeTab === 'academic'
-          ? renderSection('Oferta académica', 'Carreras, maestrías, especializaciones, diplomas y diplomados.', visibleAcademicOffers, 'academic-offers-heading', 'academic')
-          : renderSection('Seminarios', 'Propuestas de formación breve y actualización.', visibleSeminars, 'seminars-heading', 'seminarios')}
-        {(activeTab === 'academic' ? visibleAcademicOffers : visibleSeminars).length === 0 && (
-          <p className="catalog-empty">No encontramos propuestas para esa búsqueda.</p>
-        )}
+      <div className="catalog-panel" role="region" aria-label="Catálogo de propuestas">
+        <div role="tabpanel" aria-label={activeTab === 'academic' ? 'Oferta académica' : 'Seminarios'}>
+          {activeTab === 'academic'
+            ? renderSection('Oferta académica', 'Carreras, maestrías, especializaciones, diplomas y diplomados.', visibleAcademicOffers, 'academic-offers-heading', 'academic')
+            : renderSection('Seminarios', 'Propuestas de formación breve y actualización.', visibleSeminars, 'seminars-heading', 'seminarios')}
+          {(activeTab === 'academic' ? visibleAcademicOffers : visibleSeminars).length === 0 && (
+            <p className="catalog-empty">No encontramos propuestas para esa búsqueda.</p>
+          )}
+        </div>
       </div>
     </div>
   );

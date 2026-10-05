@@ -69,7 +69,7 @@ describe('HomePage Component', () => {
 
     render(<HomePage onSelectTarget={onSelect} />);
 
-    expect(screen.getByText(/Cargando destinos/i)).toBeInTheDocument();
+    expect(screen.getByText('Estamos preparando la oferta')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('DAVIA Cohorte 11')).toBeInTheDocument();
@@ -94,6 +94,17 @@ describe('HomePage Component', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Seminarios/i }));
     expect(screen.getByRole('heading', { name: 'Seminarios' })).toBeInTheDocument();
     expect(screen.getByText('Seminario de Investigación Cualitativa')).toBeInTheDocument();
+  });
+
+  it('presents a clear catalogue introduction and summary after loading', async () => {
+    vi.mocked(apiClient.listTargets).mockResolvedValue([mockTargets[0]!]);
+
+    render(<HomePage onSelectTarget={vi.fn()} />);
+
+    expect(await screen.findByRole('heading', { name: 'Elegí tu próxima propuesta de formación' })).toBeInTheDocument();
+    expect(screen.getByLabelText('1 propuesta disponible')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Catálogo de propuestas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Completar preinscripción' })).toBeInTheDocument();
   });
 
   it('keeps one academic category open at a time', async () => {
