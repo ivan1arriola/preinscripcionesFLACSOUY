@@ -552,6 +552,7 @@ export const apiClient = {
 
 export interface AdminTelegramSettings {
   enabled: boolean;
+  preinscriptionEnabled: boolean;
   hasToken: boolean;
   chatIdsCount: number;
   maskedChatIds: string[];
@@ -563,6 +564,7 @@ export interface AdminTelegramSettings {
 
 export interface UpdateAdminTelegramSettingsInput {
   enabled?: boolean;
+  preinscriptionEnabled?: boolean;
   botToken?: string;
   replaceToken?: boolean;
   chatIds?: string[];

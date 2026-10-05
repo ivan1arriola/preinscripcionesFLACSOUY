@@ -84,6 +84,7 @@ describe('AdminProfilesPage Component', () => {
     vi.mocked(apiClient.getTelegramSettings).mockResolvedValue({
       telegram: {
         enabled: false,
+        preinscriptionEnabled: false,
         hasToken: false,
         chatIdsCount: 0,
         maskedChatIds: [],

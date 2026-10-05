@@ -134,6 +134,7 @@ const DiscardRecoverySchema = z
 const UpdateTelegramSettingsSchema = z
   .object({
     enabled: z.boolean().optional(),
+    preinscriptionEnabled: z.boolean().optional(),
     botToken: z.string().optional(),
     replaceToken: z.boolean().optional(),
     chatIds: z.array(z.string()).optional(),
@@ -200,7 +201,6 @@ export function createAdminSettingsRoutes(
   googleDriveRepository?: GoogleDriveRepositoryPort,
   spreadsheetRepository?: SpreadsheetRepository,
   telegramProviderFactory?: (botToken: string) => TelegramProvider,
-  telegramAlertRepository?: TelegramAlertRepository,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -796,6 +796,7 @@ export function createAdminSettingsRoutes(
         encryptedSettingsService,
         {
           enabled: parsed.data.enabled,
+          preinscriptionEnabled: parsed.data.preinscriptionEnabled,
           botToken: tokenToSave,
           chatIds: parsed.data.chatIds,
         },
@@ -1033,22 +1034,6 @@ export function createAdminSettingsRoutes(
                   try {
                     const cfg = await loadEmailConfig(encryptedSettingsService);
                     return cfg.masterEmails;
-                  } catch {
-                    return [];
-                  }
-                }
-                return [];
-              },
-            }
-          : undefined,
-        telegramDependencies: telegramAlertRepository
-          ? {
-              repository: telegramAlertRepository,
-              getPreinscriptionChatIds: async () => {
-                if (encryptedSettingsService) {
-                  try {
-                    const cfg = await loadTelegramConfig(encryptedSettingsService);
-                    return cfg.preinscriptionEnabled ? cfg.chatIds : [];
                   } catch {
                     return [];
                   }
