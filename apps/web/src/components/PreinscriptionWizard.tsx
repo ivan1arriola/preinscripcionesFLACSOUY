@@ -291,10 +291,13 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   const isFinalStep = currentStepIndex === steps.length - 1;
 
+  if (isSubmitting) {
+    return <PreinscriptionLoadingOverlay />;
+  }
+
   if (!hasStarted) {
     return (
       <div className="preinscription-wizard mx-auto py-4 relative">
-        {isSubmitting && <PreinscriptionLoadingOverlay />}
         <PreinscriptionStartCard
           title={form.title}
           documentSummary={(form.documents ?? []).map((document) => ({
@@ -311,8 +314,6 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   return (
     <div className="preinscription-wizard mx-auto py-4 relative">
-      {isSubmitting && <PreinscriptionLoadingOverlay />}
-
       <WizardProgress
         steps={steps}
         currentStepIndex={currentStepIndex}

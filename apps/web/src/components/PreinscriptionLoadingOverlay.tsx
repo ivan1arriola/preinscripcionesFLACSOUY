@@ -17,26 +17,26 @@ export const PreinscriptionLoadingOverlay: React.FC<PreinscriptionLoadingOverlay
 
   return (
     <div
-      className="preinscription-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4"
-      role="dialog"
-      aria-modal="true"
+      className="preinscription-loading-screen flex min-h-[28rem] w-full items-center justify-center px-4 py-12 sm:min-h-[34rem]"
+      role="status"
       aria-live="polite"
-      aria-labelledby="loading-overlay-title"
-      aria-describedby="loading-overlay-message"
+      aria-labelledby="loading-screen-title"
+      aria-describedby="loading-screen-message"
       tabIndex={-1}
       ref={dialogRef}
     >
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center border border-slate-100 flex flex-col items-center">
+      <div className="w-full max-w-xl rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-lg sm:p-12">
         <div
-          className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"
+          className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600"
           aria-hidden="true"
         />
-        <h3 id="loading-overlay-title" className="text-xl font-bold text-gray-900 mb-2">
+        <h3 id="loading-screen-title" className="text-xl font-bold text-gray-900 mb-3">
           {title}
         </h3>
-        <p id="loading-overlay-message" className="text-sm text-gray-600 leading-relaxed">
+        <p id="loading-screen-message" className="text-sm text-gray-600 leading-relaxed">
           {message}
         </p>
+        <p className="mt-5 text-xs font-medium uppercase tracking-[0.14em] text-blue-700">No cierres esta ventana</p>
       </div>
     </div>
   );

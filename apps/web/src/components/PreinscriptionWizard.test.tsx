@@ -537,9 +537,11 @@ describe('PreinscriptionWizard Component', () => {
     // While submitting, rerender with isSubmitting = true
     rerender(<PreinscriptionWizard form={testForm} onSubmit={handleSubmit} isSubmitting={true} />);
 
-    const dialog = screen.getByRole('dialog');
-    expect(dialog).toBeInTheDocument();
-    expect(dialog).toHaveAttribute('aria-live', 'polite');
+    const loadingScreen = screen.getByRole('status');
+    expect(loadingScreen).toBeInTheDocument();
+    expect(loadingScreen).toHaveAttribute('aria-live', 'polite');
+    expect(screen.queryByRole('heading', { name: /Revisión de datos antes de enviar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Confirmar y enviar preinscripción/i })).not.toBeInTheDocument();
     expect(screen.getByText('Enviando tu preinscripción…')).toBeInTheDocument();
     expect(screen.getByText(/Guardando tus datos y documentación en FLACSO Uruguay/i)).toBeInTheDocument();
 
