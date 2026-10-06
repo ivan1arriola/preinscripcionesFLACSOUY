@@ -5,12 +5,17 @@ import type { WordPressCache } from './wordpress-cache.js';
 
 export interface WordPressAcademicCatalogOptions {
   ttlSeconds?: number;
+  agreementsTtlSeconds?: number;
   cacheKey?: string;
 }
 
+export const DEFAULT_AGREEMENTS_TTL_SECONDS = 30 * 60;
+
 export class WordPressAcademicCatalog implements AcademicCatalog {
   private readonly ttlSeconds: number;
+  private readonly agreementsTtlSeconds: number;
   private readonly cacheKey: string;
+  private agreementsRefresh?: Promise<AgreementOption[]>;
 
   constructor(
     private readonly client: WordPressClient,
@@ -18,6 +23,7 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
     options?: WordPressAcademicCatalogOptions
   ) {
     this.ttlSeconds = options?.ttlSeconds ?? 60;
+    this.agreementsTtlSeconds = options?.agreementsTtlSeconds ?? DEFAULT_AGREEMENTS_TTL_SECONDS;
     this.cacheKey = options?.cacheKey ?? 'wp_targets_v1';
   }
 
@@ -63,13 +69,36 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
   }
 
   async listAgreements(): Promise<AgreementOption[]> {
-    return this.client.getAgreements();
+    const cached = await this.cache.getAgreements();
+    if (cached) return cached;
+
+    const stale = await this.cache.getStaleAgreements();
+    if (stale) {
+      void this.refreshAgreements().catch(() => undefined);
+      return stale;
+    }
+
+    return this.refreshAgreements();
   }
 
   private async refreshTargets(): Promise<AcademicTarget[]> {
     const fresh = await this.client.getPreinscriptions();
     await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
     return fresh.targets.map((t) => this.mapTarget(t));
+  }
+
+  private refreshAgreements(): Promise<AgreementOption[]> {
+    if (!this.agreementsRefresh) {
+      this.agreementsRefresh = this.client.getAgreements()
+        .then(async (agreements) => {
+          await this.cache.setAgreements(agreements, this.agreementsTtlSeconds);
+          return agreements;
+        })
+        .finally(() => {
+          this.agreementsRefresh = undefined;
+        });
+    }
+    return this.agreementsRefresh;
   }
 
   private mapTarget(raw: WordPressTarget): AcademicTarget {

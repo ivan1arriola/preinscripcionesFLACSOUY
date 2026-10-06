@@ -324,6 +324,39 @@ describe('WordPress Client & Contract Adapter', () => {
     expect(targets2[0]!.id).toBe('target_davia_c11');
   });
 
+  it('caches agreements for the configured TTL and uses stale agreements when WordPress fails', async () => {
+    vi.useFakeTimers();
+    let agreementCalls = 0;
+    const agreements = [{ id: '42', label: 'Convenio Universidad de la República' }];
+    const wordpressAgreements = [{ id: 42, title: { rendered: agreements[0]!.label } }];
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/convenio?')) {
+        agreementCalls++;
+        if (agreementCalls > 1) throw new Error('Connection refused');
+        return { ok: true, status: 200, json: async () => wordpressAgreements };
+      }
+      return { ok: true, status: 200, json: async () => simplifiedV1Response };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const cache = new MemoryWordPressCache();
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+    const catalog = new WordPressAcademicCatalog(client, cache, { agreementsTtlSeconds: 60 });
+
+    try {
+      await expect(catalog.listAgreements()).resolves.toEqual(agreements);
+      await expect(catalog.listAgreements()).resolves.toEqual(agreements);
+      expect(agreementCalls).toBe(1);
+
+      vi.advanceTimersByTime(61_000);
+      await expect(catalog.listAgreements()).resolves.toEqual(agreements);
+      await Promise.resolve();
+      expect(agreementCalls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('serves stale targets immediately while refreshing an unavailable upstream in the background', async () => {
     let callCount = 0;
     let resolveRefresh!: (response: Response) => void;
