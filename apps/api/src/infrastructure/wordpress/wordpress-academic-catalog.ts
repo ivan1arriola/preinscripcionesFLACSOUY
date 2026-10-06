@@ -10,12 +10,14 @@ export interface WordPressAcademicCatalogOptions {
 }
 
 export const DEFAULT_AGREEMENTS_TTL_SECONDS = 30 * 60;
+const AGREEMENTS_FAILURE_RETRY_BACKOFF_MS = 60 * 1000;
 
 export class WordPressAcademicCatalog implements AcademicCatalog {
   private readonly ttlSeconds: number;
   private readonly agreementsTtlSeconds: number;
   private readonly cacheKey: string;
   private agreementsRefresh?: Promise<AgreementOption[]>;
+  private agreementsRetryAt = 0;
 
   constructor(
     private readonly client: WordPressClient,
@@ -74,11 +76,19 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
 
     const stale = await this.cache.getStaleAgreements();
     if (stale) {
-      void this.refreshAgreements().catch(() => undefined);
+      if (Date.now() >= this.agreementsRetryAt) {
+        void this.refreshAgreements().catch(() => undefined);
+      }
       return stale;
     }
 
-    return this.refreshAgreements();
+    if (Date.now() < this.agreementsRetryAt) return [];
+
+    try {
+      return await this.refreshAgreements();
+    } catch {
+      return [];
+    }
   }
 
   private async refreshTargets(): Promise<AcademicTarget[]> {
@@ -92,7 +102,12 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
       this.agreementsRefresh = this.client.getAgreements()
         .then(async (agreements) => {
           await this.cache.setAgreements(agreements, this.agreementsTtlSeconds);
+          this.agreementsRetryAt = 0;
           return agreements;
+        })
+        .catch((error) => {
+          this.agreementsRetryAt = Date.now() + AGREEMENTS_FAILURE_RETRY_BACKOFF_MS;
+          throw error;
         })
         .finally(() => {
           this.agreementsRefresh = undefined;

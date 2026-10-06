@@ -357,6 +357,19 @@ describe('WordPress Client & Contract Adapter', () => {
     }
   });
 
+  it('returns an empty agreement list with a short retry backoff when the cache is cold and WordPress fails', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('Connection refused'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const cache = new MemoryWordPressCache();
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+    const catalog = new WordPressAcademicCatalog(client, cache);
+
+    await expect(catalog.listAgreements()).resolves.toEqual([]);
+    await expect(catalog.listAgreements()).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('serves stale targets immediately while refreshing an unavailable upstream in the background', async () => {
     let callCount = 0;
     let resolveRefresh!: (response: Response) => void;
