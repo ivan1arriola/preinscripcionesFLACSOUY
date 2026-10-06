@@ -30,7 +30,16 @@ export async function getTargetForm(
   }
 
   if (target.kind === 'seminar') {
-    const allTargets = await catalog.revalidateTargets();
+    let allTargets;
+    try {
+      allTargets = await catalog.revalidateTargets();
+    } catch (error) {
+      console.warn(
+        '[Catalog] Revalidación de seminario no disponible; usando catálogo cacheado:',
+        error instanceof Error ? error.message : error,
+      );
+      allTargets = await catalog.listTargets();
+    }
     const resolutions = resolveSeminarPermalinks(allTargets);
     const rawUrl = target.urls?.legacyRegistration;
     const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;

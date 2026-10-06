@@ -86,6 +86,22 @@ describe('getTargetForm Use Case', () => {
     }
   });
 
+  it('uses cached targets when WordPress revalidation times out', async () => {
+    const targets = [
+      baseSeminar('sem-1', 1, false, 'closed'),
+      baseSeminar('sem-2', 2, true, 'open'),
+    ];
+    const catalog = createMockCatalog(targets);
+    catalog.revalidateTargets = async () => {
+      throw new Error('WordPress timeout');
+    };
+
+    const result = await getTargetForm(catalog, 'sem-2');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.form.targetId).toBe('sem-2');
+  });
+
   it('composes canonical form for maestria with 2 recommendation letters and 6 total documents', async () => {
     const maestriaOffer: AcademicTarget = {
       id: 'maestria-test',
