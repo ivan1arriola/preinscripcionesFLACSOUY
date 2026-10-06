@@ -481,8 +481,8 @@ describe('PreinscriptionWizard Component', () => {
     expect(submitBtn).not.toBeDisabled();
 
     rerender(<PreinscriptionWizard form={singleStepForm} onSubmit={vi.fn()} isSubmitting={true} />);
-    const disabledBtn = screen.getByRole('button', { name: /Revisar datos/i });
-    expect(disabledBtn).toBeDisabled();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Revisar datos/i })).not.toBeInTheDocument();
   });
 
   it('navigates to data review screen, shows summary with sections and handles loading overlay during submission', async () => {
