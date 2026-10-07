@@ -11,6 +11,7 @@
     "build": "pnpm -r run build",
     "compose:up": "docker compose up",
     "db:migrate": "pnpm --filter api db:migrate",
+    "migrate:spreadsheets": "pnpm --filter api migrate:spreadsheets",
     "e2e": "playwright test"
   },
   "devDependencies": {
