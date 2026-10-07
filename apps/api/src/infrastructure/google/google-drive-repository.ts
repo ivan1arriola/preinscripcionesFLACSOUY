@@ -13,6 +13,7 @@ import type {
 import {
   buildDriveFolderNames,
   buildSemanticDriveFileName,
+  buildSubmissionFolderName,
   driveTargetDescriptor,
 } from '../../domain/google-drive-naming.js';
 
@@ -88,7 +89,16 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
         uploadFolderId = await this.ensureChildFolder(uploadFolderId, name, token);
       }
       const preinscripcionesId = await this.ensureChildFolder(uploadFolderId, 'Preinscripciones', token);
-      uploadFolderId = await this.ensureChildFolder(preinscripcionesId, 'Documentación', token);
+      const documentacionId = await this.ensureChildFolder(preinscripcionesId, 'Documentación', token);
+      if (command.values) {
+        const submissionFolderName = buildSubmissionFolderName({
+          submissionId: command.submissionId,
+          values: command.values,
+        });
+        uploadFolderId = await this.ensureChildFolder(documentacionId, submissionFolderName, token);
+      } else {
+        uploadFolderId = documentacionId;
+      }
     }
     const result: StoredDriveFile[] = [];
     const ordinals = new Map<string, number>();

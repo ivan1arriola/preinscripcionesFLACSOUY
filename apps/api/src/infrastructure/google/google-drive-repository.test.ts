@@ -73,7 +73,7 @@ describe('GoogleDriveRepository', () => {
       },
     });
 
-    await repository.storeSubmissionFiles({
+    const result = await repository.storeSubmissionFiles({
       submissionId: 'sub-1',
       target: {
         targetId: 'offer-1', kind: 'academic_offer', offerName: 'Maestría en Educación', cohortName: 'Cohorte VII',
@@ -85,7 +85,7 @@ describe('GoogleDriveRepository', () => {
     const folderCreationRequests = requests.filter(
       (r) => r.method === 'POST' && r.url.includes('/drive/v3/files?fields=')
     );
-    expect(folderCreationRequests.length).toBe(5);
+    expect(folderCreationRequests.length).toBe(6);
 
     // Verify folder 4 (Preinscripciones) has parent folder-3 (Cohorte VII)
     const preinscripcionesBody = JSON.parse(await folderCreationRequests[3]!.clone().text());
@@ -97,9 +97,18 @@ describe('GoogleDriveRepository', () => {
     expect(documentacionBody.name).toBe('Documentación');
     expect(documentacionBody.parents).toEqual(['folder-4']);
 
+    // Verify folder 6 (Applicant folder) has parent folder-5 (Documentación)
+    const applicantFolderBody = JSON.parse(await folderCreationRequests[5]!.clone().text());
+    expect(applicantFolderBody.name).toBe('apellidos-perez__nombres-ana__sub-1');
+    expect(applicantFolderBody.parents).toEqual(['folder-5']);
+
+    expect(result.documentsFolderId).toBe('folder-6');
+    expect(result.documentsFolderUrl).toBe('https://drive.google.com/drive/folders/folder-6');
+
     const uploadRequest = requests.find((request) => request.url.includes('/upload/drive/v3/files'));
     expect(uploadRequest).toBeDefined();
     const uploadBody = await uploadRequest?.text();
+    expect(uploadBody).toContain('"parents":["folder-6"]');
     expect(uploadBody).toContain('apellidos-perez__nombres-ana__cv__sub-1.pdf');
     expect(uploadBody).toContain('flacsoTargetId');
     expect(uploadBody).toContain('flacsoFieldKey');

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDriveFolderNames,
   buildSemanticDriveFileName,
+  buildSubmissionFolderName,
   sanitizeDriveSegment,
   type DriveTargetDescriptor,
 } from './google-drive-naming.js';
@@ -53,5 +54,25 @@ describe('Google Drive hierarchy and semantic names', () => {
 
   it('sanitizes segments deterministically', () => {
     expect(sanitizeDriveSegment('  Educación / Género  ')).toBe('educacion-genero');
+  });
+
+  it('builds submission folder name with surnames, names, and sanitized submission id', () => {
+    expect(buildSubmissionFolderName({
+      submissionId: 'sub_37ac069da3a94b5683948ebd404070bf',
+      values: {
+        apellido1: 'Rodríguez',
+        apellido2: 'Pérez',
+        nombre1: 'María',
+        nombre2: 'José',
+      },
+    })).toBe('apellidos-rodriguez-perez__nombres-maria-jose__sub-37ac069da3a94b5683948ebd404070bf');
+
+    expect(buildSubmissionFolderName({
+      submissionId: 'sub_123',
+      values: {
+        apellido1: 'Gómez',
+        nombre1: 'Juan',
+      },
+    })).toBe('apellidos-gomez__nombres-juan__sub-123');
   });
 });

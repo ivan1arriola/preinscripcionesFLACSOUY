@@ -81,6 +81,22 @@ export function buildSemanticDriveFileName(input: {
   return `apellidos-${surname}__nombres-${givenName}__${documentLabel}__${sanitizeDriveSegment(input.submissionId)}${ordinalSuffix}.${extension}`;
 }
 
+export function buildSubmissionFolderName(input: {
+  submissionId: string;
+  values: Record<string, string>;
+}): string {
+  const surname = [input.values.apellido1, input.values.apellido2]
+    .map((value) => sanitizeDriveSegment(value ?? ''))
+    .filter(Boolean)
+    .join('-') || 'postulante';
+  const givenName = [input.values.nombre1, input.values.nombre2]
+    .map((value) => sanitizeDriveSegment(value ?? ''))
+    .filter(Boolean)
+    .join('-') || 'sin-nombre';
+
+  return `apellidos-${surname}__nombres-${givenName}__${sanitizeDriveSegment(input.submissionId)}`;
+}
+
 export function driveTargetDescriptor(target: AcademicTarget): DriveTargetDescriptor {
   const cohort = (target as AcademicTarget & { cohort?: { number?: number | string; name?: string } }).cohort;
   const edition = (target as AcademicTarget & { edition?: { number?: number | string; name?: string } }).edition;
