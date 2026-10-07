@@ -67,26 +67,62 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     this.timeoutMs = options.timeoutMs ?? 10000;
   }
 
+  private async executeFetch(
+    url: string,
+    init: RequestInit,
+    errorContext: string,
+    maxRetries = 3
+  ): Promise<Response> {
+    let attempt = 0;
+    while (true) {
+      attempt++;
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          ...init,
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+      } catch (err) {
+        if (attempt <= maxRetries) {
+          const backoffMs = Math.min(10000, 1000 * Math.pow(2, attempt - 1));
+          await new Promise((r) => setTimeout(r, backoffMs));
+          continue;
+        }
+        throw new GoogleSheetsClientError(
+          `Error de red ${errorContext}: ${err instanceof Error ? err.message : 'timeout'}`
+        );
+      }
+
+      if ((res.status === 429 || res.status === 503) && attempt <= maxRetries) {
+        const retryAfterHeader = res.headers.get('retry-after');
+        const parsedRetryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) * 1000 : null;
+        const backoffMs = parsedRetryAfter !== null && !isNaN(parsedRetryAfter) && parsedRetryAfter >= 0
+          ? Math.max(100, parsedRetryAfter)
+          : Math.min(30000, 2000 * Math.pow(2, attempt - 1));
+        await new Promise((r) => setTimeout(r, backoffMs));
+        continue;
+      }
+
+      return res;
+    }
+  }
+
   async getValues(spreadsheetId: string, range: string): Promise<string[][]> {
     const token = await this.tokenProvider();
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
       spreadsheetId
     )}/values/${encodeURIComponent(range)}`;
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
+    const res = await this.executeFetch(
+      url,
+      {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-    } catch (err) {
-      throw new GoogleSheetsClientError(
-        `Error de red al consultar Google Sheets: ${err instanceof Error ? err.message : 'timeout'}`
-      );
-    }
+      },
+      'al consultar Google Sheets'
+    );
 
     if (!res.ok) {
       const details = await readGoogleApiError(res);
@@ -110,9 +146,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
       spreadsheetId
     )}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`;
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
+    const res = await this.executeFetch(
+      url,
+      {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -120,13 +156,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
           Accept: 'application/json',
         },
         body: JSON.stringify({ values }),
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-    } catch (err) {
-      throw new GoogleSheetsClientError(
-        `Error de red al insertar fila en Google Sheets: ${err instanceof Error ? err.message : 'timeout'}`
-      );
-    }
+      },
+      'al insertar fila en Google Sheets'
+    );
 
     if (!res.ok) {
       const details = await readGoogleApiError(res);
@@ -155,9 +187,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     const token = await this.tokenProvider();
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`;
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
+    const res = await this.executeFetch(
+      url,
+      {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -177,13 +209,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
             },
           }],
         }),
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-    } catch (err) {
-      throw new GoogleSheetsClientError(
-        `Error de red al insertar una fila en Google Sheets: ${err instanceof Error ? err.message : 'timeout'}`
-      );
-    }
+      },
+      'al insertar una fila en Google Sheets'
+    );
 
     if (!res.ok) {
       const details = await readGoogleApiError(res);
@@ -205,9 +233,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
       spreadsheetId
     )}/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`;
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
+    const res = await this.executeFetch(
+      url,
+      {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -215,13 +243,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
           Accept: 'application/json',
         },
         body: JSON.stringify({ range, majorDimension: 'ROWS', values }),
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-    } catch (err) {
-      throw new GoogleSheetsClientError(
-        `Error de red al crear los encabezados de Google Sheets: ${err instanceof Error ? err.message : 'timeout'}`
-      );
-    }
+      },
+      'al crear los encabezados de Google Sheets'
+    );
 
     if (!res.ok) {
       const details = await readGoogleApiError(res);
@@ -238,22 +262,18 @@ export class HttpGoogleSheetsClient implements SheetsClient {
       spreadsheetId
     )}/values/${encodeURIComponent(range)}:clear`;
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
+    const res = await this.executeFetch(
+      url,
+      {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
         body: '{}',
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-    } catch (err) {
-      throw new GoogleSheetsClientError(
-        `Error de red al limpiar columnas obsoletas de Google Sheets: ${err instanceof Error ? err.message : 'timeout'}`
-      );
-    }
+      },
+      'al limpiar columnas obsoletas de Google Sheets'
+    );
 
     if (!res.ok) {
       const details = await readGoogleApiError(res);
@@ -270,20 +290,16 @@ export class HttpGoogleSheetsClient implements SheetsClient {
       spreadsheetId
     )}?fields=sheets.properties`;
 
-    let res: Response;
-    try {
-      res = await fetch(url, {
+    const res = await this.executeFetch(
+      url,
+      {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
-        signal: AbortSignal.timeout(this.timeoutMs),
-      });
-    } catch (err) {
-      throw new GoogleSheetsClientError(
-        `Error de red al consultar metadata de Google Sheets: ${err instanceof Error ? err.message : 'timeout'}`
-      );
-    }
+      },
+      'al consultar metadata de Google Sheets'
+    );
 
     if (!res.ok) {
       const details = await readGoogleApiError(res);

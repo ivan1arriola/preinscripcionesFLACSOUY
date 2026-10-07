@@ -314,4 +314,81 @@ describe('migrateTargetSpreadsheets', () => {
     expect(mockSheetsClient.updateValues).not.toHaveBeenCalled();
     expect(mockSheetsClient.clearValues).not.toHaveBeenCalled();
   });
+
+  it('resolves actual sheet title via getSheetMetadata when configured sheetName differs from real tab name', async () => {
+    const config = {
+      targetId: 'diplomado-salud-c2',
+      spreadsheetId: 'sheet-mismatch',
+      sheetName: 'Inscripciones', // Config has Inscripciones
+    };
+
+    const targetRepo: TargetSpreadsheetRepository = {
+      ensureTarget: vi.fn(),
+      get: vi.fn(async () => ({ ...config })),
+      list: vi.fn(async () => [{ ...config }]),
+      save: vi.fn(async () => {}),
+    };
+
+    const catalog: AcademicCatalog = {
+      listTargets: vi.fn(async () => [sampleTarget]),
+      getTarget: vi.fn(async () => sampleTarget),
+      revalidateTarget: vi.fn(async () => sampleTarget),
+      revalidateTargets: vi.fn(async () => [sampleTarget]),
+      listAgreements: vi.fn(async () => []),
+    };
+
+    let requestedGetRange: string | undefined;
+    let requestedUpdateRange: string | undefined;
+
+    const mockSheetsClient: SheetsClient = {
+      getSheetMetadata: vi.fn(async () => ({
+        sheetId: 0,
+        title: 'Hoja 1', // Real tab is Hoja 1
+        index: 0,
+      })),
+      getValues: vi.fn(async (_id, range) => {
+        requestedGetRange = range;
+        return [['ID de seguimiento'], ['sub-1']];
+      }),
+      updateValues: vi.fn(async (_id, range) => {
+        requestedUpdateRange = range;
+      }),
+      clearValues: vi.fn(),
+      insertRows: vi.fn(),
+      appendValues: vi.fn(),
+    };
+
+    const progressCalls: any[] = [];
+
+    const result = await migrateTargetSpreadsheets(
+      {
+        targetSpreadsheetRepository: targetRepo,
+        catalog,
+        sheetsClient: mockSheetsClient,
+        getSubmissionsForTarget: vi.fn(async () => []),
+      },
+      {
+        dryRun: false,
+        throttleMs: 0,
+        onProgress: (p) => progressCalls.push(p),
+      }
+    );
+
+    expect(result.results[0]!.status).toBe('migrated');
+    expect(result.results[0]!.sheetName).toBe('Hoja 1');
+    expect(requestedGetRange).toBe("'Hoja 1'!A1:ZZ");
+    expect(requestedUpdateRange).toBe("'Hoja 1'!A1");
+
+    // Must have saved the reconciled sheetName to targetSpreadsheetRepository
+    expect(targetRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetId: 'diplomado-salud-c2',
+        sheetName: 'Hoja 1',
+      })
+    );
+
+    // Check onProgress callback was invoked
+    expect(progressCalls.length).toBe(1);
+    expect(progressCalls[0].result.sheetName).toBe('Hoja 1');
+  });
 });

@@ -50,6 +50,13 @@ export interface MigrationSummary {
 export interface MigrateOptions {
   dryRun?: boolean;
   targetId?: string;
+  throttleMs?: number;
+  onProgress?: (progress: {
+    current: number;
+    total: number;
+    targetId: string;
+    result: TargetMigrationResult;
+  }) => void;
 }
 
 function toSheetRange(sheetName: string): string {
@@ -63,6 +70,7 @@ export async function migrateTargetSpreadsheets(
   options: MigrateOptions = {}
 ): Promise<MigrationSummary> {
   const dryRun = options.dryRun ?? false;
+  const throttleMs = options.throttleMs ?? 1500;
   const configurations = await dependencies.targetSpreadsheetRepository.list();
 
   const targetsToMigrate = options.targetId
@@ -75,7 +83,13 @@ export async function migrateTargetSpreadsheets(
 
   const results: TargetMigrationResult[] = [];
 
-  for (const config of targetsToMigrate) {
+  for (let i = 0; i < targetsToMigrate.length; i++) {
+    const config = targetsToMigrate[i]!;
+
+    if (i > 0 && throttleMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, throttleMs));
+    }
+
     try {
       const result = await migrateSingleSpreadsheet(
         config.targetId,
@@ -86,8 +100,14 @@ export async function migrateTargetSpreadsheets(
         dryRun
       );
       results.push(result);
+      options.onProgress?.({
+        current: i + 1,
+        total: targetsToMigrate.length,
+        targetId: config.targetId,
+        result,
+      });
     } catch (err) {
-      results.push({
+      const result: TargetMigrationResult = {
         targetId: config.targetId,
         spreadsheetId: config.spreadsheetId,
         sheetName: config.sheetName || 'Preinscripciones',
@@ -97,6 +117,13 @@ export async function migrateTargetSpreadsheets(
         dryRun,
         status: 'failed',
         error: err instanceof Error ? err.message : String(err),
+      };
+      results.push(result);
+      options.onProgress?.({
+        current: i + 1,
+        total: targetsToMigrate.length,
+        targetId: config.targetId,
+        result,
       });
     }
   }
@@ -133,11 +160,23 @@ async function migrateSingleSpreadsheet(
     };
   }
 
+  let actualSheetName = sheetName;
+  if (dependencies.sheetsClient.getSheetMetadata) {
+    try {
+      const meta = await dependencies.sheetsClient.getSheetMetadata(spreadsheetId, sheetName);
+      if (meta?.title?.trim()) {
+        actualSheetName = meta.title.trim();
+      }
+    } catch {
+      // Fallback to configured sheetName if query fails
+    }
+  }
+
   const composition = getCanonicalFormDefinition(target, agreements);
   const form: FormDefinition = composition.ok ? composition.value : (target as any);
   const { headers: targetHeaders } = buildSpreadsheetSchema(form);
 
-  const sheetRange = toSheetRange(sheetName);
+  const sheetRange = toSheetRange(actualSheetName);
 
   const existingSheetData = await dependencies.sheetsClient.getValues(
     spreadsheetId,
@@ -212,12 +251,27 @@ async function migrateSingleSpreadsheet(
       newSpreadsheetData,
       'USER_ENTERED'
     );
+
+    if (actualSheetName !== sheetName) {
+      try {
+        const currentConfig = await dependencies.targetSpreadsheetRepository.get(targetId);
+        if (currentConfig) {
+          await dependencies.targetSpreadsheetRepository.save({
+            ...currentConfig,
+            sheetName: actualSheetName,
+            updatedAt: new Date(),
+          });
+        }
+      } catch {
+        // Non-fatal if updating target repository fails
+      }
+    }
   }
 
   return {
     targetId,
     spreadsheetId,
-    sheetName,
+    sheetName: actualSheetName,
     totalRows: oldDataRows.length,
     matchedDbSubmissions,
     manualRowsPreserved,

@@ -38,4 +38,27 @@ describe('HttpGoogleSheetsClient', () => {
       }),
     );
   });
+
+  it('retries on HTTP 429 and succeeds on subsequent attempt', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { message: 'Rate limit exceeded' } }), {
+          status: 429,
+          headers: { 'retry-after': '0' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ values: [['Col1', 'Col2']] }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new HttpGoogleSheetsClient({ accessTokenOrProvider: 'token' });
+    const rows = await client.getValues('sheet-1', 'Sheet1!A1:B1');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(rows).toEqual([['Col1', 'Col2']]);
+  });
 });

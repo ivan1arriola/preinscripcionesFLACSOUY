@@ -16,6 +16,8 @@ export async function runSpreadsheetMigrationCli(argv: string[] = process.argv.s
   const isDryRun = args.includes('--dry-run') || args.includes('-d');
   const targetArg = args.find((a) => a.startsWith('--target='));
   const targetId = targetArg ? targetArg.split('=')[1]?.trim() : undefined;
+  const throttleArg = args.find((a) => a.startsWith('--throttle=') || a.startsWith('--delay='));
+  const throttleMs = throttleArg ? parseInt(throttleArg.split('=')[1] ?? '1500', 10) : 1500;
 
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
@@ -25,6 +27,7 @@ Uso: pnpm run migrate:spreadsheets [opciones]
 Opciones:
   --dry-run, -d        Ejecuta la migración en modo simulación sin modificar Google Sheets.
   --target=<targetId>  Migra únicamente la planilla del destino académico indicado.
+  --throttle=<ms>      Pausa en milisegundos entre planillas (por defecto: 1500ms).
   --help, -h           Muestra esta ayuda.
 `);
     return;
@@ -34,6 +37,7 @@ Opciones:
   console.log(` FLACSO Uruguay - Migración de Planillas de Preinscripciones`);
   console.log(` Modo: ${isDryRun ? '🔍 SIMULACIÓN (--dry-run)' : '🚀 EN VIVO (aplicando cambios)'}`);
   if (targetId) console.log(` Destino específico: ${targetId}`);
+  console.log(` Intervalo de cuota: ${throttleMs}ms`);
   console.log('='.repeat(70));
 
   const db = createKyselyDb();
@@ -101,6 +105,7 @@ Opciones:
   };
 
   try {
+    console.log('Procesando planillas...\n');
     const summary = await migrateTargetSpreadsheets(
       {
         targetSpreadsheetRepository,
@@ -111,6 +116,16 @@ Opciones:
       {
         dryRun: isDryRun,
         targetId,
+        throttleMs,
+        onProgress: ({ current, total, result }) => {
+          const icon = result.status === 'migrated' ? '✅' : result.status === 'skipped' ? '⚠️' : '❌';
+          console.log(
+            `[${current}/${total}] ${icon} [${result.targetId}] ${result.spreadsheetId} (${result.sheetName}) - ${result.totalRows} filas (${result.matchedDbSubmissions} DB, ${result.manualRowsPreserved} manuales)`
+          );
+          if (result.error) {
+            console.log(`       Detalle: ${result.error}`);
+          }
+        },
       }
     );
 
