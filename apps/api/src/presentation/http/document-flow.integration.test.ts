@@ -185,7 +185,7 @@ describe('Document Flow Integration', () => {
     expect(appendedSpreadsheetRows.length).toBe(1);
     const row = appendedSpreadsheetRows[0]!;
     expect(row['Denominación del título']).toBe('Licenciada en Educación');
-    expect(row['No posee actualmente título']).toBe('No');
+    expect(row['No posee actualmente título']).toBeUndefined();
     expect(row['Primer nombre']).toBe('Ana');
     expect(row['Primer apellido']).toBe('Pérez');
   });
@@ -265,7 +265,7 @@ describe('Document Flow Integration', () => {
     expect(appendedSpreadsheetRows.length).toBe(1);
     const row = appendedSpreadsheetRows[0]!;
     expect(row['Denominación del título']).toBe('Licenciatura en Sociología');
-    expect(row['No posee actualmente título']).toBe('No');
+    expect(row['No posee actualmente título']).toBeUndefined();
     expect(row['Carta de recomendación 1 pendiente']).toBeUndefined();
     expect(row['Carta de recomendación 2 pendiente']).toBeUndefined();
   });
@@ -336,7 +336,7 @@ describe('Document Flow Integration', () => {
     expect(appendedSpreadsheetRows.length).toBe(1);
     const row = appendedSpreadsheetRows[0]!;
     expect(row['Denominación del título']).toBe('Licenciatura en Psicología');
-    expect(row['No posee actualmente título']).toBe('No');
+    expect(row['No posee actualmente título']).toBeUndefined();
     expect(row['Carta de recomendación 1 pendiente']).toBeUndefined();
     expect(row['Carta de recomendación 2 pendiente']).toBeUndefined();
   });
@@ -401,8 +401,8 @@ describe('Document Flow Integration', () => {
     // Verify Sheets row
     expect(appendedSpreadsheetRows.length).toBe(1);
     const row = appendedSpreadsheetRows[0]!;
-    expect(row['Denominación del título']).toBe('');
-    expect(row['No posee actualmente título']).toBe('Si');
+    expect(row['Denominación del título']).toBe('No posee actualmente título');
+    expect(row['No posee actualmente título']).toBeUndefined();
     expect(row['Carta de recomendación 1 pendiente']).toBeUndefined();
     expect(row['Carta de recomendación 2 pendiente']).toBeUndefined();
   });

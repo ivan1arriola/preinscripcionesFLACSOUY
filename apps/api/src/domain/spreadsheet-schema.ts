@@ -1,15 +1,44 @@
 import type { AgreementOption, FormDefinition } from '@flacso/contracts';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 export const SPREADSHEET_TRACKING_COLUMN = 'ID de seguimiento';
 export const SPREADSHEET_DATE_COLUMN = 'Fecha de preinscripción';
 export const SPREADSHEET_POSTGRADUATE_COLUMN = 'Posgrado en FLACSO';
 export const SPREADSHEET_AGREEMENT_COLUMN = 'Convenio';
+export const SPREADSHEET_PHONE_COUNTRY_COLUMN = 'País del celular';
+export const SPREADSHEET_DOCUMENTS_FOLDER_COLUMN = 'Carpeta de documentos';
 
-const COLLAPSED_INPUT_KEYS = new Set(['posgradoCual', 'convenioWordpressId']);
+const COLLAPSED_INPUT_KEYS = new Set(['posgradoCual', 'convenioWordpressId', 'generoOtra', 'sinTituloActual']);
 
 export interface SpreadsheetSchema {
   headers: string[];
   requiredColumns: string[];
+}
+
+export interface SpreadsheetDriveFileRef {
+  fieldKey?: string;
+  token?: string;
+  driveFileId?: string;
+}
+
+export interface SpreadsheetDriveContext {
+  documentsFolderUrl?: string;
+  files?: SpreadsheetDriveFileRef[];
+}
+
+export function extractPhoneCountryCode(celular: string): string {
+  const trimmed = celular?.trim();
+  if (!trimmed) return '';
+  const parsed = parsePhoneNumberFromString(trimmed, 'UY');
+  return parsed?.country ?? '';
+}
+
+export function formatDriveFolderHyperlink(folderUrl: string, label = 'Abrir carpeta'): string {
+  return `=HYPERLINK("${folderUrl}", "${label}")`;
+}
+
+export function formatDriveFileHyperlink(fileId: string, label = 'Ver archivo'): string {
+  return `=HYPERLINK("https://drive.google.com/file/d/${fileId}/view", "${label}")`;
 }
 
 export function buildSpreadsheetSchema(form: FormDefinition): SpreadsheetSchema {
@@ -21,6 +50,26 @@ export function buildSpreadsheetSchema(form: FormDefinition): SpreadsheetSchema 
     const column = spreadsheetColumnForInput(input.key, input.spreadsheetColumn ?? input.label);
     if (!headers.includes(column)) headers.push(column);
     if (input.required && !requiredColumns.includes(column)) requiredColumns.push(column);
+
+    if (input.key === 'celular') {
+      if (!headers.includes(SPREADSHEET_PHONE_COUNTRY_COLUMN)) {
+        headers.push(SPREADSHEET_PHONE_COUNTRY_COLUMN);
+      }
+      if (input.required && !requiredColumns.includes(SPREADSHEET_PHONE_COUNTRY_COLUMN)) {
+        requiredColumns.push(SPREADSHEET_PHONE_COUNTRY_COLUMN);
+      }
+    }
+  }
+
+  if ((form.documents ?? []).length > 0) {
+    if (!headers.includes(SPREADSHEET_DOCUMENTS_FOLDER_COLUMN)) {
+      headers.push(SPREADSHEET_DOCUMENTS_FOLDER_COLUMN);
+    }
+    for (const doc of form.documents ?? []) {
+      const docColumn = doc.label;
+      if (!headers.includes(docColumn)) headers.push(docColumn);
+      if (doc.required && !requiredColumns.includes(docColumn)) requiredColumns.push(docColumn);
+    }
   }
 
   return { headers, requiredColumns };
@@ -31,6 +80,7 @@ export function buildSpreadsheetValues(
   normalizedValues: Record<string, string>,
   submissionId: string,
   submittedAt: Date = new Date(),
+  driveContext?: SpreadsheetDriveContext,
 ): Record<string, string> {
   const values: Record<string, string> = {
     [SPREADSHEET_TRACKING_COLUMN]: submissionId,
@@ -52,7 +102,63 @@ export function buildSpreadsheetValues(
         : 'No';
       continue;
     }
+    if (input.key === 'genero') {
+      const isOtra = normalizedValues.genero === 'Otra';
+      values[column] = isOtra && normalizedValues.generoOtra?.trim()
+        ? normalizedValues.generoOtra.trim()
+        : (normalizedValues.genero ?? '');
+      continue;
+    }
+    if (input.key === 'tituloDenominacion') {
+      const sinTitulo = normalizedValues.sinTituloActual === 'Si' || normalizedValues.sinTituloActual === 'true';
+      values[column] = sinTitulo
+        ? 'No posee actualmente título'
+        : (normalizedValues.tituloDenominacion ?? '');
+      continue;
+    }
+    if (input.key === 'celular') {
+      values[column] = normalizedValues.celular ?? '';
+      values[SPREADSHEET_PHONE_COUNTRY_COLUMN] = extractPhoneCountryCode(normalizedValues.celular ?? '');
+      continue;
+    }
     values[column] = normalizedValues[input.key] ?? '';
+  }
+
+  if (!values[SPREADSHEET_PHONE_COUNTRY_COLUMN] && normalizedValues.celular) {
+    values[SPREADSHEET_PHONE_COUNTRY_COLUMN] = extractPhoneCountryCode(normalizedValues.celular);
+  }
+
+  if (driveContext?.documentsFolderUrl) {
+    values[SPREADSHEET_DOCUMENTS_FOLDER_COLUMN] = formatDriveFolderHyperlink(
+      driveContext.documentsFolderUrl,
+      'Abrir carpeta'
+    );
+  } else {
+    values[SPREADSHEET_DOCUMENTS_FOLDER_COLUMN] = '';
+  }
+
+  const files = driveContext?.files ?? [];
+  const sinTitulo = normalizedValues.sinTituloActual === 'Si' || normalizedValues.sinTituloActual === 'true';
+
+  for (const doc of form.documents ?? []) {
+    const docFiles = files.filter((f) => f.fieldKey === doc.key && Boolean(f.driveFileId));
+
+    if (doc.key === 'titulo' && docFiles.length === 0 && sinTitulo) {
+      values[doc.label] = 'No posee actualmente título';
+      continue;
+    }
+
+    if (docFiles.length === 1 && docFiles[0].driveFileId) {
+      values[doc.label] = formatDriveFileHyperlink(docFiles[0].driveFileId, 'Ver archivo');
+    } else if (docFiles.length > 1) {
+      if (driveContext?.documentsFolderUrl) {
+        values[doc.label] = formatDriveFolderHyperlink(driveContext.documentsFolderUrl, 'Ver en carpeta');
+      } else {
+        values[doc.label] = `${docFiles.length} archivos`;
+      }
+    } else {
+      values[doc.label] = '';
+    }
   }
 
   return values;
@@ -75,6 +181,29 @@ export function collapseLegacySpreadsheetRow(
       return legacy.get('¿Te corresponde algún convenio?') === 'Si'
         ? agreementLabel(legacy.get('Convenio'), agreements)
         : 'No';
+    }
+    if (header === 'Identidad de género') {
+      const rawGender = legacy.get('Identidad de género') ?? '';
+      const specificGender = legacy.get('Especificación de identidad de género')
+        ?? legacy.get('Especifique su identidad de género')
+        ?? '';
+      if (rawGender === 'Otra' && specificGender.trim()) {
+        return specificGender.trim();
+      }
+      return rawGender;
+    }
+    if (header === 'Denominación del título') {
+      const sinTitulo = legacy.get('No posee actualmente título') ?? '';
+      if (sinTitulo === 'Si' || sinTitulo === 'true') {
+        return 'No posee actualmente título';
+      }
+      return legacy.get('Denominación del título') ?? '';
+    }
+    if (header === SPREADSHEET_PHONE_COUNTRY_COLUMN) {
+      const existing = legacy.get(SPREADSHEET_PHONE_COUNTRY_COLUMN);
+      if (existing) return existing;
+      const celular = legacy.get('Celular') ?? '';
+      return extractPhoneCountryCode(celular);
     }
     return legacy.get(header) ?? '';
   });
