@@ -183,6 +183,7 @@ export async function retryFailedSubmission(
   const driveTarget = driveTargetDescriptor(target);
 
   let documentsFolderUrl = '';
+  let newlyStoredFileItems: Array<{ token: string; driveFileId?: string }> = [];
 
   // 3. Drive Stage: check which files need uploading
   const pendingFiles = allFiles.filter((f) => f.status !== 'success' || !f.driveFileId);
@@ -251,6 +252,7 @@ export async function retryFailedSubmission(
           values: normalizedValues,
         });
         const fileItems = Array.isArray(stored) ? stored : (stored.files ?? stored);
+        newlyStoredFileItems = fileItems;
         documentsFolderUrl = (!Array.isArray(stored) && stored.documentsFolderUrl) ? stored.documentsFolderUrl : '';
         for (const file of fileItems) {
           if (file.driveFileId) {
@@ -286,8 +288,30 @@ export async function retryFailedSubmission(
   let spreadsheetRowUrl = '';
   if (dependencies.spreadsheetDependencies) {
     try {
+      const fileIdByToken = new Map<string, string>();
+      for (const f of allFiles) {
+        if (f.driveFileId) fileIdByToken.set(f.token, f.driveFileId);
+      }
+      for (const item of newlyStoredFileItems) {
+        if (item.driveFileId) fileIdByToken.set(item.token, item.driveFileId);
+      }
+      const driveFilesRef = allFiles.map((f) => ({
+        fieldKey: f.fieldKey,
+        token: f.token,
+        driveFileId: fileIdByToken.get(f.token),
+      }));
+
       const spreadsheetSchema = buildSpreadsheetSchema(form);
-      const valuesByColumnName = buildSpreadsheetValues(form, normalizedValues, recovery.submissionId);
+      const valuesByColumnName = buildSpreadsheetValues(
+        form,
+        normalizedValues,
+        recovery.submissionId,
+        now,
+        {
+          documentsFolderUrl: documentsFolderUrl || undefined,
+          files: driveFilesRef,
+        }
+      );
       const requiredColumns = spreadsheetSchema.requiredColumns;
 
       const spreadsheet = await dependencies.spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);

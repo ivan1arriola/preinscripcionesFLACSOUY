@@ -148,8 +148,9 @@ export function buildSpreadsheetValues(
       continue;
     }
 
-    if (docFiles.length === 1 && docFiles[0].driveFileId) {
-      values[doc.label] = formatDriveFileHyperlink(docFiles[0].driveFileId, 'Ver archivo');
+    const firstDocFile = docFiles[0];
+    if (docFiles.length === 1 && firstDocFile?.driveFileId) {
+      values[doc.label] = formatDriveFileHyperlink(firstDocFile.driveFileId, 'Ver archivo');
     } else if (docFiles.length > 1) {
       if (driveContext?.documentsFolderUrl) {
         values[doc.label] = formatDriveFolderHyperlink(driveContext.documentsFolderUrl, 'Ver en carpeta');

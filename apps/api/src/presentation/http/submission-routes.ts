@@ -12,6 +12,7 @@ import { createPreinscriptionNotifications } from '../../application/create-prei
 import type { SubmissionRecoveryRepository } from '../../ports/submission-recovery-repository.js';
 import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
 import { enqueuePreinscriptionTelegramNotifications } from '../../application/preinscription-telegram-notification.js';
+import { buildSpreadsheetValues } from '../../domain/spreadsheet-schema.js';
 
 export function sanitizeSafeError(error: unknown, fallback: string = 'Error de procesamiento técnico.'): string {
   if (!error) return fallback;
@@ -307,9 +308,31 @@ export function createSubmissionRoutes(
             return;
           }
           const spreadsheet = await spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);
+
+          const fileIdByToken = new Map<string, string>();
+          for (const item of storedDriveFiles) {
+            if (item.driveFileId) fileIdByToken.set(item.token, item.driveFileId);
+          }
+          const driveFilesRef = files.map((f) => ({
+            fieldKey: f.fieldKey,
+            token: f.token,
+            driveFileId: fileIdByToken.get(f.token),
+          }));
+
+          const valuesByColumnName = buildSpreadsheetValues(
+            result.form,
+            result.normalizedValues,
+            result.submissionId,
+            new Date(),
+            {
+              documentsFolderUrl: documentsFolderUrl || undefined,
+              files: driveFilesRef,
+            }
+          );
+
           const appendRes = await spreadsheetDependencies.repository.appendByHeaders(
             spreadsheet.spreadsheetId,
-            result.spreadsheet.valuesByColumnName,
+            valuesByColumnName,
             result.spreadsheet.requiredColumns,
             spreadsheet.sheetName,
           );
