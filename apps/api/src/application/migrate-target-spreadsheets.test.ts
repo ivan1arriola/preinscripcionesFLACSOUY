@@ -173,13 +173,13 @@ describe('migrateTargetSpreadsheets', () => {
     // Check Drive folder hyperlink
     const folderIdx = newHeaders.indexOf(SPREADSHEET_DOCUMENTS_FOLDER_COLUMN);
     expect(newRow[folderIdx]).toBe(
-      '=HYPERLINK("https://drive.google.com/drive/folders/folder-sub-101", "Abrir carpeta")'
+      '=HYPERLINK("https://drive.google.com/drive/folders/folder-sub-101"; "Abrir carpeta")'
     );
 
     // Check document hyperlink
     const cvIdx = newHeaders.indexOf('Curriculum Vitae');
     expect(newRow[cvIdx]).toBe(
-      '=HYPERLINK("https://drive.google.com/file/d/drive-file-cv-1/view", "Ver archivo")'
+      '=HYPERLINK("https://drive.google.com/file/d/drive-file-cv-1/view"; "Ver archivo")'
     );
   });
 

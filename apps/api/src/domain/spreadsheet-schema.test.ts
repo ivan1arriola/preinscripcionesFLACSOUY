@@ -149,18 +149,18 @@ describe('spreadsheet schema', () => {
     expect(values['Convenio']).toBe('Convenio FLACSO - Udelar');
     // Folder link
     expect(values['Carpeta de documentos']).toBe(
-      '=HYPERLINK("https://drive.google.com/drive/folders/folder-applicant-123", "Abrir carpeta")'
+      '=HYPERLINK("https://drive.google.com/drive/folders/folder-applicant-123"; "Abrir carpeta")'
     );
     // Document with 2 files references folder
     expect(values['Documento de identidad']).toBe(
-      '=HYPERLINK("https://drive.google.com/drive/folders/folder-applicant-123", "Ver en carpeta")'
+      '=HYPERLINK("https://drive.google.com/drive/folders/folder-applicant-123"; "Ver en carpeta")'
     );
     // Single-file documents reference file
     expect(values['Curriculum Vitae']).toBe(
-      '=HYPERLINK("https://drive.google.com/file/d/drive-cv-1/view", "Ver archivo")'
+      '=HYPERLINK("https://drive.google.com/file/d/drive-cv-1/view"; "Ver archivo")'
     );
     expect(values['Título de grado o terciario']).toBe(
-      '=HYPERLINK("https://drive.google.com/file/d/drive-tit-1/view", "Ver archivo")'
+      '=HYPERLINK("https://drive.google.com/file/d/drive-tit-1/view"; "Ver archivo")'
     );
   });
 

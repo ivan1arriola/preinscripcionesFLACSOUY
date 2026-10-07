@@ -34,11 +34,11 @@ export function extractPhoneCountryCode(celular: string): string {
 }
 
 export function formatDriveFolderHyperlink(folderUrl: string, label = 'Abrir carpeta'): string {
-  return `=HYPERLINK("${folderUrl}", "${label}")`;
+  return `=HYPERLINK("${folderUrl}"; "${label}")`;
 }
 
 export function formatDriveFileHyperlink(fileId: string, label = 'Ver archivo'): string {
-  return `=HYPERLINK("https://drive.google.com/file/d/${fileId}/view", "${label}")`;
+  return `=HYPERLINK("https://drive.google.com/file/d/${fileId}/view"; "${label}")`;
 }
 
 export function buildSpreadsheetSchema(form: FormDefinition): SpreadsheetSchema {
@@ -206,7 +206,11 @@ export function collapseLegacySpreadsheetRow(
       const celular = legacy.get('Celular') ?? '';
       return extractPhoneCountryCode(celular);
     }
-    return legacy.get(header) ?? '';
+    const rawVal = legacy.get(header) ?? '';
+    if (rawVal.startsWith('=HYPERLINK(')) {
+      return rawVal.replace(/,\s*"/g, '; "');
+    }
+    return rawVal;
   });
 }
 
