@@ -165,9 +165,9 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-8">
+    <div className="admin-recovery-panel bg-white rounded-xl border border-gray-200 p-6 shadow-sm mb-8">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-gray-200 mb-6">
+      <div className="admin-recovery-heading flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-gray-200 mb-6">
         <div>
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
             <span>🛡️</span> Bandeja de Recuperación de Preinscripciones
@@ -199,7 +199,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 mb-6 text-xs">
+      <div className="admin-recovery-filters flex flex-wrap items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 mb-6 text-xs">
         <div className="flex items-center gap-1.5">
           <label className="font-semibold text-gray-600">Estado:</label>
           <select
@@ -230,7 +230,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
           </select>
         </div>
 
-        <form onSubmit={handleSearchSubmit} className="flex-1 flex items-center gap-2 min-w-[200px]">
+        <form onSubmit={handleSearchSubmit} className="admin-recovery-search flex-1 flex items-center gap-2 min-w-[200px]">
           <input
             type="text"
             placeholder="Buscar por ID de seguimiento, oferta o error..."
@@ -260,8 +260,8 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto border border-gray-200 rounded-lg">
-          <table className="w-full text-left text-xs">
+        <div className="admin-recovery-list overflow-x-auto border border-gray-200 rounded-lg">
+          <table className="admin-recovery-table w-full text-left text-xs">
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-700 font-semibold">
               <tr>
                 <th className="py-2.5 px-3">Seguimiento</th>
@@ -277,21 +277,21 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
             <tbody className="divide-y divide-gray-200">
               {recoveries.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 px-3 font-mono text-[11px] font-semibold text-gray-900">
+                  <td data-label="Seguimiento" className="py-3 px-3 font-mono text-[11px] font-semibold text-gray-900">
                     {item.submissionId}
                   </td>
-                  <td className="py-3 px-3">
+                  <td data-label="Oferta" className="py-3 px-3">
                     <div className="font-medium text-gray-900 line-clamp-1">
                       {item.targetTitle ?? item.targetId}
                     </div>
                     <div className="text-[10px] text-gray-500 font-mono">{item.targetId}</div>
                   </td>
-                  <td className="py-3 px-3">{formatStage(item.stage)}</td>
-                  <td className="py-3 px-3">{formatStatus(item.status)}</td>
-                  <td className="py-3 px-3">
+                  <td data-label="Etapa" className="py-3 px-3">{formatStage(item.stage)}</td>
+                  <td data-label="Estado" className="py-3 px-3">{formatStatus(item.status)}</td>
+                  <td data-label="Documentos" className="py-3 px-3">
                     <span className="font-mono text-gray-700">{item.filesCount}</span>
                   </td>
-                  <td className="py-3 px-3 max-w-xs">
+                  <td data-label="Error" className="py-3 px-3 max-w-xs">
                     <p className="text-red-700 text-[11px] truncate font-mono" title={item.safeError}>
                       {item.safeError}
                     </p>
@@ -299,10 +299,10 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
                       Intentos: {item.attemptCount} • {new Date(item.lastAttemptAt).toLocaleTimeString()}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-[11px]">
+                  <td data-label="Retención" className="py-3 px-3 text-[11px]">
                     {formatExpiration(item.retentionExpiresAt)}
                   </td>
-                  <td className="py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
+                  <td data-label="Acciones" className="admin-recovery-row-actions py-3 px-3 text-right space-x-1.5 whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => openDetail(item.id)}
@@ -340,8 +340,8 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
       {/* Detail Drawer / Modal */}
       {selectedRecoveryId && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="admin-recovery-dialog bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="admin-recovery-dialog-header flex items-center justify-between p-4 border-b border-gray-200">
               <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                 <span>📋</span> Detalle de Incidente: <span className="font-mono text-blue-600">{detail?.submissionId ?? selectedRecoveryId}</span>
               </h3>
@@ -354,7 +354,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
               </button>
             </div>
 
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+            <div className="admin-recovery-dialog-body p-5 overflow-y-auto space-y-4 text-xs">
               {loadingDetail ? (
                 <div className="text-center py-10 text-gray-500">Cargando detalle del incidente...</div>
               ) : !detail ? (
@@ -362,7 +362,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
               ) : (
                 <>
                   {/* Metadata Grid */}
-                  <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="admin-recovery-details-meta grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div>
                       <span className="text-gray-500 block">Oferta académica:</span>
                       <span className="font-semibold text-gray-900">{detail.targetTitle ?? detail.targetId}</span>
@@ -384,7 +384,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
                   </div>
 
                   {/* Error Box */}
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg space-y-1">
+                  <div className="admin-recovery-error p-3 bg-red-50 border border-red-200 rounded-lg space-y-1">
                     <span className="font-semibold text-red-900 block">Detalle técnico del error:</span>
                     <p className="font-mono text-[11px] text-red-700 whitespace-pre-wrap">{detail.safeError}</p>
                   </div>
@@ -403,7 +403,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
                     ) : (
                       <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
                         {detail.files.map((file, idx) => (
-                          <div key={idx} className="p-3 flex items-center justify-between gap-3">
+                          <div key={idx} className="admin-recovery-document-row p-3 flex items-center justify-between gap-3">
                             <div>
                               <div className="font-medium text-gray-900">{file.originalName}</div>
                               <div className="text-[10px] text-gray-500 font-mono mt-0.5">
@@ -440,7 +440,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
               )}
             </div>
 
-            <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
+            <div className="admin-recovery-dialog-footer flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
               <button
                 type="button"
                 onClick={closeDetail}
@@ -476,7 +476,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
       {/* Discard Confirmation Modal */}
       {discardTargetId && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+          <div className="admin-recovery-confirm bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
             <div className="flex items-center gap-2 text-red-600">
               <span className="text-xl">⚠️</span>
               <h3 className="text-sm font-bold text-gray-900">¿Descartar incidente de preinscripción?</h3>
@@ -499,7 +499,7 @@ export const AdminFailedSubmissionsCard: React.FC<AdminFailedSubmissionsCardProp
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="admin-recovery-confirm-actions flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 disabled={discarding}

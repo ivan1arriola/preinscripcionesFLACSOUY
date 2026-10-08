@@ -1,0 +1,221 @@
+/* Administración FLACSO — estilos encapsulados y mobile-first.
+   La aplicación utiliza CSS propio, no las utilidades completas de Tailwind. */
+
+.admin-page, .admin-section-content, .admin-recovery-panel { width: 100%; min-width: 0; }
+.admin-page-header > div, .admin-page-user, .admin-page .grid > div,
+.admin-section-content > div { min-width: 0; }
+.admin-page-user span, .admin-recovery-dialog-header h3, .admin-recovery-error p,
+.admin-recovery-document-row { overflow-wrap: anywhere; }
+.admin-section-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: .45rem;
+  padding-bottom: .75rem;
+}
+.admin-section-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 3.25rem;
+  padding: .7rem .4rem;
+  text-align: center;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  border: 1px solid #e0e7ef;
+  border-bottom-width: 2px;
+  border-radius: .65rem .65rem 0 0;
+}
+.admin-section-tab[aria-selected="true"] {
+  background: #eff8ff;
+  border-color: #b2ddff;
+  border-bottom-color: #175cd3;
+}
+.admin-recovery-list { width: 100%; max-width: 100%; }
+.admin-recovery-table { width: 100%; min-width: 65rem; border-collapse: collapse; }
+.admin-recovery-table th { white-space: nowrap; }
+.admin-recovery-table td { vertical-align: top; }
+.admin-recovery-table td::before { display: none; }
+
+/* El panel previo usaba clases fixed/inset-0/z-50 que NO existen en app.css.
+   El detalle debe ser un diálogo real, independiente del flujo del documento. */
+.admin-recovery-panel .fixed {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, .62);
+}
+.admin-recovery-dialog, .admin-recovery-confirm {
+  background: #fff;
+  width: 100%;
+  min-width: 0;
+  box-shadow: 0 20px 60px rgba(15,23,42,.22);
+}
+.admin-recovery-dialog {
+  display: flex;
+  flex-direction: column;
+  max-width: 42rem;
+  max-height: min(90dvh, 52rem);
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 1rem;
+}
+.admin-recovery-dialog-header, .admin-recovery-dialog-body,
+.admin-recovery-dialog-footer { min-width: 0; }
+.admin-recovery-dialog-header h3 { min-width: 0; }
+.admin-recovery-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.admin-recovery-dialog-footer { flex-shrink: 0; }
+.admin-recovery-confirm {
+  max-width: 28rem;
+  max-height: min(90dvh, 48rem);
+  overflow-y: auto;
+  border-radius: 1rem;
+}
+.admin-recovery-error p, .admin-recovery-document-row { overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+  .admin-page { padding: .25rem 0 1.5rem; }
+  .admin-page-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: .8rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+  }
+  .admin-page-header h1 { font-size: clamp(1.35rem, 5vw, 1.75rem); line-height: 1.2; }
+  .admin-page-header p { margin-top: .4rem; font-size: .9rem; line-height: 1.5; }
+  .admin-page-user { justify-content: space-between; gap: .65rem; }
+  .admin-page-user > div { min-width: 0; text-align: left; }
+  .admin-section-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem;
+    padding: 0 0 .75rem;
+    margin-bottom: 1rem;
+  }
+  .admin-section-tab {
+    min-height: 3.3rem;
+    border: 1px solid #dfe7f1;
+    border-radius: .7rem;
+    padding: .75rem .5rem;
+    background: #fff;
+    color: #344054;
+    font-size: .875rem;
+  }
+  .admin-section-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .admin-section-tab[aria-selected="true"] { background: #eff8ff; border: 2px solid #175cd3; color: #1849a9; }
+
+  .admin-section-content, .admin-section-content > div { max-width: 100%; min-width: 0; }
+  .admin-section-content .bg-white { max-width: 100%; }
+  .admin-section-content .grid { min-width: 0; }
+  .admin-section-content .grid-cols-2 { grid-template-columns: minmax(0, 1fr); }
+  .admin-section-content input:not([type="checkbox"]):not([type="radio"]),
+  .admin-section-content select, .admin-section-content textarea { min-width: 0; max-width: 100%; }
+  .admin-section-content .flex-wrap { min-width: 0; }
+
+  .admin-recovery-panel { padding: 1rem; border-radius: .85rem; margin-bottom: 1rem; }
+  .admin-recovery-heading { gap: .7rem; margin-bottom: 1rem; }
+  .admin-recovery-heading h2 { font-size: 1.1rem; line-height: 1.35; }
+  .admin-recovery-heading p { font-size: .85rem; line-height: 1.55; }
+  .admin-recovery-heading button { min-height: 2.75rem; }
+  .admin-recovery-filters { display: flex; flex-direction: column; align-items: stretch; padding: .8rem; }
+  .admin-recovery-filters > div { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: .5rem; }
+  .admin-recovery-filters label { font-size: .85rem; }
+  .admin-recovery-filters select { width: min(100%, 13rem); min-height: 2.75rem; font-size: .875rem; }
+  .admin-recovery-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-width: 0; width: 100%; }
+  .admin-recovery-search input { width: 100%; min-width: 0; min-height: 2.75rem; font-size: 1rem; }
+  .admin-recovery-search button { min-height: 2.75rem; }
+  .admin-recovery-list { overflow: visible; border: 0; }
+  .admin-recovery-table, .admin-recovery-table tbody,
+  .admin-recovery-table tr, .admin-recovery-table td { display: block; min-width: 0; width: 100%; }
+  .admin-recovery-table { min-width: 0; border-collapse: separate; }
+  .admin-recovery-table thead { display: none; }
+  .admin-recovery-table tbody { display: grid; gap: .8rem; }
+  .admin-recovery-table tr {
+    padding: .75rem;
+    background: #fff;
+    border: 1px solid #dfe7f1;
+    border-radius: .8rem;
+    box-shadow: 0 2px 6px rgba(16,35,64,.05);
+  }
+  .admin-recovery-table td {
+    padding: .5rem .25rem;
+    border: 0;
+    text-align: left;
+    font-size: .875rem;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .admin-recovery-table td + td { border-top: 1px solid #edf1f6; }
+  .admin-recovery-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin: 0 0 .22rem;
+    color: #667085;
+    font: 700 .76rem/1.3 Inter, system-ui, sans-serif;
+  }
+  .admin-recovery-table td[data-label="Seguimiento"] { word-break: break-all; }
+  .admin-recovery-table td[data-label="Seguimiento"]::before { word-break: normal; }
+  .admin-recovery-table td[data-label="Error"] { max-width: none; }
+  .admin-recovery-table td[data-label="Error"] p { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+  .admin-recovery-table td[data-label="Error"] span { font-size: .75rem; }
+  .admin-recovery-row-actions { display: flex !important; flex-wrap: wrap; gap: .5rem; }
+  .admin-recovery-row-actions::before { flex-basis: 100%; }
+  .admin-recovery-row-actions button {
+    flex: 1 1 auto;
+    min-height: 2.75rem;
+    margin: 0;
+    padding: .55rem .6rem;
+    font-size: .85rem;
+  }
+
+  .admin-recovery-panel .fixed { padding: 0; align-items: stretch; }
+  .admin-recovery-dialog {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+  .admin-recovery-dialog-header { padding: 1rem; gap: .65rem; }
+  .admin-recovery-dialog-header h3 { flex: 1; min-width: 0; font-size: 1rem; line-height: 1.4; }
+  .admin-recovery-dialog-header button { min-height: 2.75rem; min-width: 2.75rem; flex-shrink: 0; }
+  .admin-recovery-dialog-body { padding: 1rem; font-size: .875rem; }
+  .admin-recovery-details-meta { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .admin-recovery-error p { font-size: .85rem; }
+  .admin-recovery-dialog-body .space-y-2 > h4 {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .25rem;
+    font-size: .9rem;
+  }
+  .admin-recovery-document-row { flex-direction: column; align-items: stretch; gap: .5rem; }
+  .admin-recovery-document-row > div, .admin-recovery-document-row > div:last-child {
+    min-width: 0;
+    text-align: left;
+  }
+  .admin-recovery-dialog-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: .65rem;
+    padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  .admin-recovery-dialog-footer > button { width: 100%; min-height: 2.75rem; }
+  .admin-recovery-dialog-footer > div { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+  .admin-recovery-dialog-footer button { min-height: 2.75rem; white-space: normal; font-size: .83rem; }
+  .admin-recovery-confirm { margin: auto .6rem; padding: 1rem; }
+  .admin-recovery-confirm-actions { flex-direction: column; align-items: stretch; }
+  .admin-recovery-confirm-actions button { width: 100%; min-height: 2.75rem; }
+}

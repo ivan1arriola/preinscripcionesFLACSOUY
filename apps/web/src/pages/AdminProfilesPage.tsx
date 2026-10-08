@@ -5,6 +5,7 @@ import { AdminSpreadsheetSettingsCard } from '../components/AdminSpreadsheetSett
 import { AdminNotificationsSettingsCard } from '../components/AdminNotificationsSettingsCard.js';
 import { AdminRecoverySettingsCard } from '../components/AdminRecoverySettingsCard.js';
 import { AdminFailedSubmissionsCard } from '../components/AdminFailedSubmissionsCard.js';
+import './admin-responsive.css';
 
 interface AdminProfilesPageProps {
   onRequireLogin: () => void;
@@ -60,9 +61,9 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4">
+    <div className="admin-page max-w-5xl mx-auto py-8 px-4">
       {/* Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-gray-200 mb-8">
+      <div className="admin-page-header flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-gray-200 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Administración de Preinscripciones</h1>
           <p className="text-sm text-gray-600">
@@ -70,7 +71,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="admin-page-user flex items-center gap-4">
           <div className="text-right">
             <span className="block text-sm font-medium text-gray-900">{adminUser.name}</span>
             <span className="block text-xs text-gray-500">{adminUser.email}</span>
@@ -92,13 +93,13 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
       )}
 
       {/* Main Section Navigation */}
-      <div className="flex gap-2 border-b border-gray-200 mb-6" role="tablist" aria-label="Secciones de administración">
+      <div className="admin-section-tabs flex gap-2 border-b border-gray-200 mb-6" role="tablist" aria-label="Secciones de administración">
         <button
           type="button"
           role="tab"
           aria-selected={activeSection === 'profiles'}
           onClick={() => setActiveSection('profiles')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+          className={`admin-section-tab px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
             activeSection === 'profiles'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -111,7 +112,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
           role="tab"
           aria-selected={activeSection === 'drive'}
           onClick={() => setActiveSection('drive')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+          className={`admin-section-tab px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
             activeSection === 'drive'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -124,7 +125,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
           role="tab"
           aria-selected={activeSection === 'spreadsheets'}
           onClick={() => setActiveSection('spreadsheets')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+          className={`admin-section-tab px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
             activeSection === 'spreadsheets'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -137,7 +138,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
           role="tab"
           aria-selected={activeSection === 'notifications'}
           onClick={() => setActiveSection('notifications')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+          className={`admin-section-tab px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
             activeSection === 'notifications'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -150,7 +151,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
           role="tab"
           aria-selected={activeSection === 'recovery'}
           onClick={() => setActiveSection('recovery')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+          className={`admin-section-tab px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
             activeSection === 'recovery'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -160,6 +161,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
         </button>
       </div>
 
+      <div className="admin-section-content">
       {activeSection === 'drive' ? (
         <AdminDriveSettingsCard csrfToken={csrfToken} />
       ) : activeSection === 'spreadsheets' ? (
@@ -203,6 +205,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

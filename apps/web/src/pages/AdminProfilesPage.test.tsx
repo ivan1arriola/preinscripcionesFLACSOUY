@@ -123,6 +123,20 @@ describe('AdminProfilesPage Component', () => {
     });
   });
 
+  it('exposes a responsive tab grid without losing section navigation', async () => {
+    vi.mocked(apiClient.getAdminMe).mockResolvedValue({ user: mockAdminUser, csrfToken: 'csrf-123' });
+    const { container } = render(<AdminProfilesPage onRequireLogin={vi.fn()} onLogout={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Administración de Preinscripciones')).toBeInTheDocument());
+
+    const navigation = screen.getByRole('tablist', { name: 'Secciones de administración' });
+    expect(navigation).toHaveClass('admin-section-tabs');
+    expect(screen.getAllByRole('tab')).toHaveLength(5);
+    expect(screen.getAllByRole('tab').every((tab) => tab.classList.contains('admin-section-tab'))).toBe(true);
+    expect(container.querySelector('.admin-section-content')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /Recuperación y Alertas/i }));
+    expect(await screen.findByText(/Bandeja de Recuperación de Preinscripciones/i)).toBeInTheDocument();
+  });
+
   it('switches between sections for Drive and Spreadsheets', async () => {
     vi.mocked(apiClient.getAdminMe).mockResolvedValue({ user: mockAdminUser, csrfToken: 'csrf-123' });
 

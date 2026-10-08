@@ -66,6 +66,21 @@ describe('AdminFailedSubmissionsCard Component', () => {
     });
   });
 
+  it('uses labelled mobile cards while retaining accessible table semantics', async () => {
+    vi.mocked(apiClient.listRecoveries).mockResolvedValue({ recoveries: [mockRecovery] });
+    const { container } = render(<AdminFailedSubmissionsCard csrfToken="csrf-test-token" />);
+    await waitFor(() => expect(screen.getByText('sub-test-123')).toBeInTheDocument());
+
+    const table = container.querySelector('table.admin-recovery-table');
+    expect(table).toBeInTheDocument();
+    expect(table?.querySelectorAll('thead th')).toHaveLength(8);
+    const cells = table?.querySelectorAll('tbody tr:first-child td');
+    expect(Array.from(cells ?? []).map(cell => cell.getAttribute('data-label'))).toEqual([
+      'Seguimiento', 'Oferta', 'Etapa', 'Estado', 'Documentos', 'Error', 'Retención', 'Acciones',
+    ]);
+    expect(container.querySelector('.admin-recovery-row-actions')).toBeInTheDocument();
+  });
+
   it('opens detail drawer and shows document status and missing explanation', async () => {
     vi.mocked(apiClient.listRecoveries).mockResolvedValue({
       recoveries: [mockRecovery],
