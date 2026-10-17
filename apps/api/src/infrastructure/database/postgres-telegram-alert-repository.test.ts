@@ -5,11 +5,10 @@ import { PostgresTelegramAlertRepository } from './postgres-telegram-alert-repos
 import type { DatabaseSchema } from './schema.js';
 import type { Kysely } from 'kysely';
 
-describe('PostgresTelegramAlertRepository (Integration)', () => {
-  const dbUrl =
-    process.env.DATABASE_URL ??
-    'postgres://flacso:flacso_password@localhost:5433/flacso_preinscripciones';
+const dbUrl = process.env.PREINSCRIPTIONS_TEST_DATABASE_URL;
+const integrationDescribe = dbUrl ? describe : describe.skip;
 
+integrationDescribe('PostgresTelegramAlertRepository (Integration)', () => {
   let db: Kysely<DatabaseSchema>;
   let repository: PostgresTelegramAlertRepository;
   const testSubId = `sub_test_${Date.now()}`;

@@ -5,11 +5,10 @@ import { runMigrations } from './migrate.js';
 import { PostgresEmailNotificationRepository } from './postgres-email-notification-repository.js';
 import type { SubmissionNotificationSnapshot } from '../../application/notification-snapshot.js';
 
-describe('PostgresEmailNotificationRepository (Integration with PostgreSQL)', () => {
-  const dbUrl =
-    process.env.DATABASE_URL ??
-    'postgres://flacso:flacso_password@localhost:5433/flacso_preinscripciones';
+const dbUrl = process.env.PREINSCRIPTIONS_TEST_DATABASE_URL;
+const integrationDescribe = dbUrl ? describe : describe.skip;
 
+integrationDescribe('PostgresEmailNotificationRepository (Integration with PostgreSQL)', () => {
   const db = createKyselyDb(dbUrl);
   const repository = new PostgresEmailNotificationRepository(db);
 

@@ -17,7 +17,8 @@ describe('TemporaryFileStorage', () => {
     expect((await storage.open(saved.token, 'session-a')).data.toString()).toBe('contenido');
     await expect(storage.open(saved.token, 'session-b')).rejects.toThrow('no autorizado');
     const fileInfo = await stat(join(root, saved.token, 'payload'));
-    expect(fileInfo.mode & 0o077).toBe(0);
+    // POSIX mode bits are not reported consistently by Windows filesystems.
+    if (process.platform !== 'win32') expect(fileInfo.mode & 0o077).toBe(0);
   });
 
   it('rejects disallowed type or size and removes expired files', async () => {

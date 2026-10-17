@@ -12,6 +12,7 @@ import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
 import { TelegramRecoveryAlertDispatcher } from './application/telegram-recovery-alert-dispatcher.js';
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
+import { RegistrationEventDispatcher } from './application/registration-event-dispatcher.js';
 
 console.log('[Worker] Iniciando worker de despacho de notificaciones (SMTP, Telegram) y retención...');
 
@@ -71,6 +72,12 @@ const telegramDispatcher = new TelegramRecoveryAlertDispatcher({
 emailDispatcher.start(10_000);
 telegramDispatcher.start(15_000);
 
+const registrationEventDispatcher = new RegistrationEventDispatcher(db, {
+  endpoint: process.env.FLACSO_MAILING_REGISTRATIONS_URL,
+  secret: process.env.PREINSCRIPCIONES_HMAC_SECRET,
+});
+const stopRegistrationEventDispatcher = registrationEventDispatcher.start(5_000);
+
 const cleanupInterval = setInterval(async () => {
   try {
     const result = await cleanupExpiredRecoveries({
@@ -93,6 +100,7 @@ async function shutdown() {
   clearInterval(cleanupInterval);
   emailDispatcher.stop();
   telegramDispatcher.stop();
+  stopRegistrationEventDispatcher();
   await db.destroy();
   console.log('[Worker] Worker detenido.');
   process.exit(0);

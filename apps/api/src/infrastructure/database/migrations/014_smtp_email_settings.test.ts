@@ -4,11 +4,11 @@ import type { Kysely } from 'kysely';
 import { createKyselyDb } from '../kysely.js';
 import { runMigrations } from '../migrate.js';
 
-describe('014_smtp_email_settings migration', () => {
-  const sourceUrl = new URL(
-    process.env.SMTP_MIGRATION_TEST_DATABASE_URL
-      ?? 'postgres://flacso:flacso_password@localhost:5433/flacso_preinscripciones',
-  );
+const testDatabaseUrl = process.env.PREINSCRIPTIONS_TEST_DATABASE_URL ?? process.env.SMTP_MIGRATION_TEST_DATABASE_URL;
+const integrationDescribe = testDatabaseUrl ? describe : describe.skip;
+const sourceUrl = new URL(testDatabaseUrl ?? 'postgres://flacso:flacso_password@localhost:5433/flacso_preinscripciones');
+
+integrationDescribe('014_smtp_email_settings migration', () => {
   const databaseName = `flacso_smtp_migration_${process.pid}_${Date.now()}`;
   const adminUrl = new URL(sourceUrl);
   const testUrl = new URL(sourceUrl);

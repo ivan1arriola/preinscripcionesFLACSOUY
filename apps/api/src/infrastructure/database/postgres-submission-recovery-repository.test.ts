@@ -4,11 +4,10 @@ import { createKyselyDb } from './kysely.js';
 import { runMigrations } from './migrate.js';
 import { PostgresSubmissionRecoveryRepository } from './postgres-submission-recovery-repository.js';
 
-describe('PostgresSubmissionRecoveryRepository (Integration with PostgreSQL)', () => {
-  const dbUrl =
-    process.env.DATABASE_URL ??
-    'postgres://flacso:flacso_password@localhost:5433/flacso_preinscripciones';
+const dbUrl = process.env.PREINSCRIPTIONS_TEST_DATABASE_URL;
+const integrationDescribe = dbUrl ? describe : describe.skip;
 
+integrationDescribe('PostgresSubmissionRecoveryRepository (Integration with PostgreSQL)', () => {
   const db = createKyselyDb(dbUrl);
   const repository = new PostgresSubmissionRecoveryRepository(db);
 

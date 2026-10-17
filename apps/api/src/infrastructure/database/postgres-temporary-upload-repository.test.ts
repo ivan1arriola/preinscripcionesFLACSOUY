@@ -3,11 +3,10 @@ import { createKyselyDb } from './kysely.js';
 import { runMigrations } from './migrate.js';
 import { PostgresTemporaryUploadRepository } from './postgres-temporary-upload-repository.js';
 
-describe('PostgresTemporaryUploadRepository (Integration)', () => {
-  const dbUrl =
-    process.env.DATABASE_URL ??
-    'postgres://flacso:flacso_password@localhost:5433/flacso_preinscripciones';
+const dbUrl = process.env.PREINSCRIPTIONS_TEST_DATABASE_URL;
+const integrationDescribe = dbUrl ? describe : describe.skip;
 
+integrationDescribe('PostgresTemporaryUploadRepository (Integration)', () => {
   const db = createKyselyDb(dbUrl);
   const repository = new PostgresTemporaryUploadRepository(db, 30 * 60 * 1000); // 30 min TTL
 

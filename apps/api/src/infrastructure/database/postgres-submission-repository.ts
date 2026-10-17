@@ -10,9 +10,22 @@ import {
   UNIVERSAL_INPUTS,
   SUPPORTED_SPECIFIC_INPUTS,
 } from '../../domain/form-definition.js';
+import { buildRegistrationStatusChangedEvent } from '../../application/registration-event.js';
+import type { RegistrationLookup } from '../../ports/registration-lookup.js';
 
-export class PostgresSubmissionRepository implements SubmissionRepository {
+export class PostgresSubmissionRepository implements SubmissionRepository, RegistrationLookup {
   constructor(private readonly db: KyselyDb) {}
+
+  async hasEffectiveRegistration(email: string, targetId: string): Promise<boolean> {
+    const row = await this.db.selectFrom('submissions')
+      .innerJoin('submission_values', 'submission_values.submission_id', 'submissions.id')
+      .select('submissions.id')
+      .where('submission_values.input_key', '=', 'email')
+      .where(sql`lower(trim(submission_values.value))`, '=', email.trim().toLowerCase())
+      .where('submissions.target_id', '=', targetId)
+      .executeTakeFirst();
+    return Boolean(row);
+  }
 
   async save(record: ValidatedSubmissionRecord): Promise<SavedSubmissionResult> {
     return this.saveOrGet(record);
@@ -106,6 +119,30 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
             updated_at: new Date(),
           })
           .execute();
+
+        const email = record.values.email?.trim().toLowerCase();
+        if (!email) throw new Error('An effective registration requires an email address.');
+        const event = buildRegistrationStatusChangedEvent({
+          submissionId,
+          targetId: record.targetId,
+          email,
+          occurredAt: new Date(),
+        });
+        await trx.insertInto('registration_event_outbox').values({
+          id: 'reg_evt_' + crypto.randomUUID().replace(/-/g, ''),
+          submission_id: submissionId,
+          idempotency_key: event.idempotency_key,
+          payload_json: JSON.stringify(event),
+          status: 'pending',
+          attempt_count: 0,
+          available_at: new Date(),
+          locked_until: null,
+          locked_by: null,
+          last_error: null,
+          delivered_at: null,
+          created_at: new Date(),
+          updated_at: new Date(),
+        }).execute();
 
         // 4. Insert submission values
         for (const [key, value] of Object.entries(record.values)) {

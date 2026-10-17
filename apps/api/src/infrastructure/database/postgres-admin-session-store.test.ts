@@ -4,11 +4,10 @@ import { runMigrations } from './migrate.js';
 import { PostgresAdminSessionStore } from './postgres-admin-session-store.js';
 import type { AdminUser } from '../../domain/form-profiles.js';
 
-describe('PostgresAdminSessionStore (Integration with PostgreSQL)', () => {
-  const dbUrl =
-    process.env.DATABASE_URL ??
-    'postgres://flacso:flacso_password@localhost:5433/flacso_preinscripciones';
+const dbUrl = process.env.PREINSCRIPTIONS_TEST_DATABASE_URL;
+const integrationDescribe = dbUrl ? describe : describe.skip;
 
+integrationDescribe('PostgresAdminSessionStore (Integration with PostgreSQL)', () => {
   const db = createKyselyDb(dbUrl);
   // 1 hour TTL for testing
   const sessionStore = new PostgresAdminSessionStore(db, 60 * 60 * 1000);

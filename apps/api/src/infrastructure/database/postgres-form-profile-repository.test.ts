@@ -4,11 +4,10 @@ import { PostgresFormProfileRepository } from './postgres-form-profile-repositor
 import { runMigrations } from './migrate.js';
 import { getDefaultProfileDefinition } from '../../domain/form-profiles.js';
 
-describe('PostgresFormProfileRepository (Integration with PostgreSQL)', () => {
-  const dbUrl =
-    process.env.DATABASE_URL ??
-    'postgres://flacso:flacso_password@localhost:5433/flacso_preinscripciones';
+const dbUrl = process.env.PREINSCRIPTIONS_TEST_DATABASE_URL;
+const integrationDescribe = dbUrl ? describe : describe.skip;
 
+integrationDescribe('PostgresFormProfileRepository (Integration with PostgreSQL)', () => {
   const db = createKyselyDb(dbUrl);
   const repository = new PostgresFormProfileRepository(db);
 
