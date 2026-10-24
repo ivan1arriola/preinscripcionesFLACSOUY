@@ -10,7 +10,7 @@ describe('createPreinscriptionNotifications & buildNotificationRecipients', () =
   describe('buildNotificationRecipients', () => {
     it('creates applicant, target, and master recipients and deduplicates shared addresses', () => {
       const applicant = '  Postulante@Example.com ';
-      const target = 'coordinacion@flacso.edu.uy';
+      const targets = ['coordinacion@flacso.edu.uy', ' Secretaria@flacso.edu.uy ', 'COORDINACION@flacso.edu.uy'];
       const masters = [
         'coordinacion@flacso.edu.uy', // Duplicate of target!
         'admin@flacso.edu.uy',
@@ -18,17 +18,18 @@ describe('createPreinscriptionNotifications & buildNotificationRecipients', () =
         'not-an-email',
       ];
 
-      const recipients = buildNotificationRecipients(applicant, target, masters);
+      const recipients = buildNotificationRecipients(applicant, targets, masters);
 
       expect(recipients).toEqual([
         { audience: 'applicant', email: 'postulante@example.com' },
         { audience: 'target', email: 'coordinacion@flacso.edu.uy' },
+        { audience: 'target', email: 'secretaria@flacso.edu.uy' },
         { audience: 'master', email: 'admin@flacso.edu.uy' },
       ]);
     });
 
-    it('handles target without notificationEmail and empty masters list', () => {
-      const recipients = buildNotificationRecipients('postulante@example.com', undefined, []);
+    it('handles target without notification emails and empty masters list', () => {
+      const recipients = buildNotificationRecipients('postulante@example.com', [], []);
       expect(recipients).toEqual([
         { audience: 'applicant', email: 'postulante@example.com' },
       ]);
@@ -41,7 +42,7 @@ describe('createPreinscriptionNotifications & buildNotificationRecipients', () =
       kind: 'academic_offer',
       title: 'Diploma Superior en Educación y Tecnología',
       registrationOpen: true,
-      notificationEmail: 'edutec@flacso.edu.uy',
+      notificationEmails: ['edutec@flacso.edu.uy'],
       configRevision: 'v1',
       orientations: [],
       mentions: [],

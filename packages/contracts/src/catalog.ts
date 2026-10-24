@@ -78,7 +78,8 @@ export interface AcademicTarget {
   kind: AcademicTargetKind;
   title: string;
   offerType?: string;
-  notificationEmail?: string;
+  /** "Correo de la Oferta Académica" en WordPress (puede tener varios destinatarios). */
+  notificationEmails?: string[];
   registrationOpen: boolean;
   registrationAvailability?: RegistrationAvailability;
   registrationWindow?: RegistrationWindow;

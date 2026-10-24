@@ -20,7 +20,7 @@ export interface CreateNotificationsInput {
 
 export function buildNotificationRecipients(
   applicantEmail?: string,
-  targetEmail?: string,
+  targetEmails: string[] = [],
   masterRecipients: string[] = []
 ): Array<{ audience: NotificationAudience; email: string }> {
   const recipients: Array<{ audience: NotificationAudience; email: string }> = [];
@@ -34,10 +34,11 @@ export function buildNotificationRecipients(
     }
   }
 
-  // 2. Target operational email
-  if (targetEmail && targetEmail.trim().length > 0) {
+  // 2. Target operational emails ("Correo de la Oferta Académica", deduplicated)
+  for (const targetEmail of targetEmails) {
+    if (!targetEmail || !targetEmail.trim()) continue;
     const normalized = targetEmail.trim().toLowerCase();
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) && !seenEmails.has(normalized)) {
       recipients.push({ audience: 'target', email: normalized });
       seenEmails.add(normalized);
     }
@@ -74,7 +75,7 @@ export async function createPreinscriptionNotifications(
 
   const recipients = buildNotificationRecipients(
     snapshot.applicantEmail,
-    snapshot.notificationEmail,
+    snapshot.notificationEmails,
     input.masterRecipients
   );
 

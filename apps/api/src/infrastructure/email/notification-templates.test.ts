@@ -14,7 +14,7 @@ describe('Notification Templates', () => {
     targetKind: 'academic_offer',
     applicantEmail: 'postulante@example.com',
     applicantName: 'Ana Silva',
-    notificationEmail: 'coordinacion@flacso.edu.uy',
+    notificationEmails: ['coordinacion@flacso.edu.uy'],
     orderedFieldKeys: ['nombre', 'apellido', 'documento', 'email', 'pais', 'ciudad'],
     values: {
       nombre: { key: 'nombre', label: 'Nombres', value: 'Ana <script>alert(1)</script>' },
@@ -99,10 +99,22 @@ describe('Notification Templates', () => {
       expect(masterNotifs.map((n) => n.to)).toEqual(['master1@flacso.edu.uy', 'master2@flacso.edu.uy']);
     });
 
-    it('omits target notification if snapshot does not have notificationEmail', () => {
+    it('sends one target notification per offer email', () => {
+      const notifications = renderAllNotifications(
+        { ...sampleSnapshot, notificationEmails: ['coordinacion@flacso.edu.uy', 'secretaria@flacso.edu.uy'] },
+        ['secretaria@flacso.edu.uy']
+      );
+      expect(notifications.filter((n) => n.audience === 'target').map((n) => n.to)).toEqual([
+        'coordinacion@flacso.edu.uy',
+        'secretaria@flacso.edu.uy',
+      ]);
+      expect(notifications.some((n) => n.audience === 'master')).toBe(false);
+    });
+
+    it('omits target notification if snapshot does not have notification emails', () => {
       const snapshotWithoutTargetEmail = {
         ...sampleSnapshot,
-        notificationEmail: undefined,
+        notificationEmails: [],
       };
 
       const notifications = renderAllNotifications(snapshotWithoutTargetEmail, ['master@flacso.edu.uy']);

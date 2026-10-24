@@ -11,6 +11,20 @@ export interface WordPressAcademicCatalogOptions {
 
 export const DEFAULT_AGREEMENTS_TTL_SECONDS = 30 * 60;
 const AGREEMENTS_FAILURE_RETRY_BACKOFF_MS = 60 * 1000;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Destinatarios del "Correo de la Oferta Académica". Usa la lista multivaluada
+ * y, si WordPress aún no la publica, el campo único anterior. Las direcciones
+ * inválidas se descartan sin invalidar el resto del catálogo.
+ */
+function normalizeNotificationEmails(raw: WordPressTarget): string[] | undefined {
+  const candidates = raw.notificationEmails ?? (raw.notificationEmail ? [raw.notificationEmail] : []);
+  const emails = [
+    ...new Set(candidates.map((email) => email.trim().toLowerCase()).filter((email) => EMAIL_PATTERN.test(email))),
+  ];
+  return emails.length > 0 ? emails : undefined;
+}
 
 export class WordPressAcademicCatalog implements AcademicCatalog {
   private readonly ttlSeconds: number;
@@ -131,7 +145,7 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
       kind: raw.kind,
       title,
       offerType,
-      notificationEmail: raw.notificationEmail && raw.notificationEmail.trim().length > 0 ? raw.notificationEmail.trim() : undefined,
+      notificationEmails: normalizeNotificationEmails(raw),
       registrationOpen: raw.registrationOpen,
       registrationAvailability: raw.registrationAvailability,
       registrationWindow: {

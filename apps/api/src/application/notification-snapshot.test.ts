@@ -12,7 +12,7 @@ describe('SubmissionNotificationSnapshot', () => {
     kind: 'academic_offer',
     title: 'Diploma Superior en Educación, Imágenes y Medios',
     registrationOpen: true,
-    notificationEmail: 'coordinacion.educacion@flacso.edu.uy',
+    notificationEmails: ['Coordinacion.Educacion@flacso.edu.uy', 'secretaria@flacso.edu.uy', 'coordinacion.educacion@flacso.edu.uy'],
     configRevision: 'rev-1',
     orientations: [],
     mentions: [],
@@ -54,7 +54,7 @@ describe('SubmissionNotificationSnapshot', () => {
     expect(snapshot.targetKind).toBe('academic_offer');
     expect(snapshot.applicantEmail).toBe('ana.silva@example.com');
     expect(snapshot.applicantName).toBe('Ana Silva');
-    expect(snapshot.notificationEmail).toBe('coordinacion.educacion@flacso.edu.uy');
+    expect(snapshot.notificationEmails).toEqual(['coordinacion.educacion@flacso.edu.uy', 'secretaria@flacso.edu.uy']);
     expect(snapshot.templateVersion).toBe('preinscription-notification-v1');
 
     // Values should match labels from fields
@@ -93,10 +93,10 @@ describe('SubmissionNotificationSnapshot', () => {
     expect(snapshot.documentsFolderUrl).toBe('https://drive.google.com/drive/folders/folder-abc');
   });
 
-  it('handles target without notificationEmail returning undefined', () => {
+  it('handles target without notification emails returning an empty list', () => {
     const targetWithoutEmail: AcademicTarget = {
       ...sampleTarget,
-      notificationEmail: undefined,
+      notificationEmails: undefined,
     };
 
     const snapshot = buildSubmissionNotificationSnapshot({
@@ -108,6 +108,6 @@ describe('SubmissionNotificationSnapshot', () => {
       documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-abc',
     });
 
-    expect(snapshot.notificationEmail).toBeUndefined();
+    expect(snapshot.notificationEmails).toEqual([]);
   });
 });

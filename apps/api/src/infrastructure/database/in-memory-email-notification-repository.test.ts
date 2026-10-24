@@ -10,7 +10,7 @@ describe('InMemoryEmailNotificationRepository', () => {
     targetKind: 'academic_offer',
     applicantEmail: 'postulante@example.com',
     applicantName: 'Ana Clara',
-    notificationEmail: 'coordinacion@flacso.edu.uy',
+    notificationEmails: ['coordinacion@flacso.edu.uy'],
     values: {
       nombre: { key: 'nombre', label: 'Nombre', value: 'Ana' },
       apellido: { key: 'apellido', label: 'Apellido', value: 'Clara' },

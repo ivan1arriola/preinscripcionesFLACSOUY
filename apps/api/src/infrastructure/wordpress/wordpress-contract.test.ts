@@ -285,6 +285,30 @@ describe('WordPress Client & Contract Adapter', () => {
     await expect(client.getPreinscriptions()).rejects.toThrow(/version/);
   });
 
+  it('maps every offer email from notificationEmails and ignores invalid entries', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ...simplifiedV1Response,
+        targets: [
+          {
+            ...simplifiedV1Response.targets[0],
+            notificationEmail: 'coordinacion@flacso.edu.uy',
+            notificationEmails: ['coordinacion@flacso.edu.uy', ' Secretaria@flacso.edu.uy ', 'no-es-correo'],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
+    const catalog = new WordPressAcademicCatalog(client, new MemoryWordPressCache(), { ttlSeconds: 60 });
+    const [target] = await catalog.listTargets();
+
+    expect(target!.notificationEmails).toEqual(['coordinacion@flacso.edu.uy', 'secretaria@flacso.edu.uy']);
+  });
+
   it('caches targets and uses stale cache on upstream failure', async () => {
     let callCount = 0;
     const fetchMock = vi.fn().mockImplementation(async () => {
@@ -312,11 +336,11 @@ describe('WordPress Client & Contract Adapter', () => {
       'Innovación Pública',
     ]);
     expect(targets1[0]!.title).toBe('Diploma Superior en Aprendizaje Visual e Inteligencia Artificial — Cohorte XI');
-    expect(targets1[0]!.notificationEmail).toBe('coordinacion@flacso.edu.uy');
+    expect(targets1[0]!.notificationEmails).toEqual(['coordinacion@flacso.edu.uy']);
     expect(targets1[1]!.registrationAvailability).toBe('closed');
-    expect(targets1[1]!.notificationEmail).toBeUndefined();
+    expect(targets1[1]!.notificationEmails).toBeUndefined();
     expect(targets1[2]!.registrationAvailability).toBeUndefined();
-    expect(targets1[2]!.notificationEmail).toBeUndefined();
+    expect(targets1[2]!.notificationEmails).toBeUndefined();
 
     // Second call: upstream fails, but cache provides targets
     const targets2 = await catalog.listTargets();

@@ -29,7 +29,7 @@ describe('EmailNotificationDispatcher', () => {
     targetKind: 'academic_offer',
     applicantEmail: 'postulante@example.com',
     applicantName: 'Lucía Méndez',
-    notificationEmail: 'edutec@flacso.edu.uy',
+    notificationEmails: ['edutec@flacso.edu.uy'],
     values: {
       nombre: { key: 'nombre', label: 'Nombre', value: 'Lucía' },
     },

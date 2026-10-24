@@ -239,17 +239,17 @@ export function renderAllNotifications(
   // 1. Applicant notification
   notifications.push(renderApplicantNotification(snapshot));
 
-  // 2. Target notification (if notificationEmail configured)
-  const targetEmail = snapshot.notificationEmail ? snapshot.notificationEmail.toLowerCase().trim() : undefined;
-  if (targetEmail) {
-    notifications.push(renderOperationalNotification(snapshot, 'target', targetEmail));
+  // 2. Target notifications (one per configured offer email)
+  const seenEmails = new Set<string>();
+  for (const rawTarget of snapshot.notificationEmails ?? []) {
+    const targetEmail = rawTarget.toLowerCase().trim();
+    if (targetEmail && !seenEmails.has(targetEmail)) {
+      seenEmails.add(targetEmail);
+      notifications.push(renderOperationalNotification(snapshot, 'target', targetEmail));
+    }
   }
 
-  // 3. Master notifications (deduplicated against targetEmail and each other)
-  const seenEmails = new Set<string>();
-  if (targetEmail) {
-    seenEmails.add(targetEmail);
-  }
+  // 3. Master notifications (deduplicated against target emails and each other)
 
   for (const rawMaster of masterEmails) {
     const masterEmail = rawMaster.toLowerCase().trim();

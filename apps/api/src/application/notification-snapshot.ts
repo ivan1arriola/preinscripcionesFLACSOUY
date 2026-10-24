@@ -15,7 +15,8 @@ export interface SubmissionNotificationSnapshot {
   targetKind: 'academic_offer' | 'seminar';
   applicantEmail: string;
   applicantName?: string;
-  notificationEmail?: string;
+  /** Optional: snapshots persisted before multi-recipient support do not include it. */
+  notificationEmails?: string[];
   values: Record<string, NotificationFieldValue>;
   orderedFieldKeys: string[];
   spreadsheetRowUrl: string;
@@ -161,10 +162,13 @@ export function buildSubmissionNotificationSnapshot(params: BuildSnapshotParams)
   const applicantNameParts = [firstName, lastName].filter((s) => s && s !== '-');
   const applicantName = applicantNameParts.length > 0 ? applicantNameParts.join(' ') : undefined;
 
-  const notificationEmail =
-    target.notificationEmail && target.notificationEmail.trim().length > 0
-      ? target.notificationEmail.trim().toLowerCase()
-      : undefined;
+  const notificationEmails = [
+    ...new Set(
+      (target.notificationEmails ?? [])
+        .map((email) => email.trim().toLowerCase())
+        .filter((email) => email.length > 0)
+    ),
+  ];
 
   return {
     submissionId,
@@ -173,7 +177,7 @@ export function buildSubmissionNotificationSnapshot(params: BuildSnapshotParams)
     targetKind: target.kind,
     applicantEmail,
     applicantName,
-    notificationEmail,
+    notificationEmails,
     values,
     orderedFieldKeys,
     spreadsheetRowUrl,
