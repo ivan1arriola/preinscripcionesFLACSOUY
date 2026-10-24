@@ -86,6 +86,11 @@ export type WordPressTarget = z.infer<typeof WordPressTargetSchema>;
 export interface WordPressClientOptions {
   baseUrl: string;
   timeoutMs?: number;
+  /**
+   * Token del portal (FLACSO_PREINSCRIPCIONES_CATALOG_TOKEN en WordPress). Sin él,
+   * WordPress entrega el catálogo público, que no incluye los correos de notificación.
+   */
+  catalogToken?: string;
 }
 
 const WordPressAgreementSchema = z.object({
@@ -96,10 +101,12 @@ const WordPressAgreementSchema = z.object({
 export class WordPressClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly catalogToken?: string;
 
   constructor(options: WordPressClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.timeoutMs = options.timeoutMs ?? 5000;
+    this.catalogToken = options.catalogToken?.trim() || undefined;
   }
 
   async getPreinscriptions(): Promise<WordPressV1Response> {
@@ -108,7 +115,10 @@ export class WordPressClient {
 
     try {
       response = await fetch(url, {
-        headers: { Accept: 'application/json' },
+        headers: this.catalogToken
+          ? { Accept: 'application/json', Authorization: `Bearer ${this.catalogToken}` }
+          : { Accept: 'application/json' },
+        cache: 'no-store',
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (err: any) {

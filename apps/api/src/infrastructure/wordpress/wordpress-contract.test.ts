@@ -273,6 +273,18 @@ describe('WordPress Client & Contract Adapter', () => {
     await expect(client.getPreinscriptions()).rejects.toThrow(/JSON/);
   });
 
+  it('sends the portal token only when configured, so offer emails stay private', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => simplifiedV1Response });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new WordPressClient({ baseUrl: 'https://flacso.edu.uy', catalogToken: ' portal-token ' }).getPreinscriptions();
+    expect(fetchMock.mock.calls[0]![1].headers).toEqual({ Accept: 'application/json', Authorization: 'Bearer portal-token' });
+    expect(fetchMock.mock.calls[0]![1].cache).toBe('no-store');
+
+    await new WordPressClient({ baseUrl: 'https://flacso.edu.uy' }).getPreinscriptions();
+    expect(fetchMock.mock.calls[1]![1].headers).toEqual({ Accept: 'application/json' });
+  });
+
   it('rejects unknown contract version', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

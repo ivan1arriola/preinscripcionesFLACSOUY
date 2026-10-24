@@ -48,10 +48,14 @@ const telegramAlertRepository = new PostgresTelegramAlertRepository(db);
 
 const catalog = process.env.WORDPRESS_URL
   ? new WordPressAcademicCatalog(
-      new WordPressClient({ baseUrl: process.env.WORDPRESS_URL }),
+      new WordPressClient({ baseUrl: process.env.WORDPRESS_URL, catalogToken: process.env.WORDPRESS_CATALOG_TOKEN }),
       new PostgresWordPressCache(db)
     )
   : new FixtureAcademicCatalog();
+
+if (process.env.WORDPRESS_URL && !process.env.WORDPRESS_CATALOG_TOKEN?.trim()) {
+  console.warn('[Catalog] WORDPRESS_CATALOG_TOKEN no configurado: no se notificará a los correos de las ofertas académicas.');
+}
 
 const repository = new PostgresSubmissionRepository(db);
 

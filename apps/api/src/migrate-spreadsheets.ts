@@ -54,7 +54,7 @@ Opciones:
 
   const catalog = process.env.WORDPRESS_URL
     ? new WordPressAcademicCatalog(
-        new WordPressClient({ baseUrl: process.env.WORDPRESS_URL }),
+        new WordPressClient({ baseUrl: process.env.WORDPRESS_URL, catalogToken: process.env.WORDPRESS_CATALOG_TOKEN }),
         new PostgresWordPressCache(db)
       )
     : new FixtureAcademicCatalog();

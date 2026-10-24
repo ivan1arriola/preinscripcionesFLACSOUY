@@ -28,6 +28,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgres://flacso:flacso_password@postgres:5432/flacso_preinscripciones
       WORDPRESS_URL: ${WORDPRESS_URL:-}
+      WORDPRESS_CATALOG_TOKEN: ${WORDPRESS_CATALOG_TOKEN:-}
       ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:-web@flacso.edu.uy}
       APP_SETTINGS_ENCRYPTION_KEY: ${APP_SETTINGS_ENCRYPTION_KEY:-}
       PREINSCRIPCIONES_HMAC_SECRET: ${PREINSCRIPCIONES_HMAC_SECRET:-}
