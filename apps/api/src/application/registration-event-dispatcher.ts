@@ -19,6 +19,8 @@ export class RegistrationEventDispatcher {
       fetch?: RegistrationEventFetch;
       timeoutMs?: number;
       workerId?: string;
+      /** Se invoca cuando un evento queda en 'failed' y requiere conciliación manual. */
+      onPermanentFailure?: (failure: { submissionId: string; safeCode: string }) => Promise<void>;
     } = {}
   ) {
     this.workerId = options.workerId ?? `registration-outbox-${crypto.randomUUID()}`;
@@ -84,7 +86,8 @@ export class RegistrationEventDispatcher {
         }).where('id', '=', row.id).where('locked_by', '=', row.locked_by ?? '').execute();
         return;
       }
-      const retryable = response.status === 429 || response.status >= 500;
+      // 401/403 suelen ser reloj desfasado o rotación del secreto: se reintentan.
+      const retryable = response.status === 401 || response.status === 403 || response.status === 429 || response.status >= 500;
       await this.recordFailure(row, `upstream_http_${response.status}`, retryable);
     } catch (error) {
       await this.recordFailure(row, error instanceof Error && error.name === 'AbortError' ? 'upstream_timeout' : 'upstream_transport', true);
@@ -105,6 +108,14 @@ export class RegistrationEventDispatcher {
       last_error: safeCode,
       updated_at: new Date(),
     }).where('id', '=', row.id).where('locked_by', '=', row.locked_by ?? '').execute();
+
+    if (status === 'failed' && this.options.onPermanentFailure) {
+      try {
+        await this.options.onPermanentFailure({ submissionId: row.submission_id, safeCode });
+      } catch (error) {
+        console.error('[RegistrationOutbox] no se pudo avisar el fallo definitivo:', error instanceof Error ? error.message : 'error');
+      }
+    }
   }
 
   start(intervalMs = 5_000): () => void {

@@ -75,6 +75,22 @@ telegramDispatcher.start(15_000);
 const registrationEventDispatcher = new RegistrationEventDispatcher(db, {
   endpoint: process.env.FLACSO_MAILING_REGISTRATIONS_URL,
   secret: process.env.PREINSCRIPCIONES_HMAC_SECRET,
+  onPermanentFailure: async ({ submissionId, safeCode }) => {
+    const telegramConfig = await loadTelegramConfig(encryptedSettingsService);
+    if (!telegramConfig.enabled) return;
+    await telegramAlertRepo.ensureForSubmission(telegramConfig.chatIds.map((chatId) => ({
+      submissionId,
+      chatId,
+      eventType: 'recovery' as const,
+      dedupeKey: `${submissionId}:${chatId}:registration_event_failed`,
+      message: [
+        '⚠️ Evento de preinscripción no entregado a FLACSO Mailing',
+        `ID: ${submissionId}`,
+        `Motivo: ${safeCode}`,
+        'Requiere conciliación manual (registration_event_outbox).',
+      ].join('\n'),
+    })));
+  },
 });
 const stopRegistrationEventDispatcher = registrationEventDispatcher.start(5_000);
 

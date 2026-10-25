@@ -1,6 +1,6 @@
 # Integración con FLACSO Mailing
 
-Preinscripciones persiste `registration.status.changed` en `registration_event_outbox` dentro de la misma transacción que registra la solicitud efectiva. El worker de notificaciones envía esos eventos al endpoint configurado y reintenta errores de red, timeout, HTTP 429 y 5xx con backoff. Los rechazos HTTP 4xx y el agotamiento de 20 intentos quedan en estado `failed` para conciliación operativa. Al confirmar una respuesta 2xx se borra el cuerpo personal del outbox y permanece la clave idempotente.
+Preinscripciones persiste `registration.status.changed` en `registration_event_outbox` dentro de la misma transacción que registra la solicitud efectiva. El worker de notificaciones envía esos eventos al endpoint configurado y reintenta errores de red, timeout, HTTP 401, 403 (reloj desfasado o rotación del secreto), 429 y 5xx con backoff. Los demás rechazos HTTP 4xx y el agotamiento de 20 intentos quedan en estado `failed` para conciliación operativa y generan una alerta de Telegram (si está habilitado). Al confirmar una respuesta 2xx se borra el cuerpo personal del outbox y permanece la clave idempotente.
 
 ## Configuración
 
