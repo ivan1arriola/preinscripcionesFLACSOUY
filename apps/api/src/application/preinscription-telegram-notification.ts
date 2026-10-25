@@ -9,6 +9,7 @@ export interface BuildPreinscriptionTelegramMessageInput {
   targetTitle: string;
   targetKind: 'offer' | 'seminar' | string;
   occurredAt?: Date;
+  catalogValidation?: 'live' | 'cached';
 }
 
 export function buildPreinscriptionTelegramMessage(
@@ -33,6 +34,9 @@ export function buildPreinscriptionTelegramMessage(
     `Tipo: ${typeLabel}`,
     `Fecha: ${formattedDate}`,
     'Estado: Registrada',
+    ...(input.catalogValidation === 'cached'
+      ? ['⚠️ WordPress no respondía: se validó contra el catálogo guardado. Revisar que la convocatoria siga abierta.']
+      : []),
   ].join('\n');
 }
 
@@ -42,12 +46,13 @@ export interface EnqueuePreinscriptionTelegramNotificationsInput {
   target: AcademicTarget;
   chatIds: string[];
   occurredAt?: Date;
+  catalogValidation?: 'live' | 'cached';
 }
 
 export async function enqueuePreinscriptionTelegramNotifications(
   input: EnqueuePreinscriptionTelegramNotificationsInput
 ): Promise<TelegramAlertRecord[]> {
-  const { repository, submissionId, target, chatIds, occurredAt = new Date() } = input;
+  const { repository, submissionId, target, chatIds, occurredAt = new Date(), catalogValidation } = input;
   if (!chatIds || chatIds.length === 0) {
     return [];
   }
@@ -57,6 +62,7 @@ export async function enqueuePreinscriptionTelegramNotifications(
     targetTitle: target.title,
     targetKind: target.kind,
     occurredAt,
+    catalogValidation,
   });
 
   const inputs = chatIds.map((chatId) => ({

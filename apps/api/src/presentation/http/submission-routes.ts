@@ -179,6 +179,14 @@ export function createSubmissionRoutes(
               },
             });
             return;
+          case 'CATALOG_UNAVAILABLE':
+            res.status(503).json({
+              error: {
+                code: 'CATALOG_UNAVAILABLE',
+                message: result.message,
+              },
+            });
+            return;
           case 'VALIDATION_ERROR':
             res.status(400).json({
               error: {
@@ -411,6 +419,7 @@ export function createSubmissionRoutes(
               submissionId: result.submissionId,
               target: result.target,
               chatIds,
+              catalogValidation: result.catalogValidation,
             });
           }
         } catch (telegramError) {

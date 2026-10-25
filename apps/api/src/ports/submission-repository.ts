@@ -10,6 +10,8 @@ export interface ValidatedSubmissionRecord {
   files?: SubmissionFileToken[];
   profileVersionId?: string | null;
   profileSnapshot?: unknown | null;
+  /** 'cached' cuando WordPress no respondió y se validó contra el catálogo guardado. */
+  catalogValidation?: 'live' | 'cached';
 }
 
 export interface SavedSubmissionResult {

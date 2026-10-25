@@ -11,6 +11,7 @@ export interface WordPressAcademicCatalogOptions {
 
 export const DEFAULT_AGREEMENTS_TTL_SECONDS = 30 * 60;
 const AGREEMENTS_FAILURE_RETRY_BACKOFF_MS = 60 * 1000;
+const TARGETS_FAILURE_RETRY_BACKOFF_MS = 60 * 1000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
@@ -32,6 +33,8 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
   private readonly cacheKey: string;
   private agreementsRefresh?: Promise<AgreementOption[]>;
   private agreementsRetryAt = 0;
+  private targetsRefresh?: Promise<AcademicTarget[]>;
+  private targetsRetryAt = 0;
 
   constructor(
     private readonly client: WordPressClient,
@@ -54,7 +57,9 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
     // The public catalog must remain usable when WordPress is temporarily down.
     const stale = await this.cache.getStale(this.cacheKey);
     if (stale) {
-      void this.refreshTargets().catch(() => undefined);
+      if (Date.now() >= this.targetsRetryAt) {
+        void this.refreshTargets().catch(() => undefined);
+      }
       return stale.targets.map((t) => this.mapTarget(t));
     }
 
@@ -73,10 +78,14 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
 
   async revalidateTarget(id: string): Promise<AcademicTarget | null> {
     // Bypass cache to get authoritative state from WordPress
-    const fresh = await this.client.getPreinscriptions();
-    await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
-    const target = fresh.targets.find((t) => t.id === id);
-    return target ? this.mapTarget(target) : null;
+    const targets = await this.refreshTargets();
+    return targets.find((t) => t.id === id) ?? null;
+  }
+
+  async listCachedTargets(maxAgeMs: number): Promise<AcademicTarget[] | null> {
+    const cached = await this.cache.getStaleWithAge(this.cacheKey);
+    if (!cached || Date.now() - cached.cachedAt.getTime() > maxAgeMs) return null;
+    return cached.data.targets.map((t) => this.mapTarget(t));
   }
 
   async revalidateTargets(): Promise<AcademicTarget[]> {
@@ -105,10 +114,24 @@ export class WordPressAcademicCatalog implements AcademicCatalog {
     }
   }
 
-  private async refreshTargets(): Promise<AcademicTarget[]> {
-    const fresh = await this.client.getPreinscriptions();
-    await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
-    return fresh.targets.map((t) => this.mapTarget(t));
+  /** Una sola consulta a WordPress a la vez; tras un fallo, la revalidación en segundo plano espera. */
+  private refreshTargets(): Promise<AcademicTarget[]> {
+    if (!this.targetsRefresh) {
+      this.targetsRefresh = this.client.getPreinscriptions()
+        .then(async (fresh) => {
+          await this.cache.set(this.cacheKey, fresh, this.ttlSeconds);
+          this.targetsRetryAt = 0;
+          return fresh.targets.map((t) => this.mapTarget(t));
+        })
+        .catch((error) => {
+          this.targetsRetryAt = Date.now() + TARGETS_FAILURE_RETRY_BACKOFF_MS;
+          throw error;
+        })
+        .finally(() => {
+          this.targetsRefresh = undefined;
+        });
+    }
+    return this.targetsRefresh;
   }
 
   private refreshAgreements(): Promise<AgreementOption[]> {

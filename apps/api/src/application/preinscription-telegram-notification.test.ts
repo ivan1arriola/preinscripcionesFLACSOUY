@@ -38,6 +38,18 @@ describe('preinscription-telegram-notification', () => {
       });
 
       expect(message).toContain('Tipo: Seminario');
+      expect(message).not.toContain('catálogo guardado');
+    });
+
+    it('warns when the submission was validated against the cached catalog', () => {
+      const message = buildPreinscriptionTelegramMessage({
+        submissionId: 'sub_test_789',
+        targetTitle: 'Maestría en Género',
+        targetKind: 'academic_offer',
+        catalogValidation: 'cached',
+      });
+
+      expect(message).toContain('se validó contra el catálogo guardado');
     });
 
     it('safely truncates excessively long target titles', () => {

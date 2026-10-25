@@ -175,7 +175,7 @@ describe('WordPress Client & Contract Adapter', () => {
     );
   });
 
-  it('rejects WordPress records that try to supply objects with IDs in orientations', async () => {
+  it('drops (without failing the catalog) WordPress records that supply objects with IDs in orientations', async () => {
     const legacyOrientationResponse = {
       version: 1,
       targets: [
@@ -194,10 +194,12 @@ describe('WordPress Client & Contract Adapter', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
-    await expect(client.getPreinscriptions()).rejects.toThrow();
+    const response = await client.getPreinscriptions();
+    expect(response.targets).toEqual([]);
+    expect(response.rejectedTargets?.map((r) => r.id)).toEqual([simplifiedV1Response.targets[0]!.id]);
   });
 
-  it('rejects WordPress records that try to supply objects with IDs in mentions', async () => {
+  it('drops (without failing the catalog) WordPress records that supply objects with IDs in mentions', async () => {
     const legacyMentionResponse = {
       version: 1,
       targets: [
@@ -216,10 +218,12 @@ describe('WordPress Client & Contract Adapter', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
-    await expect(client.getPreinscriptions()).rejects.toThrow();
+    const response = await client.getPreinscriptions();
+    expect(response.targets).toEqual([]);
+    expect(response.rejectedTargets?.map((r) => r.id)).toEqual([simplifiedV1Response.targets[0]!.id]);
   });
 
-  it('rejects academic_offer records missing offer.type', async () => {
+  it('drops (without failing the catalog) academic_offer records missing offer.type', async () => {
     const invalidTargetResponse = {
       version: 1,
       targets: [
@@ -243,7 +247,9 @@ describe('WordPress Client & Contract Adapter', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
-    await expect(client.getPreinscriptions()).rejects.toThrow();
+    const response = await client.getPreinscriptions();
+    expect(response.targets).toEqual([]);
+    expect(response.rejectedTargets?.map((r) => r.id)).toEqual([simplifiedV1Response.targets[0]!.id]);
   });
 
   it('rejects HTTP non-200 responses with safe redacted error', async () => {
@@ -319,6 +325,66 @@ describe('WordPress Client & Contract Adapter', () => {
     const [target] = await catalog.listTargets();
 
     expect(target!.notificationEmails).toEqual(['coordinacion@flacso.edu.uy', 'secretaria@flacso.edu.uy']);
+  });
+
+  it('keeps valid targets when another target breaks the contract', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ...simplifiedV1Response,
+        targets: [{ ...simplifiedV1Response.targets[0], kind: 'unknown' }, ...simplifiedV1Response.targets.slice(1)],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const response = await new WordPressClient({ baseUrl: 'https://flacso.edu.uy' }).getPreinscriptions();
+
+    expect(response.targets).toHaveLength(simplifiedV1Response.targets.length - 1);
+    expect(response.rejectedTargets).toEqual([
+      expect.objectContaining({ id: simplifiedV1Response.targets[0]!.id }),
+    ]);
+  });
+
+  it('shares one WordPress request between concurrent revalidations and backs off after a failure', async () => {
+    let calls = 0;
+    const fetchMock = vi.fn().mockImplementation(async () => {
+      calls++;
+      if (calls === 1) return { ok: true, status: 200, json: async () => simplifiedV1Response };
+      throw new Error('Connection refused');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const catalog = new WordPressAcademicCatalog(
+      new WordPressClient({ baseUrl: 'https://flacso.edu.uy' }),
+      new MemoryWordPressCache(),
+      { ttlSeconds: -1 }
+    );
+
+    await Promise.all([catalog.revalidateTargets(), catalog.revalidateTargets(), catalog.revalidateTarget('x')]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await expect(catalog.revalidateTargets()).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // Stale cache is served and no background refresh is attempted during the back-off window.
+    await catalog.listTargets();
+    await catalog.listTargets();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('only returns cached targets for submissions while they are recent enough', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => simplifiedV1Response }));
+    const catalog = new WordPressAcademicCatalog(
+      new WordPressClient({ baseUrl: 'https://flacso.edu.uy' }),
+      new MemoryWordPressCache(),
+      { ttlSeconds: 60 }
+    );
+
+    expect(await catalog.listCachedTargets(60_000)).toBeNull();
+    await catalog.revalidateTargets();
+    expect(await catalog.listCachedTargets(60_000)).toHaveLength(3);
+    expect(await catalog.listCachedTargets(-1)).toBeNull();
   });
 
   it('caches targets and uses stale cache on upstream failure', async () => {
@@ -444,7 +510,7 @@ describe('WordPress Client & Contract Adapter', () => {
     } as Response);
   });
 
-  it('rejects targets with invalid notificationEmail format', async () => {
+  it('keeps targets whose notificationEmail is invalid; the address is filtered later', async () => {
     const invalidEmailResponse = {
       version: 1,
       targets: [
@@ -463,7 +529,9 @@ describe('WordPress Client & Contract Adapter', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const client = new WordPressClient({ baseUrl: 'https://flacso.edu.uy' });
-    await expect(client.getPreinscriptions()).rejects.toThrow();
+    const response = await client.getPreinscriptions();
+    expect(response.targets).toHaveLength(1);
+    expect(response.rejectedTargets).toBeUndefined();
   });
 
   it('revalidates single target bypassing cache', async () => {

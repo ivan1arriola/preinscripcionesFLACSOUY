@@ -35,7 +35,8 @@ export const WordPressTargetSchema = z.object({
   id: z.string(),
   kind: z.enum(['academic_offer', 'seminar']),
   title: z.string(),
-  notificationEmail: z.string().email().nullable().optional(),
+  // Sin .email(): normalizeNotificationEmails descarta direcciones inválidas sin invalidar el target.
+  notificationEmail: z.string().nullable().optional(),
   notificationEmails: z.array(z.string()).optional(),
   registrationOpen: z.boolean(),
   registrationAvailability: z.enum(['open', 'closed', 'conflict']).optional(),
@@ -80,7 +81,20 @@ export const WordPressV1ResponseSchema = z.object({
   targets: z.array(WordPressTargetSchema),
 });
 
-export type WordPressV1Response = z.infer<typeof WordPressV1ResponseSchema>;
+/** Sobre del contrato: cada target se valida por separado para que uno inválido no tire el catálogo. */
+const WordPressV1EnvelopeSchema = z.object({
+  version: z.literal(1),
+  targets: z.array(z.unknown()),
+});
+
+export interface RejectedWordPressTarget {
+  id: string;
+  issues: string[];
+}
+
+export type WordPressV1Response = z.infer<typeof WordPressV1ResponseSchema> & {
+  rejectedTargets?: RejectedWordPressTarget[];
+};
 export type WordPressTarget = z.infer<typeof WordPressTargetSchema>;
 
 export interface WordPressClientOptions {
@@ -139,15 +153,40 @@ export class WordPressClient {
       throw new WordPressClientError('Respuesta de WordPress no es un JSON válido');
     }
 
-    const parseResult = WordPressV1ResponseSchema.safeParse(payload);
-    if (!parseResult.success) {
-      const issueDetails = parseResult.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
+    const envelope = WordPressV1EnvelopeSchema.safeParse(payload);
+    if (!envelope.success) {
+      const issueDetails = envelope.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(', ');
       throw new WordPressClientError(
         `Respuesta de WordPress incompatible con el contrato v1: ${issueDetails}`
       );
     }
 
-    return parseResult.data;
+    const targets: WordPressTarget[] = [];
+    const rejectedTargets: RejectedWordPressTarget[] = [];
+    envelope.data.targets.forEach((rawTarget, index) => {
+      const parsed = WordPressTargetSchema.safeParse(rawTarget);
+      if (parsed.success) {
+        targets.push(parsed.data);
+        return;
+      }
+      const rawId = (rawTarget as { id?: unknown } | null)?.id;
+      rejectedTargets.push({
+        id: typeof rawId === 'string' ? rawId : `#${index}`,
+        issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      });
+    });
+
+    if (rejectedTargets.length > 0) {
+      // Sólo id y rutas del error: nunca valores, que pueden incluir correos.
+      console.warn(
+        `[Catalog] ${rejectedTargets.length} destino(s) de WordPress descartado(s) por no cumplir el contrato v1:`,
+        rejectedTargets.map((r) => `${r.id} (${r.issues.map((issue) => issue.split(':')[0]).join(', ')})`).join('; ')
+      );
+    }
+
+    return rejectedTargets.length > 0
+      ? { version: envelope.data.version, targets, rejectedTargets }
+      : { version: envelope.data.version, targets };
   }
 
   async getAgreements(): Promise<Array<{ id: string; label: string }>> {

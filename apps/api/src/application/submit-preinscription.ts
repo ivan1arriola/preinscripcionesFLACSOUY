@@ -8,6 +8,11 @@ import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import type { AcademicTarget, FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { buildSpreadsheetSchema, buildSpreadsheetValues } from '../domain/spreadsheet-schema.js';
 
+/** Antigüedad máxima del catálogo guardado para aceptar preinscripciones con WordPress caído. */
+export const CACHED_CATALOG_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+export type CatalogValidation = 'live' | 'cached';
+
 export interface SubmitPreinscriptionCommand {
   clientSubmissionId?: string;
   targetId: string;
@@ -28,10 +33,11 @@ export type SubmitPreinscriptionResult =
       target: AcademicTarget;
       form: FormDefinition;
       normalizedValues: Record<string, string>;
+      catalogValidation: CatalogValidation;
     }
   | {
       ok: false;
-      code: 'NOT_FOUND' | 'CLOSED' | 'INCOMPATIBLE_FORM' | 'STALE_REVISION' | 'VALIDATION_ERROR';
+      code: 'NOT_FOUND' | 'CLOSED' | 'INCOMPATIBLE_FORM' | 'STALE_REVISION' | 'VALIDATION_ERROR' | 'CATALOG_UNAVAILABLE';
       message: string;
       fieldErrors?: Record<string, string[]>;
       issues?: string[];
@@ -42,8 +48,19 @@ export async function submitPreinscription(
   repository: SubmissionRepository,
   command: SubmitPreinscriptionCommand = {} as SubmitPreinscriptionCommand,
 ): Promise<SubmitPreinscriptionResult> {
-  // 1. Re-query and revalidate the academic catalog during submission
-  const target = await catalog.revalidateTarget(command.targetId);
+  // 1. Re-query and revalidate the academic catalog during submission.
+  // Si WordPress no responde, se valida contra el catálogo guardado (acotado en antigüedad)
+  // para no perder el formulario y los documentos que el postulante ya completó.
+  const resolved = await resolveCatalogForSubmission(catalog);
+  if (!resolved) {
+    return {
+      ok: false,
+      code: 'CATALOG_UNAVAILABLE',
+      message: 'No pudimos verificar la convocatoria en este momento. Sus datos no se perdieron: intente enviar nuevamente en unos minutos.',
+    };
+  }
+  const { targets: catalogTargets, catalogValidation } = resolved;
+  const target = catalogTargets.find((t) => t.id === command.targetId) ?? null;
 
   if (!target) {
     return {
@@ -63,8 +80,7 @@ export async function submitPreinscription(
   }
 
   if (target.kind === 'seminar') {
-    const allTargets = await catalog.revalidateTargets();
-    const resolutions = resolveSeminarPermalinks(allTargets);
+    const resolutions = resolveSeminarPermalinks(catalogTargets);
     const rawUrl = target.urls?.legacyRegistration;
     const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
     const resolution = permalink ? resolutions.get(permalink) : undefined;
@@ -134,6 +150,7 @@ export async function submitPreinscription(
     files: command.files,
     profileVersionId: CANONICAL_SCHEMA_VERSION,
     profileSnapshot: form as any,
+    catalogValidation,
   });
 
   const spreadsheetSchema = buildSpreadsheetSchema(form);
@@ -149,5 +166,23 @@ export async function submitPreinscription(
     target,
     form,
     normalizedValues,
+    catalogValidation,
   };
+}
+
+async function resolveCatalogForSubmission(
+  catalog: AcademicCatalog,
+): Promise<{ targets: AcademicTarget[]; catalogValidation: CatalogValidation } | null> {
+  try {
+    return { targets: await catalog.revalidateTargets(), catalogValidation: 'live' };
+  } catch (error) {
+    const cached = catalog.listCachedTargets
+      ? await catalog.listCachedTargets(CACHED_CATALOG_MAX_AGE_MS)
+      : null;
+    console.warn(
+      `[Catalog] WordPress no respondió al validar una preinscripción; ${cached ? 'se usa el catálogo guardado' : 'no hay catálogo guardado reciente'}:`,
+      error instanceof Error ? error.message : error,
+    );
+    return cached ? { targets: cached, catalogValidation: 'cached' } : null;
+  }
 }

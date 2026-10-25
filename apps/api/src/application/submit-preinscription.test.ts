@@ -85,6 +85,49 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions[0]?.values.celular).toBe('+59899123456');
     expect(repo.submissions[0]?.values.orientacion).toBe('Educación');
     expect(repo.submissions[0]?.values.mencion).toBe('Tecnología Educativa');
+    expect(result.catalogValidation).toBe('live');
+  });
+
+  describe('when WordPress does not respond', () => {
+    function unavailableCatalog(cached: AcademicTarget[] | null): AcademicCatalog {
+      return {
+        listTargets: () => catalog.listTargets(),
+        getTarget: (id) => catalog.getTarget(id),
+        revalidateTarget: async () => { throw new Error('WordPress caído'); },
+        revalidateTargets: async () => { throw new Error('WordPress caído'); },
+        listCachedTargets: async () => cached,
+      };
+    }
+
+    it('accepts the submission against the recent cached catalog and marks it', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const result = await submitPreinscription(unavailableCatalog(await catalog.listTargets()), repo, {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: validValues,
+        files: baseFiles,
+      });
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.catalogValidation).toBe('cached');
+      expect(repo.submissions[0]?.catalogValidation).toBe('cached');
+    });
+
+    it('returns CATALOG_UNAVAILABLE without persisting when there is no recent cache', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const result = await submitPreinscription(unavailableCatalog(null), repo, {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: validValues,
+        files: baseFiles,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.code).toBe('CATALOG_UNAVAILABLE');
+      expect(repo.submissions).toHaveLength(0);
+    });
   });
 
   it('rejects a submission when WordPress target revision changes (stale form revision) but keeps prior submissions unchanged', async () => {

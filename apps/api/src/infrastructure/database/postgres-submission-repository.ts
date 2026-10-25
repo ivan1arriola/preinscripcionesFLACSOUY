@@ -107,6 +107,7 @@ export class PostgresSubmissionRepository implements SubmissionRepository, Regis
             config_revision: record.configRevision,
             profile_version_id: record.profileVersionId ?? null,
             profile_snapshot: record.profileSnapshot ? JSON.stringify(record.profileSnapshot) : null,
+            catalog_validation: record.catalogValidation ?? 'live',
           })
           .execute();
 

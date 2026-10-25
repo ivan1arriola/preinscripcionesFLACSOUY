@@ -98,7 +98,7 @@ async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: Spreadsheet
         'Inscripciones',
       )
     : undefined;
-  app.use('/submissions', createSubmissionRoutes(
+  app.use('/targets/:id/submissions', createSubmissionRoutes(
     catalog,
     repository,
     { storage, drive },
@@ -124,7 +124,7 @@ describe('Submission file orchestration', () => {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('server address missing');
     try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+      const response = await fetch(`http://127.0.0.1:${address.port}/targets/offer-1/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
@@ -142,7 +142,7 @@ describe('Submission file orchestration', () => {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('server address missing');
     try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+      const response = await fetch(`http://127.0.0.1:${address.port}/targets/offer-1/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
@@ -194,7 +194,7 @@ describe('Submission file orchestration', () => {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('server address missing');
     try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+      const response = await fetch(`http://127.0.0.1:${address.port}/targets/offer-1/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
@@ -228,7 +228,7 @@ describe('Submission file orchestration', () => {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('server address missing');
     try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+      const response = await fetch(`http://127.0.0.1:${address.port}/targets/offer-1/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
@@ -266,7 +266,7 @@ describe('Submission file orchestration', () => {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('server address missing');
     try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+      const response = await fetch(`http://127.0.0.1:${address.port}/targets/offer-1/submissions`, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),
       });
@@ -301,7 +301,7 @@ describe('Submission file orchestration', () => {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('server address missing');
     try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/submissions`, {
+      const response = await fetch(`http://127.0.0.1:${address.port}/targets/offer-1/submissions`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
         body: JSON.stringify({ configRevision: effectiveRevision, values, files: testFiles }),

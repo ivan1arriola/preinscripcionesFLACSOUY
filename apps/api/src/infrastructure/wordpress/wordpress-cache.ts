@@ -6,6 +6,8 @@ import type { AgreementOption } from '@flacso/contracts';
 export interface WordPressCache {
   get(key: string): Promise<WordPressV1Response | null>;
   getStale(key: string): Promise<WordPressV1Response | null>;
+  /** Como getStale, con la fecha en que se guardó (para acotar cuánto tiempo se confía en la caché). */
+  getStaleWithAge(key: string): Promise<{ data: WordPressV1Response; cachedAt: Date } | null>;
   set(key: string, data: WordPressV1Response, ttlSeconds: number): Promise<void>;
   getAgreements(): Promise<AgreementOption[] | null>;
   getStaleAgreements(): Promise<AgreementOption[] | null>;
@@ -13,7 +15,7 @@ export interface WordPressCache {
 }
 
 export class MemoryWordPressCache implements WordPressCache {
-  private store = new Map<string, { data: WordPressV1Response; expiresAt: number }>();
+  private store = new Map<string, { data: WordPressV1Response; expiresAt: number; cachedAt: number }>();
   private agreements: { data: AgreementOption[]; expiresAt: number } | null = null;
 
   async get(key: string): Promise<WordPressV1Response | null> {
@@ -28,10 +30,16 @@ export class MemoryWordPressCache implements WordPressCache {
     return entry ? entry.data : null;
   }
 
+  async getStaleWithAge(key: string): Promise<{ data: WordPressV1Response; cachedAt: Date } | null> {
+    const entry = this.store.get(key);
+    return entry ? { data: entry.data, cachedAt: new Date(entry.cachedAt) } : null;
+  }
+
   async set(key: string, data: WordPressV1Response, ttlSeconds: number): Promise<void> {
     this.store.set(key, {
       data,
       expiresAt: Date.now() + ttlSeconds * 1000,
+      cachedAt: Date.now(),
     });
   }
 
@@ -71,15 +79,19 @@ export class PostgresWordPressCache implements WordPressCache {
   }
 
   async getStale(key: string): Promise<WordPressV1Response | null> {
+    return (await this.getStaleWithAge(key))?.data ?? null;
+  }
+
+  async getStaleWithAge(key: string): Promise<{ data: WordPressV1Response; cachedAt: Date } | null> {
     try {
       const row = await (this.db as any)
         .selectFrom('technical_cache')
-        .select(['payload'])
+        .select(['payload', 'cached_at'])
         .where('key', '=', key)
         .executeTakeFirst();
 
       if (!row) return null;
-      return JSON.parse(row.payload) as WordPressV1Response;
+      return { data: JSON.parse(row.payload) as WordPressV1Response, cachedAt: new Date(row.cached_at) };
     } catch {
       return null;
     }

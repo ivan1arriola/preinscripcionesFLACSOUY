@@ -49,6 +49,7 @@ export interface SubmissionsTable {
   submitted_at: Generated<Date>;
   profile_version_id: string | null;
   profile_snapshot: unknown | null;
+  catalog_validation: Generated<'live' | 'cached'>;
 }
 
 export interface SubmissionProcessingTable {
