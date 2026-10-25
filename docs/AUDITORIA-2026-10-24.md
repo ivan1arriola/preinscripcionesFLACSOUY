@@ -483,3 +483,46 @@ Verificación tras los cambios: typecheck limpio en API y web; API 473 tests y w
 - ESLint.
 - Código muerto menor (`startNotificationSupervisor`, `calculateNextAttemptTime`, etc.) y `docs/superpowers/`.
 - Los 28 tests de PostgreSQL y los e2e no se pudieron ejecutar; en particular `findByClientSubmissionId` del repositorio Postgres está sin probar contra una base real.
+
+---
+
+## 14. Verificación en el servidor de producción (2026-10-25, solo lectura)
+
+Acceso por `ssh servidor-flacso` (AWS EC2, Ubuntu, ISPConfig). Solo se ejecutaron comandos de lectura: conteos agregados de la base, estado de contenedores, nombres de variables (nunca sus valores), permisos de archivos y logs filtrados. No se modificó nada.
+
+### Estado del despliegue
+- Producción corre el commit `cbebc8c` (7 de octubre): **18 commits por detrás** del repositorio local. Funcionan 22 preinscripciones registradas (20 exitosas, 2 fallidas) entre el 5 y el 23 de octubre.
+- No existen todavía la tabla `mautic_contact_sync` ni la columna `submissions.catalog_validation`: el próximo despliegue ejecutará las migraciones 019 a 023, incluida la 021, que **elimina** `registration_event_outbox` (irreversible; contenía correos de postulantes pendientes de enviar).
+- Apache hace `ProxyPass` a `127.0.0.1:3300` con `ProxyTimeout 120` y agrega `X-Forwarded-Proto`; el dominio apunta directo al servidor (sin CDN). Son exactamente **2 proxies** (Apache → nginx), por lo que `TRUST_PROXY_HOPS=2` es correcto.
+
+### Hallazgos confirmados con datos reales
+| Hallazgo | Evidencia en producción |
+|---|---|
+| F-05 (nginx 1 MB) | **32 respuestas 413** en el log de nginx, **31 de ellas en `POST /api/uploads`** (frente a 73 subidas exitosas): postulantes reales no pudieron adjuntar documentos. El nginx desplegado no define `client_max_body_size` |
+| F-27 (token del catálogo) | `WORDPRESS_CATALOG_TOKEN` no está en `.env.production` ni en el contenedor. En 20 preinscripciones exitosas hay 20 correos al postulante y 40 a "master", pero **0 a las coordinaciones de oferta** (`audience = 'target'`). Además la constante `FLACSO_PREINSCRIPCIONES_CATALOG_TOKEN` **tampoco está definida en ningún `wp-config.php`** del servidor |
+| F-18 (WordPress) | El catálogo público devuelve 76 destinos, **todos con `urls.edit`** (enlace a `wp-admin`), y 0 con correos de notificación |
+| F-22 (subida y WordPress) | 3 respuestas 500 en `/api/uploads` y 3 errores "No se pudo conectar con WordPress: timeout" en el log de la API |
+| F-04 (caída por error de pool) | El log de la API conserva `Unhandled 'error' event ... terminating connection due to administrator command`: el proceso se cayó cuando se reinició PostgreSQL, exactamente el escenario corregido en `kysely.ts` |
+| F-07 (idempotencia) | 0 de 22 envíos tienen `client_submission_id` |
+| F-44 (sesiones) | 8 sesiones administrativas guardadas, las 8 vencidas |
+| F-36 (recuperación con adjuntos) | Un envío fallido (8 de octubre) terminó con "No se pudo recuperar: el archivo temporal … expiró o no se encuentra disponible" |
+
+### Otros hallazgos del servidor
+- **Contenedor `preinscripciones-postgres` olvidado**: es el PostgreSQL del `docker-compose.yml` de **desarrollo** (creado el 3 de octubre desde `/opt/flacso/preinscripcionesFLACSOUY/current/docker-compose.yml`), con usuario `flacso` y contraseña por defecto `flacso_password`, publicado en `0.0.0.0:5433`. La base `flacso_preinscripciones` **no tiene tablas** (no hay datos personales) y el puerto **no es alcanzable desde Internet** (probado desde fuera; lo bloquea el grupo de seguridad de AWS). `ufw` está inactivo, de modo que dependen únicamente de AWS. Conviene detenerlo y eliminarlo.
+- **Sin respaldos periódicos**: los únicos respaldos son los que toma `deploy-production.sh` en cada despliegue; el último es del 7 de octubre y no hay tarea `cron` de `pg_dump`. Las preinscripciones posteriores no están respaldadas.
+- **Secretos compatibles con la imagen sin root**: `.secrets/*.json` pertenecen al uid 1000 con modo 600, que es el mismo uid del usuario `node` de la imagen, de modo que el nuevo entrypoint podrá leerlos sin caer a root. El volumen de subidas pertenece a `root`: el `chown` automático lo corregirá.
+- **Clave de cifrado**: `APP_SETTINGS_ENCRYPTION_KEY` mide 44 caracteres (no es hexadecimal de 64). La validación nueva la sigue aceptando (≥ 32 caracteres, no es el valor de ejemplo) y se deriva igual que antes, de modo que los secretos ya guardados siguen descifrándose.
+- Espacio en disco: 67 % usado (35 GB libres). `.env.production` tiene modo 600.
+
+### Requisitos antes del próximo despliegue
+1. **Definir `FLACSO_PREINSCRIPCIONES_CATALOG_TOKEN` en el `wp-config.php` del sitio de WordPress y el mismo valor como `WORDPRESS_CATALOG_TOKEN` en `.env.production`** (mínimo 32 caracteres). El compose de producción ahora lo exige: sin la variable, `docker compose config` falla y el despliegue se detiene antes de tocar nada.
+2. Dejar `TRUST_PROXY_HOPS` sin definir (el valor por defecto en producción ya es 2) o fijarlo en 2.
+3. Tras desplegar: cargar las claves de reCAPTCHA v3 en el panel (pestaña "Seguridad") y activarlo.
+4. Verificar que Apache envía `X-Forwarded-For` (lo hace `mod_proxy` por defecto) mirando que el límite por IP no bloquee a todos a la vez.
+5. Programar un `pg_dump` periódico y retirar el contenedor `preinscripciones-postgres`.
+
+### Acciones aplicadas en el servidor (2026-10-25, a pedido)
+1. **Retirado el PostgreSQL de desarrollo olvidado** (`preinscripciones-postgres`): detenido y eliminado tras verificar 0 conexiones activas. El puerto 5433 ya no escucha; el volumen `current_postgres_data` se conservó (la base estaba vacía) y el stack de producción siguió sano (`/api/health` 200).
+2. **Respaldo diario instalado** en `/opt/flacso/preinscripcionesFLACSOUY/backup-db.sh` (versión del repositorio: `scripts/backup-db.sh`) y programado con `cron` del usuario `ubuntu` todos los días a las 03:00 (hora del servidor, UTC-3). Primera corrida de prueba correcta: 67 588 bytes, `gzip -t` íntegro, 23 tablas y las 22 preinscripciones en el volcado. Archivos con modo 600 en `/opt/flacso/backups/preinscripcionesFLACSOUY/daily/`, retención de 14 días, registro en `backup.log`.
+
+Siguen sin hacerse (requieren decisión o datos que no tengo): definir el token de WordPress en `wp-config.php` y `.env.production`, desplegar, y cargar las claves de reCAPTCHA. Los respaldos viven en el mismo disco del servidor; conviene copiarlos fuera de la máquina.
