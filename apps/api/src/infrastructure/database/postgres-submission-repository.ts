@@ -110,6 +110,25 @@ export class PostgresSubmissionRepository implements SubmissionRepository, Regis
           })
           .execute();
 
+        if (record.mauticContact) {
+          await trx
+            .insertInto('mautic_contact_sync')
+            .values({
+              id: `mcs_${crypto.randomUUID().replace(/-/g, '')}`,
+              submission_id: submissionId,
+              payload_json: JSON.stringify(record.mauticContact),
+              status: 'pending',
+              attempt_count: 0,
+              available_at: new Date(),
+              locked_until: null,
+              locked_by: null,
+              last_error: null,
+              mautic_contact_id: null,
+              synced_at: null,
+            })
+            .execute();
+        }
+
         await trx
           .insertInto('submission_processing')
           .values({

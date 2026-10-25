@@ -54,6 +54,8 @@ export interface WordPressTargetOffer {
   id: number;
   slug: string;
   name: string;
+  /** Abreviación de la oferta: código estable para los tags de Mautic. */
+  abbreviation?: string;
   type: string;
   orientations?: string[];
   mentions?: string[];

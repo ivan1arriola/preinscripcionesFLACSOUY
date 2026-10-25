@@ -7,11 +7,27 @@ import { normalizePermalink, resolvePermalinks } from '../domain/permalink-avail
 import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import type { AcademicTarget, FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { buildSpreadsheetSchema, buildSpreadsheetValues } from '../domain/spreadsheet-schema.js';
+import { buildMauticContactSync } from '../domain/mautic-contact.js';
 
 /** Antigüedad máxima del catálogo guardado para aceptar preinscripciones con WordPress caído. */
 export const CACHED_CATALOG_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 
 export type CatalogValidation = 'live' | 'cached';
+
+export interface SubmitPreinscriptionOptions {
+  /** Si devuelve true, se encola la sincronización del contacto del postulante con Mautic. */
+  isMauticContactSyncEnabled?: () => Promise<boolean>;
+}
+
+/** Una configuración ilegible nunca bloquea la preinscripción: sólo omite la sincronización. */
+async function isMauticContactSyncEnabled(options: SubmitPreinscriptionOptions): Promise<boolean> {
+  try {
+    return (await options.isMauticContactSyncEnabled?.()) === true;
+  } catch (error) {
+    console.warn('[Mautic] No se pudo leer la configuración de contactos; se omite la sincronización:', error instanceof Error ? error.message : error);
+    return false;
+  }
+}
 
 export interface SubmitPreinscriptionCommand {
   clientSubmissionId?: string;
@@ -47,6 +63,7 @@ export async function submitPreinscription(
   catalog: AcademicCatalog,
   repository: SubmissionRepository,
   command: SubmitPreinscriptionCommand = {} as SubmitPreinscriptionCommand,
+  options: SubmitPreinscriptionOptions = {},
 ): Promise<SubmitPreinscriptionResult> {
   // 1. Re-query and revalidate the academic catalog during submission.
   // Si WordPress no responde, se valida contra el catálogo guardado (acotado en antigüedad)
@@ -138,7 +155,10 @@ export async function submitPreinscription(
     };
   }
 
-  // 5. Persist submission
+  // 5. Persist submission (and, if enabled, enqueue the Mautic contact sync atomically)
+  const mauticContact = (await isMauticContactSyncEnabled(options))
+    ? buildMauticContactSync(target, normalizedValues)
+    : null;
   const saved = await repository.saveOrGet({
     clientSubmissionId: command.clientSubmissionId,
     targetId: target.id,
@@ -150,6 +170,7 @@ export async function submitPreinscription(
     profileVersionId: CANONICAL_SCHEMA_VERSION,
     profileSnapshot: form as any,
     catalogValidation,
+    mauticContact,
   });
 
   const spreadsheetSchema = buildSpreadsheetSchema(form);

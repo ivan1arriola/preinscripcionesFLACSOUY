@@ -115,6 +115,7 @@ export function createSubmissionRoutes(
   notificationDependencies?: SubmissionNotificationDependencies,
   recoveryDependencies?: SubmissionRecoveryDependencies,
   telegramDependencies?: SubmissionTelegramDependencies,
+  mauticDependencies?: { isContactSyncEnabled: () => Promise<boolean> },
 ): Router {
   const router = Router({ mergeParams: true });
 
@@ -141,6 +142,8 @@ export function createSubmissionRoutes(
         configRevision: parsed.data.configRevision,
         values: parsed.data.values,
         files: parsed.data.files,
+      }, {
+        isMauticContactSyncEnabled: mauticDependencies?.isContactSyncEnabled,
       });
 
       if (!result.ok) {

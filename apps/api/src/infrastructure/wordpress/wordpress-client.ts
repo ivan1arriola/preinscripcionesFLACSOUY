@@ -19,6 +19,8 @@ export const WordPressOfferSchema = z.object({
   id: z.number(),
   slug: z.string(),
   name: z.string(),
+  /** Abreviación de la oferta: código estable para los tags de Mautic. */
+  abbreviation: z.string().optional(),
   type: z.string().min(1),
   orientations: z.array(z.string()).optional(),
   mentions: z.array(z.string()).optional(),

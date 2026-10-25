@@ -1,4 +1,5 @@
 import type { SubmissionFileToken } from '@flacso/contracts';
+import type { MauticContactSync } from '../domain/mautic-contact.js';
 
 export interface ValidatedSubmissionRecord {
   clientSubmissionId?: string;
@@ -12,6 +13,8 @@ export interface ValidatedSubmissionRecord {
   profileSnapshot?: unknown | null;
   /** 'cached' cuando WordPress no respondió y se validó contra el catálogo guardado. */
   catalogValidation?: 'live' | 'cached';
+  /** Si está presente, se encola la sincronización del contacto con Mautic en la misma transacción. */
+  mauticContact?: MauticContactSync | null;
 }
 
 export interface SavedSubmissionResult {

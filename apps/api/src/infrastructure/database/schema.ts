@@ -232,6 +232,22 @@ export interface TelegramRecoveryAlertsTable {
   updated_at: Generated<Date>;
 }
 
+export interface MauticContactSyncTable {
+  id: string;
+  submission_id: string;
+  payload_json: string;
+  status: 'pending' | 'processing' | 'synced' | 'failed';
+  attempt_count: number;
+  available_at: Date;
+  locked_until: Date | null;
+  locked_by: string | null;
+  last_error: string | null;
+  mautic_contact_id: number | null;
+  synced_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -255,4 +271,5 @@ export interface DatabaseSchema {
   email_notifications: EmailNotificationsTable;
   submission_recoveries: SubmissionRecoveriesTable;
   telegram_recovery_alerts: TelegramRecoveryAlertsTable;
+  mautic_contact_sync: MauticContactSyncTable;
 }

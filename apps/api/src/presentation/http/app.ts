@@ -1,5 +1,5 @@
 import type { MauticClient } from '../../infrastructure/mautic/mautic-client.js';
-import type { MauticConfig } from '../../infrastructure/mautic/mautic-config.js';
+import { loadMauticConfig, type MauticConfig } from '../../infrastructure/mautic/mautic-config.js';
 import express, { type Express } from 'express';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../../ports/submission-repository.js';
@@ -201,6 +201,9 @@ export function createApp(dependencies: AppDependencies): Express {
             return [];
           },
         }
+      : undefined,
+    encryptedSettingsService
+      ? { isContactSyncEnabled: async () => (await loadMauticConfig(encryptedSettingsService)).contactsEnabled }
       : undefined,
   );
 

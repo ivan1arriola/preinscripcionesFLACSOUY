@@ -88,6 +88,41 @@ describe('submitPreinscription Use Case', () => {
     expect(result.catalogValidation).toBe('live');
   });
 
+  describe('Mautic contact sync', () => {
+    async function submitWith(isMauticContactSyncEnabled?: () => Promise<boolean>) {
+      const repo = new InMemorySubmissionRepository();
+      const result = await submitPreinscription(catalog, repo, {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: validValues,
+        files: baseFiles,
+      }, { isMauticContactSyncEnabled });
+      return { repo, result };
+    }
+
+    it('enqueues the applicant contact with stable profile and tags when enabled', async () => {
+      const { repo, result } = await submitWith(async () => true);
+      expect(result.ok).toBe(true);
+      expect(repo.submissions[0]?.mauticContact).toMatchObject({
+        email: 'valeria@example.com',
+        fields: { firstname: 'Valeria', lastname: 'González', flacso_origen: 'preinscripciones' },
+      });
+      expect(repo.submissions[0]?.mauticContact?.tags).toContain('origen-preinscripciones');
+      expect(JSON.stringify(repo.submissions[0]?.mauticContact)).not.toContain('3.456.789-4');
+    });
+
+    it('does not enqueue anything when disabled', async () => {
+      const { repo } = await submitWith(async () => false);
+      expect(repo.submissions[0]?.mauticContact).toBeNull();
+    });
+
+    it('still accepts the submission if the Mautic setting cannot be read', async () => {
+      const { repo, result } = await submitWith(async () => { throw new Error('clave de cifrado ausente'); });
+      expect(result.ok).toBe(true);
+      expect(repo.submissions[0]?.mauticContact).toBeNull();
+    });
+  });
+
   describe('when WordPress does not respond', () => {
     function unavailableCatalog(cached: AcademicTarget[] | null): AcademicCatalog {
       return {

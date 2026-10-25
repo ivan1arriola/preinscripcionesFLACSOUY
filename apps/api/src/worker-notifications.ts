@@ -7,6 +7,8 @@ import { PostgresSubmissionRecoveryRepository } from './infrastructure/database/
 import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
 import { createEmailProviderResolver } from './infrastructure/email/email-provider-resolver.js';
+import { createMauticClientCache, hasMauticCredentials, loadMauticConfig } from './infrastructure/mautic/mautic-config.js';
+import { MauticContactSyncDispatcher } from './application/mautic-contact-sync-dispatcher.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
 import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js';
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
@@ -71,6 +73,36 @@ const telegramDispatcher = new TelegramRecoveryAlertDispatcher({
 emailDispatcher.start(10_000);
 telegramDispatcher.start(15_000);
 
+const mauticClientFor = createMauticClientCache();
+const mauticContactSyncDispatcher = new MauticContactSyncDispatcher(db, {
+  getClient: async () => {
+    try {
+      const config = await loadMauticConfig(encryptedSettingsService);
+      return hasMauticCredentials(config) ? mauticClientFor(config) : null;
+    } catch (err) {
+      console.warn('[MauticContacts] Configuración de Mautic no disponible:', err instanceof Error ? err.message : err);
+      return null;
+    }
+  },
+  onPermanentFailure: async ({ submissionId, safeCode }) => {
+    const telegramConfig = await loadTelegramConfig(encryptedSettingsService);
+    if (!telegramConfig.enabled) return;
+    await telegramAlertRepo.ensureForSubmission(telegramConfig.chatIds.map((chatId) => ({
+      submissionId,
+      chatId,
+      eventType: 'recovery' as const,
+      dedupeKey: `${submissionId}:${chatId}:mautic_contact_failed`,
+      message: [
+        '⚠️ No se pudo registrar el contacto del postulante en Mautic',
+        `ID: ${submissionId}`,
+        `Motivo: ${safeCode}`,
+        'Revisar la configuración de Mautic (mautic_contact_sync).',
+      ].join('\n'),
+    })));
+  },
+});
+const stopMauticContactSync = mauticContactSyncDispatcher.start(10_000);
+
 const cleanupInterval = setInterval(async () => {
   try {
     const result = await cleanupExpiredRecoveries({
@@ -93,6 +125,7 @@ async function shutdown() {
   clearInterval(cleanupInterval);
   emailDispatcher.stop();
   telegramDispatcher.stop();
+  stopMauticContactSync();
   await db.destroy();
   console.log('[Worker] Worker detenido.');
   process.exit(0);

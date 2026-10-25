@@ -1,5 +1,5 @@
 import type { EncryptedSettingsService } from '../security/encrypted-settings.js';
-import type { MauticCredentials } from './mautic-client.js';
+import { MauticClient, type MauticCredentials } from './mautic-client.js';
 
 export const SETTING_MAUTIC_BASE_URL = 'mautic_base_url';
 export const SETTING_MAUTIC_CLIENT_ID = 'mautic_client_id';
@@ -38,6 +38,18 @@ export function hasMauticCredentials(config: MauticConfig): boolean {
 
 export function mauticCredentials(config: MauticConfig): MauticCredentials {
   return { baseUrl: config.baseUrl, clientId: config.clientId, clientSecret: config.clientSecret };
+}
+
+/** Un cliente por juego de credenciales: conserva el token OAuth2 entre lotes. */
+export function createMauticClientCache(): (config: MauticConfig) => MauticClient {
+  let cached: { key: string; client: MauticClient } | null = null;
+  return (config) => {
+    const key = `${config.baseUrl}|${config.clientId}|${config.clientSecret}`;
+    if (cached?.key !== key) {
+      cached = { key, client: new MauticClient(mauticCredentials(config)) };
+    }
+    return cached.client;
+  };
 }
 
 function parseTemplateId(raw: string | null): number | null {
