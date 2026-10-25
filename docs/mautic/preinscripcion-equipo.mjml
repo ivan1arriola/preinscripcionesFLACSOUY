@@ -1,0 +1,32 @@
+<mjml>
+  <mj-head>
+    <mj-title>{preinscripcion_asunto}</mj-title>
+    <mj-preview>Nueva preinscripción recibida.</mj-preview>
+    <mj-attributes>
+      <mj-all font-family="Roboto, Arial, Helvetica, sans-serif" />
+      <mj-text color="#2e2f34" font-size="15px" line-height="1.6" padding="0" />
+      <mj-section padding="0" />
+      <mj-column padding="0" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f8f9fa">
+    <mj-section background-color="#16396f" padding="20px 24px">
+      <mj-column>
+        <mj-text color="#fed222" font-size="12px" font-weight="700" letter-spacing="1px" padding="0 0 4px 0">PREINSCRIPCIONES · USO INTERNO</mj-text>
+        <mj-text color="#ffffff" font-size="20px" font-weight="700" line-height="1.3" padding="0">{preinscripcion_asunto}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#ffffff" padding="24px 24px">
+      <mj-column>
+        <!-- Datos de la preinscripción, enlaces a la planilla y a la carpeta de documentos (lo arma preinscripciones).
+             El correo del postulante va en este contenido: las plantillas no admiten Reply-To dinámico. -->
+        <mj-text padding="0">{preinscripcion_contenido}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#edf3fb" padding="14px 24px">
+      <mj-column>
+        <mj-text font-size="13px" color="#475467" padding="0">ID de preinscripción: <strong>{preinscripcion_id}</strong>. Contiene datos personales: no reenviar fuera del equipo.</mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

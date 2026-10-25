@@ -1,0 +1,40 @@
+<mjml>
+  <mj-head>
+    <mj-title>{preinscripcion_asunto}</mj-title>
+    <mj-preview>Recibimos tu preinscripción en FLACSO Uruguay.</mj-preview>
+    <mj-font name="Roboto" href="https://fonts.googleapis.com/css?family=Roboto:400,500,700" />
+    <mj-attributes>
+      <mj-all font-family="Roboto, Arial, Helvetica, sans-serif" />
+      <mj-text color="#2e2f34" font-size="16px" line-height="1.6" padding="0" font-family="Roboto, Arial, Helvetica, sans-serif" />
+      <mj-section padding="0" />
+      <mj-column padding="0" />
+    </mj-attributes>
+  </mj-head>
+  <mj-body background-color="#f8f9fa">
+    <mj-section background-color="#f8f9fa" padding="22px 12px 0 12px"><mj-column><mj-spacer height="1px" /></mj-column></mj-section>
+    <mj-section background-color="#16396f" padding="30px 24px 24px 24px">
+      <mj-column>
+        <mj-image src="https://081g5.mjt.lu/img2/081g5/bdb8cb4d-7c60-432b-995a-ffa64b382811/content" alt="Logo alternativo de FLACSO Uruguay por sus 20 años" width="230px" padding="0 0 16px 0" />
+        <mj-text align="center" color="#fed222" font-size="13px" font-weight="700" letter-spacing="1px" padding="0 0 8px 0">PREINSCRIPCIÓN</mj-text>
+        <mj-text align="center" color="#ffffff" font-size="28px" font-weight="700" line-height="1.25" padding="0">Recibimos tu preinscripción</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#ffffff" padding="30px 28px 22px 28px">
+      <mj-column>
+        <!-- Contenido de esta preinscripción: saludo, propuesta y datos ingresados (lo arma preinscripciones). -->
+        <mj-text padding="0">{preinscripcion_contenido}</mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#edf3fb" padding="18px 28px">
+      <mj-column>
+        <mj-text font-size="14px" padding="0">Código de seguimiento: <strong>{preinscripcion_id}</strong></mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#16396f" padding="22px 24px">
+      <mj-column>
+        <mj-text align="center" color="#ffffff" font-size="14px" line-height="1.6" padding="0 0 8px 0">Saludos cordiales,<br /><strong>Equipo FLACSO Uruguay</strong></mj-text>
+        <mj-text align="center" color="#dbe4ef" font-size="14px" line-height="1.6" padding="0">Por consultas: <strong>inscripciones@flacso.edu.uy</strong></mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>
