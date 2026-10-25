@@ -20,6 +20,7 @@ import * as submissionCatalogValidationSchema from './migrations/019_submission_
 import * as dropRegistrationEventOutboxSchema from './migrations/021_drop_registration_event_outbox.js';
 import * as mauticContactSyncSchema from './migrations/022_mautic_contact_sync.js';
 import * as dropSubmissionEmailLookupIndexSchema from './migrations/023_drop_submission_email_lookup_index.js';
+import * as mauticEnrollmentNotifySchema from './migrations/024_mautic_enrollment_notify.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -44,6 +45,7 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await dropRegistrationEventOutboxSchema.up(db);
   await mauticContactSyncSchema.up(db);
   await dropSubmissionEmailLookupIndexSchema.up(db);
+  await mauticEnrollmentNotifySchema.up(db);
   console.log('Migrations complete.');
 }
 

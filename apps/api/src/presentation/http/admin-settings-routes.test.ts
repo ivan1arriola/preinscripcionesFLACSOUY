@@ -857,6 +857,25 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(kept.mautic.hasClientSecret).toBe(true);
     });
 
+    it('saves the enrollment notice switch and secret without returning the secret', async () => {
+      const secret = 'aviso-de-inscripcion-0123456789abcdef';
+      const res = await put({ enrollmentNotifyEnabled: true, enrollmentSecret: secret });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.mautic).toMatchObject({ enrollmentNotifyEnabled: true, hasEnrollmentSecret: true });
+      expect(JSON.stringify(body)).not.toContain(secret);
+
+      const kept = await (await put({ enrollmentSecret: '' })).json();
+      expect(kept.mautic.hasEnrollmentSecret).toBe(true);
+    });
+
+    it('rejects an enrollment secret shorter than 32 characters', async () => {
+      const res = await put({ enrollmentNotifyEnabled: false, enrollmentSecret: 'corto' });
+      expect(res.status).toBe(400);
+      const after = await (await fetch(`${baseUrl}/api/admin/settings/mautic`, { headers: { Cookie: validCookie } })).json();
+      expect(after.mautic.enrollmentNotifyEnabled).toBe(true);
+    });
+
     it('tests the connection and records the result', async () => {
       const res = await fetch(`${baseUrl}/api/admin/settings/mautic/test`, {
         method: 'POST',

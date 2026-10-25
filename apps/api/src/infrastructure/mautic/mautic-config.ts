@@ -7,7 +7,12 @@ export const SETTING_MAUTIC_CLIENT_SECRET = 'mautic_client_secret';
 export const SETTING_MAUTIC_CONTACTS_ENABLED = 'mautic_contacts_enabled';
 export const SETTING_MAUTIC_TEMPLATE_APPLICANT_ID = 'mautic_template_applicant_id';
 export const SETTING_MAUTIC_TEMPLATE_TEAM_ID = 'mautic_template_team_id';
+export const SETTING_MAUTIC_ENROLLMENT_NOTIFY_ENABLED = 'mautic_enrollment_notify_enabled';
+export const SETTING_MAUTIC_ENROLLMENT_SECRET = 'mautic_enrollment_secret';
 export const SETTING_MAUTIC_LAST_TESTED_AT = 'mautic_last_tested_at';
+
+/** Igual que WebhookSignature::MIN_SECRET_LENGTH del plugin de Mautic. */
+export const MIN_ENROLLMENT_SECRET_LENGTH = 32;
 export const SETTING_MAUTIC_LAST_TEST_STATUS = 'mautic_last_test_status';
 export const SETTING_MAUTIC_LAST_TEST_ERROR = 'mautic_last_test_error';
 
@@ -23,17 +28,35 @@ export interface MauticConfig {
   applicantTemplateId: number | null;
   /** Plantilla de Mautic para los correos al equipo (oferta/seminario y maestros). */
   teamTemplateId: number | null;
+  /** Avisar a Mautic de cada preinscripción a una oferta, para sacar al postulante de su campaña. */
+  enrollmentNotifyEnabled: boolean;
+  /** Secreto HMAC compartido con el plugin de Mautic: nunca se devuelve al navegador. */
+  enrollmentSecret: string;
   lastTestedAt?: string | null;
   lastTestStatus?: 'ok' | 'error' | null;
   lastTestError?: string | null;
 }
 
-export interface MaskedMauticConfig extends Omit<MauticConfig, 'clientSecret'> {
+export interface MaskedMauticConfig extends Omit<MauticConfig, 'clientSecret' | 'enrollmentSecret'> {
   hasClientSecret: boolean;
+  hasEnrollmentSecret: boolean;
 }
 
 export function hasMauticCredentials(config: MauticConfig): boolean {
   return /^https?:\/\//.test(config.baseUrl) && config.clientId.length > 0 && config.clientSecret.length > 0;
+}
+
+/** Destino del aviso de inscripción, o null si falta la URL de Mautic o el secreto. */
+export function enrollmentWebhook(config: MauticConfig): { url: string; secret: string } | null {
+  if (!/^https?:\/\//.test(config.baseUrl) || config.enrollmentSecret.length < MIN_ENROLLMENT_SECRET_LENGTH) {
+    return null;
+  }
+  return { url: `${config.baseUrl}/flacso/enrollments`, secret: config.enrollmentSecret };
+}
+
+/** Se encolan avisos sólo con el interruptor encendido y un destino utilizable. */
+export function isEnrollmentNotifyReady(config: MauticConfig): boolean {
+  return config.enrollmentNotifyEnabled && enrollmentWebhook(config) !== null;
 }
 
 export function mauticCredentials(config: MauticConfig): MauticCredentials {
@@ -65,6 +88,8 @@ export async function loadMauticConfig(service: EncryptedSettingsService): Promi
     contactsEnabled: (await service.getEncryptedSetting(SETTING_MAUTIC_CONTACTS_ENABLED)) === 'true',
     applicantTemplateId: parseTemplateId(await service.getEncryptedSetting(SETTING_MAUTIC_TEMPLATE_APPLICANT_ID)),
     teamTemplateId: parseTemplateId(await service.getEncryptedSetting(SETTING_MAUTIC_TEMPLATE_TEAM_ID)),
+    enrollmentNotifyEnabled: (await service.getEncryptedSetting(SETTING_MAUTIC_ENROLLMENT_NOTIFY_ENABLED)) === 'true',
+    enrollmentSecret: ((await service.getEncryptedSetting(SETTING_MAUTIC_ENROLLMENT_SECRET)) ?? '').trim(),
     lastTestedAt: await service.getEncryptedSetting(SETTING_MAUTIC_LAST_TESTED_AT),
     lastTestStatus: (await service.getEncryptedSetting(SETTING_MAUTIC_LAST_TEST_STATUS)) as 'ok' | 'error' | null,
     lastTestError: await service.getEncryptedSetting(SETTING_MAUTIC_LAST_TEST_ERROR),
@@ -80,9 +105,16 @@ export async function saveMauticConfig(
     contactsEnabled?: boolean;
     applicantTemplateId?: number | null;
     teamTemplateId?: number | null;
+    enrollmentNotifyEnabled?: boolean;
+    enrollmentSecret?: string;
   },
   updatedBy?: string
 ): Promise<void> {
+  // Validar antes de escribir: un secreto corto no debe dejar la configuración a medio guardar.
+  const enrollmentSecret = input.enrollmentSecret?.trim() ?? '';
+  if (enrollmentSecret.length > 0 && enrollmentSecret.length < MIN_ENROLLMENT_SECRET_LENGTH) {
+    throw new Error(`El secreto del aviso de inscripción debe tener al menos ${MIN_ENROLLMENT_SECRET_LENGTH} caracteres.`);
+  }
   if (input.baseUrl !== undefined) {
     const baseUrl = input.baseUrl.trim().replace(/\/+$/, '');
     if (baseUrl !== '' && !/^https:\/\/[^\s/]+/.test(baseUrl)) {
@@ -99,6 +131,13 @@ export async function saveMauticConfig(
   }
   if (input.contactsEnabled !== undefined) {
     await service.setEncryptedSetting(SETTING_MAUTIC_CONTACTS_ENABLED, input.contactsEnabled ? 'true' : 'false', updatedBy);
+  }
+  if (input.enrollmentNotifyEnabled !== undefined) {
+    await service.setEncryptedSetting(SETTING_MAUTIC_ENROLLMENT_NOTIFY_ENABLED, input.enrollmentNotifyEnabled ? 'true' : 'false', updatedBy);
+  }
+  // Igual que la Clave Secreta: vacío significa "conservar el actual".
+  if (enrollmentSecret.length > 0) {
+    await service.setEncryptedSetting(SETTING_MAUTIC_ENROLLMENT_SECRET, enrollmentSecret, updatedBy);
   }
   for (const [key, value] of [
     [SETTING_MAUTIC_TEMPLATE_APPLICANT_ID, input.applicantTemplateId],
@@ -123,6 +162,6 @@ export async function recordMauticTest(
 }
 
 export function maskMauticConfig(config: MauticConfig): MaskedMauticConfig {
-  const { clientSecret, ...rest } = config;
-  return { ...rest, hasClientSecret: clientSecret.length > 0 };
+  const { clientSecret, enrollmentSecret, ...rest } = config;
+  return { ...rest, hasClientSecret: clientSecret.length > 0, hasEnrollmentSecret: enrollmentSecret.length > 0 };
 }

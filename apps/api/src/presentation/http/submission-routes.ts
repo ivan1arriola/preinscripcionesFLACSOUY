@@ -122,7 +122,7 @@ export function createSubmissionRoutes(
   notificationDependencies?: SubmissionNotificationDependencies,
   recoveryDependencies?: SubmissionRecoveryDependencies,
   telegramDependencies?: SubmissionTelegramDependencies,
-  mauticDependencies?: { isContactSyncEnabled: () => Promise<boolean> },
+  mauticDependencies?: { isContactSyncEnabled: () => Promise<boolean>; isEnrollmentNotifyEnabled?: () => Promise<boolean> },
   limits?: { perEmail?: RateLimitOptions },
 ): Router {
   const router = Router({ mergeParams: true });
@@ -193,6 +193,7 @@ export function createSubmissionRoutes(
         files: parsed.data.files,
       }, {
         isMauticContactSyncEnabled: mauticDependencies?.isContactSyncEnabled,
+        isMauticEnrollmentNotifyEnabled: mauticDependencies?.isEnrollmentNotifyEnabled,
       });
 
       if (!result.ok) {

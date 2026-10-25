@@ -7,8 +7,9 @@ import { PostgresSubmissionRecoveryRepository } from './infrastructure/database/
 import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
 import { createEmailProviderResolver } from './infrastructure/email/email-provider-resolver.js';
-import { createMauticClientCache, hasMauticCredentials, loadMauticConfig } from './infrastructure/mautic/mautic-config.js';
+import { createMauticClientCache, enrollmentWebhook, hasMauticCredentials, loadMauticConfig } from './infrastructure/mautic/mautic-config.js';
 import { MauticContactSyncDispatcher } from './application/mautic-contact-sync-dispatcher.js';
+import { MauticEnrollmentNotifyDispatcher } from './application/mautic-enrollment-notify-dispatcher.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
 import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js';
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
@@ -104,6 +105,34 @@ const mauticContactSyncDispatcher = new MauticContactSyncDispatcher(db, {
 });
 const stopMauticContactSync = mauticContactSyncDispatcher.start(10_000);
 
+const mauticEnrollmentNotifyDispatcher = new MauticEnrollmentNotifyDispatcher(db, {
+  getWebhook: async () => {
+    try {
+      return enrollmentWebhook(await loadMauticConfig(encryptedSettingsService));
+    } catch (err) {
+      console.warn('[MauticEnrollments] Configuración de Mautic no disponible:', err instanceof Error ? err.message : err);
+      return null;
+    }
+  },
+  onPermanentFailure: async ({ submissionId, safeCode }) => {
+    const telegramConfig = await loadTelegramConfig(encryptedSettingsService);
+    if (!telegramConfig.enabled) return;
+    await telegramAlertRepo.ensureForSubmission(telegramConfig.chatIds.map((chatId) => ({
+      submissionId,
+      chatId,
+      eventType: 'recovery' as const,
+      dedupeKey: `${submissionId}:${chatId}:mautic_enrollment_failed`,
+      message: [
+        '⚠️ No se pudo avisar la inscripción a Mautic: el postulante puede seguir recibiendo la campaña de la oferta',
+        `ID: ${submissionId}`,
+        `Motivo: ${safeCode}`,
+        'Revisar la URL de Mautic y el secreto del aviso (mautic_enrollment_notify).',
+      ].join('\n'),
+    })));
+  },
+});
+const stopMauticEnrollmentNotify = mauticEnrollmentNotifyDispatcher.start(10_000);
+
 const cleanupInterval = setInterval(async () => {
   try {
     const result = await cleanupExpiredRecoveries({
@@ -133,6 +162,7 @@ async function shutdown() {
   emailDispatcher.stop();
   telegramDispatcher.stop();
   stopMauticContactSync();
+  stopMauticEnrollmentNotify();
   await db.destroy();
   console.log('[Worker] Worker detenido.');
   process.exit(0);

@@ -21,6 +21,8 @@ export const AdminMauticSettingsCard: React.FC<AdminMauticSettingsCardProps> = (
   const [contactsEnabled, setContactsEnabled] = useState(false);
   const [applicantTemplateId, setApplicantTemplateId] = useState('');
   const [teamTemplateId, setTeamTemplateId] = useState('');
+  const [enrollmentNotifyEnabled, setEnrollmentNotifyEnabled] = useState(false);
+  const [enrollmentSecret, setEnrollmentSecret] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -35,6 +37,8 @@ export const AdminMauticSettingsCard: React.FC<AdminMauticSettingsCardProps> = (
     setContactsEnabled(mautic.contactsEnabled);
     setApplicantTemplateId(mautic.applicantTemplateId ? String(mautic.applicantTemplateId) : '');
     setTeamTemplateId(mautic.teamTemplateId ? String(mautic.teamTemplateId) : '');
+    setEnrollmentNotifyEnabled(mautic.enrollmentNotifyEnabled);
+    setEnrollmentSecret('');
   };
 
   useEffect(() => {
@@ -58,6 +62,8 @@ export const AdminMauticSettingsCard: React.FC<AdminMauticSettingsCardProps> = (
         contactsEnabled,
         applicantTemplateId: parseTemplateId(applicantTemplateId),
         teamTemplateId: parseTemplateId(teamTemplateId),
+        enrollmentNotifyEnabled,
+        enrollmentSecret,
       });
       applySettings(res.mautic);
       setSuccess(res.message);
@@ -97,7 +103,7 @@ export const AdminMauticSettingsCard: React.FC<AdminMauticSettingsCardProps> = (
           <span>📇</span> Mautic
         </h2>
         <p className="text-xs text-gray-500 mt-0.5">
-          Registra a cada postulante como contacto (con tags de la oferta o el seminario) y permite enviar las notificaciones con plantillas de Mautic. Los postulantes no se inscriben en campañas.
+          Registra a cada postulante como contacto (con tags de la oferta o el seminario), permite enviar las notificaciones con plantillas de Mautic y avisa cada inscripción para que la persona deje de recibir la campaña de seguimiento de esa oferta. Los postulantes no se inscriben en campañas.
         </p>
       </div>
 
@@ -144,6 +150,33 @@ export const AdminMauticSettingsCard: React.FC<AdminMauticSettingsCardProps> = (
           <input type="checkbox" checked={contactsEnabled} onChange={(e) => setContactsEnabled(e.target.checked)} className="mt-1" />
           <span>Registrar a cada postulante como contacto en Mautic</span>
         </label>
+        <div className="pt-3 border-t border-gray-100 space-y-3">
+          <label className="flex items-start gap-2 text-sm text-gray-800">
+            <input type="checkbox" checked={enrollmentNotifyEnabled} onChange={(e) => setEnrollmentNotifyEnabled(e.target.checked)} className="mt-1" />
+            <span>
+              Avisar cada inscripción a una oferta, para cortar su campaña de seguimiento
+              <span className="block text-[11px] text-gray-500">
+                Se envía aunque el postulante no acepte comunicaciones: Mautic sólo actúa si la persona ya es contacto y nunca crea contactos con este aviso.
+              </span>
+            </span>
+          </label>
+          <div>
+            <label htmlFor="mautic-enrollment-secret" className="block text-xs font-semibold text-gray-700 mb-1">Secreto del aviso de inscripción</label>
+            <input
+              id="mautic-enrollment-secret"
+              type="password"
+              value={enrollmentSecret}
+              onChange={(e) => setEnrollmentSecret(e.target.value)}
+              autoComplete="new-password"
+              minLength={32}
+              placeholder={settings?.hasEnrollmentSecret ? '•••••••• (guardado; dejar vacío para conservarlo)' : 'Mínimo 32 caracteres'}
+              className={`${inputClass} font-mono`}
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              Debe ser idéntico a <code>flacso_enrollment_secret</code> en la configuración del plugin de Mautic.
+            </p>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button type="submit" disabled={saving} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium text-xs rounded-lg transition-colors shadow-sm">
             {saving ? 'Guardando...' : 'Guardar cambios'}

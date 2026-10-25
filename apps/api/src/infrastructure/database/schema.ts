@@ -248,6 +248,22 @@ export interface MauticContactSyncTable {
   updated_at: Generated<Date>;
 }
 
+export interface MauticEnrollmentNotifyTable {
+  /** eventId del aviso: Mautic lo usa para la idempotencia. */
+  id: string;
+  submission_id: string;
+  payload_json: string;
+  status: 'pending' | 'processing' | 'notified' | 'failed';
+  attempt_count: number;
+  available_at: Date;
+  locked_until: Date | null;
+  locked_by: string | null;
+  last_error: string | null;
+  notified_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -272,4 +288,5 @@ export interface DatabaseSchema {
   submission_recoveries: SubmissionRecoveriesTable;
   telegram_recovery_alerts: TelegramRecoveryAlertsTable;
   mautic_contact_sync: MauticContactSyncTable;
+  mautic_enrollment_notify: MauticEnrollmentNotifyTable;
 }

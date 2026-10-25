@@ -8,6 +8,7 @@ import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import type { AcademicTarget, FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { buildSpreadsheetSchema, buildSpreadsheetValues } from '../domain/spreadsheet-schema.js';
 import { buildMauticContactSync } from '../domain/mautic-contact.js';
+import { buildMauticEnrollmentNotice } from '../domain/mautic-enrollment.js';
 
 /** Antigüedad máxima del catálogo guardado para aceptar preinscripciones con WordPress caído. */
 export const CACHED_CATALOG_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -17,14 +18,16 @@ export type CatalogValidation = 'live' | 'cached';
 export interface SubmitPreinscriptionOptions {
   /** Si devuelve true, se encola la sincronización del contacto del postulante con Mautic. */
   isMauticContactSyncEnabled?: () => Promise<boolean>;
+  /** Si devuelve true, se encola el aviso de inscripción a Mautic (con o sin aceptación de comunicaciones). */
+  isMauticEnrollmentNotifyEnabled?: () => Promise<boolean>;
 }
 
-/** Una configuración ilegible nunca bloquea la preinscripción: sólo omite la sincronización. */
-async function isMauticContactSyncEnabled(options: SubmitPreinscriptionOptions): Promise<boolean> {
+/** Una configuración ilegible nunca bloquea la preinscripción: sólo omite el efecto en Mautic. */
+async function isEnabled(check: (() => Promise<boolean>) | undefined, label: string): Promise<boolean> {
   try {
-    return (await options.isMauticContactSyncEnabled?.()) === true;
+    return (await check?.()) === true;
   } catch (error) {
-    console.warn('[Mautic] No se pudo leer la configuración de contactos; se omite la sincronización:', error instanceof Error ? error.message : error);
+    console.warn(`[Mautic] No se pudo leer la configuración de ${label}; se omite:`, error instanceof Error ? error.message : error);
     return false;
   }
 }
@@ -163,9 +166,12 @@ export async function submitPreinscription(
     };
   }
 
-  // 5. Persist submission (and, if enabled, enqueue the Mautic contact sync atomically)
-  const mauticContact = (await isMauticContactSyncEnabled(options))
+  // 5. Persist submission (and, if enabled, enqueue the Mautic contact sync and enrollment notice atomically)
+  const mauticContact = (await isEnabled(options.isMauticContactSyncEnabled, 'contactos'))
     ? buildMauticContactSync(target, normalizedValues)
+    : null;
+  const mauticEnrollment = (await isEnabled(options.isMauticEnrollmentNotifyEnabled, 'avisos de inscripción'))
+    ? buildMauticEnrollmentNotice(target, normalizedValues)
     : null;
   const saved = await repository.saveOrGet({
     clientSubmissionId: command.clientSubmissionId,
@@ -179,6 +185,7 @@ export async function submitPreinscription(
     profileSnapshot: form as any,
     catalogValidation,
     mauticContact,
+    mauticEnrollment,
   });
 
   const spreadsheetSchema = buildSpreadsheetSchema(form);

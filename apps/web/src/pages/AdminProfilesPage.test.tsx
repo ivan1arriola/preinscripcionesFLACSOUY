@@ -99,6 +99,8 @@ describe('AdminProfilesPage Component', () => {
         contactsEnabled: false,
         applicantTemplateId: null,
         teamTemplateId: null,
+        enrollmentNotifyEnabled: false,
+        hasEnrollmentSecret: false,
       },
     });
     vi.mocked(apiClient.getTelegramSettings).mockResolvedValue({

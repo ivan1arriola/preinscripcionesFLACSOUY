@@ -209,6 +209,41 @@ describe('submitPreinscription Use Case', () => {
     });
   });
 
+  describe('Mautic enrollment notice', () => {
+    async function submitWith(isMauticEnrollmentNotifyEnabled?: () => Promise<boolean>, values = validValues) {
+      const repo = new InMemorySubmissionRepository();
+      const result = await submitPreinscription(catalog, repo, {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values,
+        files: baseFiles,
+      }, { isMauticEnrollmentNotifyEnabled });
+      return { repo, result };
+    }
+
+    it('enqueues the email and the WordPress offer when enabled', async () => {
+      const { repo, result } = await submitWith(async () => true);
+      expect(result.ok).toBe(true);
+      const notice = repo.submissions[0]?.mauticEnrollment;
+      expect(notice?.email).toBe('valeria@example.com');
+      expect(Number.isInteger(notice?.offerWpId)).toBe(true);
+      expect(Object.keys(notice ?? {}).sort()).toEqual(['email', 'offerWpId']);
+    });
+
+    it('enqueues it even when the applicant declines communications', async () => {
+      const { repo } = await submitWith(async () => true, { ...validValues, aceptaComunicaciones: 'No' });
+      expect(repo.submissions[0]?.mauticContact ?? null).toBeNull();
+      expect(repo.submissions[0]?.mauticEnrollment?.email).toBe('valeria@example.com');
+    });
+
+    it('does not enqueue anything when disabled or unreadable', async () => {
+      expect((await submitWith(async () => false)).repo.submissions[0]?.mauticEnrollment).toBeNull();
+      const unreadable = await submitWith(async () => { throw new Error('clave de cifrado ausente'); });
+      expect(unreadable.result.ok).toBe(true);
+      expect(unreadable.repo.submissions[0]?.mauticEnrollment).toBeNull();
+    });
+  });
+
   describe('when WordPress does not respond', () => {
     function unavailableCatalog(cached: AcademicTarget[] | null): AcademicCatalog {
       return {

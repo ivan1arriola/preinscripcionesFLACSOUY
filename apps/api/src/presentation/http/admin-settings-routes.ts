@@ -80,6 +80,8 @@ const UpdateMauticSettingsSchema = z.object({
   contactsEnabled: z.boolean().optional(),
   applicantTemplateId: z.number().int().positive().nullable().optional(),
   teamTemplateId: z.number().int().positive().nullable().optional(),
+  enrollmentNotifyEnabled: z.boolean().optional(),
+  enrollmentSecret: z.string().max(500).optional(),
 });
 
 const UpdateDriveFolderSchema = z.object({

@@ -601,6 +601,8 @@ export interface AdminMauticSettings {
   contactsEnabled: boolean;
   applicantTemplateId: number | null;
   teamTemplateId: number | null;
+  enrollmentNotifyEnabled: boolean;
+  hasEnrollmentSecret: boolean;
   lastTestedAt?: string | null;
   lastTestStatus?: 'ok' | 'error' | null;
   lastTestError?: string | null;
@@ -614,6 +616,9 @@ export interface UpdateAdminMauticSettingsInput {
   contactsEnabled?: boolean;
   applicantTemplateId?: number | null;
   teamTemplateId?: number | null;
+  enrollmentNotifyEnabled?: boolean;
+  /** Vacío conserva el secreto guardado. Mínimo 32 caracteres. */
+  enrollmentSecret?: string;
 }
 
 export interface AdminTelegramSettings {

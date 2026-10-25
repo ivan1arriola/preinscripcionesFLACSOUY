@@ -1,5 +1,6 @@
 import type { SubmissionFileToken } from '@flacso/contracts';
 import type { MauticContactSync } from '../domain/mautic-contact.js';
+import type { MauticEnrollmentNotice } from '../domain/mautic-enrollment.js';
 
 export interface ValidatedSubmissionRecord {
   clientSubmissionId?: string;
@@ -15,6 +16,8 @@ export interface ValidatedSubmissionRecord {
   catalogValidation?: 'live' | 'cached';
   /** Si está presente, se encola la sincronización del contacto con Mautic en la misma transacción. */
   mauticContact?: MauticContactSync | null;
+  /** Si está presente, se encola el aviso de inscripción a Mautic en la misma transacción. */
+  mauticEnrollment?: MauticEnrollmentNotice | null;
 }
 
 export interface SavedSubmissionResult {

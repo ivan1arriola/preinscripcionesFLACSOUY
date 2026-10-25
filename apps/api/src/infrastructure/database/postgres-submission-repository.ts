@@ -118,6 +118,24 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
             .execute();
         }
 
+        if (record.mauticEnrollment) {
+          await trx
+            .insertInto('mautic_enrollment_notify')
+            .values({
+              id: crypto.randomUUID(),
+              submission_id: submissionId,
+              payload_json: JSON.stringify(record.mauticEnrollment),
+              status: 'pending',
+              attempt_count: 0,
+              available_at: new Date(),
+              locked_until: null,
+              locked_by: null,
+              last_error: null,
+              notified_at: null,
+            })
+            .execute();
+        }
+
         await trx
           .insertInto('submission_processing')
           .values({
