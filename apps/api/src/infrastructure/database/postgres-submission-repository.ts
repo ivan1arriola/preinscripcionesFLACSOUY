@@ -10,21 +10,9 @@ import {
   UNIVERSAL_INPUTS,
   SUPPORTED_SPECIFIC_INPUTS,
 } from '../../domain/form-definition.js';
-import type { RegistrationLookup } from '../../ports/registration-lookup.js';
 
-export class PostgresSubmissionRepository implements SubmissionRepository, RegistrationLookup {
+export class PostgresSubmissionRepository implements SubmissionRepository {
   constructor(private readonly db: KyselyDb) {}
-
-  async hasEffectiveRegistration(email: string, targetId: string): Promise<boolean> {
-    const row = await this.db.selectFrom('submissions')
-      .innerJoin('submission_values', 'submission_values.submission_id', 'submissions.id')
-      .select('submissions.id')
-      .where('submission_values.input_key', '=', 'email')
-      .where(sql`lower(trim(submission_values.value))`, '=', email.trim().toLowerCase())
-      .where('submissions.target_id', '=', targetId)
-      .executeTakeFirst();
-    return Boolean(row);
-  }
 
   async save(record: ValidatedSubmissionRecord): Promise<SavedSubmissionResult> {
     return this.saveOrGet(record);

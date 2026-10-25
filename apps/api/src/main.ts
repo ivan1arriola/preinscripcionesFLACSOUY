@@ -211,7 +211,6 @@ const app = createApp({
   submissionRecoveryRepository,
   telegramAlertRepository,
   serviceAccountEmail: googleCreds.clientEmail,
-  registrationLookup: repository,
   checkDatabase: checkDb,
 });
 

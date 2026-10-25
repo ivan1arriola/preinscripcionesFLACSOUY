@@ -36,8 +36,6 @@ import type { EmailProvider } from '../../infrastructure/email/email-provider.js
 import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
 import type { TelegramProvider } from '../../ports/telegram-provider.js';
 import { loadTelegramConfig } from '../../infrastructure/telegram/telegram-config.js';
-import type { RegistrationLookup } from '../../ports/registration-lookup.js';
-import { createRegistrationCheckRoutes } from './registration-check-routes.js';
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -63,7 +61,6 @@ export interface AppDependencies {
   getTelegramPreinscriptionChatIds?: () => Promise<string[]> | string[];
   telegramProviderFactory?: (botToken: string) => TelegramProvider;
   mauticClientFactory?: (config: MauticConfig) => Pick<MauticClient, 'verify'>;
-  registrationLookup?: RegistrationLookup;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
@@ -75,9 +72,7 @@ export function createApp(dependencies: AppDependencies): Express {
     }
   }
 
-  app.use(express.json({ verify: (req, _res, buffer) => {
-    (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
-  } }));
+  app.use(express.json());
   app.use(cookieParser());
 
   if (dependencies.temporaryFileStorage) {
@@ -209,13 +204,6 @@ export function createApp(dependencies: AppDependencies): Express {
 
   targetRoutes.use('/:id/submissions', submissionRoutes);
   app.use('/api/targets', targetRoutes);
-
-  if (dependencies.registrationLookup) {
-    app.use('/api/v1/internal/registrations', createRegistrationCheckRoutes(
-      dependencies.registrationLookup,
-      process.env.PREINSCRIPCIONES_HMAC_SECRET
-    ));
-  }
 
   // Admin session and routes
   const sessionStore = dependencies.adminSessionStore ?? new MemoryAdminSessionStore();

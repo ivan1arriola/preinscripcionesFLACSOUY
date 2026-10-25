@@ -17,9 +17,9 @@ import * as submissionRecoverySchema from './migrations/015_submission_recovery.
 import * as telegramRecoveryAlertsSchema from './migrations/016_telegram_recovery_alerts.js';
 import * as telegramEventTypesSchema from './migrations/017_telegram_event_types.js';
 import * as submissionCatalogValidationSchema from './migrations/019_submission_catalog_validation.js';
-import * as submissionEmailLookupIndexSchema from './migrations/020_submission_email_lookup_index.js';
 import * as dropRegistrationEventOutboxSchema from './migrations/021_drop_registration_event_outbox.js';
 import * as mauticContactSyncSchema from './migrations/022_mautic_contact_sync.js';
+import * as dropSubmissionEmailLookupIndexSchema from './migrations/023_drop_submission_email_lookup_index.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -41,9 +41,9 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await telegramRecoveryAlertsSchema.up(db);
   await telegramEventTypesSchema.up(db);
   await submissionCatalogValidationSchema.up(db);
-  await submissionEmailLookupIndexSchema.up(db);
   await dropRegistrationEventOutboxSchema.up(db);
   await mauticContactSyncSchema.up(db);
+  await dropSubmissionEmailLookupIndexSchema.up(db);
   console.log('Migrations complete.');
 }
 
