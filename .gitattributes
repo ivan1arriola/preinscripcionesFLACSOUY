@@ -1,0 +1,2 @@
+# Los scripts de shell deben conservar fines de línea LF: con CRLF el shebang falla en Linux, WSL y Docker.
+*.sh text eol=lf
