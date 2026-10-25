@@ -22,6 +22,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
   let emailNotificationRepository: InMemoryEmailNotificationRepository;
   let mockEmailProvider: { verify: any; send: any };
   let mockTelegramProvider: { verify: any; send: any };
+  const mockMauticClient = { verify: vi.fn(async () => undefined) };
   let dispatcher: EmailNotificationDispatcher;
   let validCookie: string;
   let csrfToken: string;
@@ -69,6 +70,7 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       emailNotificationDispatcher: dispatcher,
       emailProviderFactory: () => mockEmailProvider,
       telegramProviderFactory: () => mockTelegramProvider,
+      mauticClientFactory: () => mockMauticClient,
       serviceAccountEmail: 'preinscripciones@flacso-uruguay.iam.gserviceaccount.com',
       googleDriveRepository: {
         storeSubmissionFiles: async () => ({ files: [], documentsFolderId: 'folder-1', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1' }),
@@ -801,6 +803,69 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(body).toHaveProperty('processed');
       expect(body).toHaveProperty('sent');
       expect(body).toHaveProperty('failed');
+    });
+  });
+
+  describe('Mautic Settings Routes (/api/admin/settings/mautic)', () => {
+    const put = (body: unknown) => fetch(`${baseUrl}/api/admin/settings/mautic`, {
+      method: 'PUT',
+      headers: { Cookie: validCookie, 'x-csrf-token': csrfToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    it('requires a session', async () => {
+      expect((await fetch(`${baseUrl}/api/admin/settings/mautic`)).status).toBe(401);
+    });
+
+    it('rejects testing before credentials are configured', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/mautic/test`, {
+        method: 'POST',
+        headers: { Cookie: validCookie, 'x-csrf-token': csrfToken },
+      });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error.code).toBe('MAUTIC_NOT_CONFIGURED');
+    });
+
+    it('rejects a non-https URL', async () => {
+      const res = await put({ baseUrl: 'http://mautic.example.com' });
+      expect(res.status).toBe(400);
+    });
+
+    it('saves the configuration without ever returning the Clave Secreta', async () => {
+      const res = await put({
+        baseUrl: 'https://mautic.flacso.edu.uy/',
+        clientId: 'clave-publica',
+        clientSecret: 'clave-secreta-123',
+        contactsEnabled: true,
+        applicantTemplateId: 21,
+        teamTemplateId: 22,
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.mautic).toMatchObject({
+        baseUrl: 'https://mautic.flacso.edu.uy',
+        clientId: 'clave-publica',
+        hasClientSecret: true,
+        contactsEnabled: true,
+        applicantTemplateId: 21,
+        teamTemplateId: 22,
+      });
+      expect(JSON.stringify(body)).not.toContain('clave-secreta-123');
+
+      // Un secreto vacío conserva el actual.
+      const kept = await (await put({ clientSecret: '' })).json();
+      expect(kept.mautic.hasClientSecret).toBe(true);
+    });
+
+    it('tests the connection and records the result', async () => {
+      const res = await fetch(`${baseUrl}/api/admin/settings/mautic/test`, {
+        method: 'POST',
+        headers: { Cookie: validCookie, 'x-csrf-token': csrfToken },
+      });
+      expect(res.status).toBe(200);
+      expect(mockMauticClient.verify).toHaveBeenCalled();
+      const after = await (await fetch(`${baseUrl}/api/admin/settings/mautic`, { headers: { Cookie: validCookie } })).json();
+      expect(after.mautic.lastTestStatus).toBe('ok');
     });
   });
 

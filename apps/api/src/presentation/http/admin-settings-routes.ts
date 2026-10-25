@@ -61,6 +61,25 @@ import {
 import type { TelegramProvider } from '../../ports/telegram-provider.js';
 import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
 import { FetchTelegramProvider } from '../../infrastructure/telegram/telegram-provider.js';
+import { MauticClient, MauticError } from '../../infrastructure/mautic/mautic-client.js';
+import {
+  hasMauticCredentials,
+  loadMauticConfig,
+  maskMauticConfig,
+  mauticCredentials,
+  recordMauticTest,
+  saveMauticConfig,
+  type MauticConfig,
+} from '../../infrastructure/mautic/mautic-config.js';
+
+const UpdateMauticSettingsSchema = z.object({
+  baseUrl: z.string().max(500).optional(),
+  clientId: z.string().max(500).optional(),
+  clientSecret: z.string().max(500).optional(),
+  contactsEnabled: z.boolean().optional(),
+  applicantTemplateId: z.number().int().positive().nullable().optional(),
+  teamTemplateId: z.number().int().positive().nullable().optional(),
+});
 
 const UpdateDriveFolderSchema = z.object({
   folderId: z.string().min(1, 'La carpeta de Google Drive es requerida'),
@@ -82,6 +101,7 @@ const RetryNotificationSchema = z.object({
 const UpdateEmailSettingsSchema = z
   .object({
     enabled: z.boolean().optional(),
+    provider: z.enum(['smtp', 'mautic']).optional(),
     masterEmails: z.array(z.string().email('Formato de correo inválido')).optional(),
     host: z.string().min(1).optional(),
     port: z.number().int().min(1).max(65535).optional(),
@@ -204,6 +224,7 @@ export function createAdminSettingsRoutes(
   spreadsheetRepository?: SpreadsheetRepository,
   telegramProviderFactory?: (botToken: string) => TelegramProvider,
   telegramAlertRepository?: TelegramAlertRepository,
+  mauticClientFactory?: (config: MauticConfig) => Pick<MauticClient, 'verify'>,
 ): Router {
   const router = Router();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -379,7 +400,8 @@ export function createAdminSettingsRoutes(
       encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_HOST), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_PORT), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_SECURITY), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_USERNAME), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_PASSWORD), encryptedSettingsService!.getEncryptedSetting(SETTING_EMAIL_FROM), encryptedSettingsService!.getEncryptedSetting(SETTING_EMAIL_REPLY_TO), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_AT), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_OK), encryptedSettingsService!.getEncryptedSetting(SETTING_SMTP_LAST_CONNECTION_TEST_ERROR),
     ]);
     const record = await settingsRepository.getSettingRecord(SETTING_SMTP_HOST);
-    return { ok: true, enabled: config.enabled, configured: Boolean(config.smtp), provider: 'smtp', smtp: { host: host ?? '', port: Number(port || 587), security: security === 'tls' ? 'tls' : 'starttls', username: username ?? '', hasPassword: Boolean(password), fromEmail: fromEmail ? maskEmail(fromEmail) : null, replyToEmail: replyToEmail ? maskEmail(replyToEmail) : null }, masterEmails: config.masterEmails, status: { lastConnectionTestAt: verifiedAt || null, lastConnectionTestOk: verifiedOk === '' || verifiedOk === null ? null : verifiedOk === 'true', lastConnectionTestError: verificationError || null }, updatedAt: record?.updatedAt ?? null, updatedBy: record?.updatedBy ?? null };
+    const provider = (await encryptedSettingsService!.getEncryptedSetting(SETTING_EMAIL_PROVIDER))?.trim().toLowerCase() === 'mautic' ? 'mautic' : 'smtp';
+    return { ok: true, enabled: config.enabled, configured: provider === 'mautic' ? config.provider === 'mautic' : Boolean(config.smtp), provider, smtp: { host: host ?? '', port: Number(port || 587), security: security === 'tls' ? 'tls' : 'starttls', username: username ?? '', hasPassword: Boolean(password), fromEmail: fromEmail ? maskEmail(fromEmail) : null, replyToEmail: replyToEmail ? maskEmail(replyToEmail) : null }, masterEmails: config.masterEmails, status: { lastConnectionTestAt: verifiedAt || null, lastConnectionTestOk: verifiedOk === '' || verifiedOk === null ? null : verifiedOk === 'true', lastConnectionTestError: verificationError || null }, updatedAt: record?.updatedAt ?? null, updatedBy: record?.updatedBy ?? null };
   };
 
   router.get('/email', async (_req, res) => {
@@ -459,7 +481,8 @@ export function createAdminSettingsRoutes(
         );
       }
 
-      await encryptedSettingsService.setEncryptedSetting(SETTING_EMAIL_PROVIDER, 'smtp', actor);
+      // Sin provider en el pedido se mantiene el comportamiento previo (SMTP).
+      await encryptedSettingsService.setEncryptedSetting(SETTING_EMAIL_PROVIDER, parsed.data.provider ?? 'smtp', actor);
 
       if (masterEmails !== undefined) {
         await encryptedSettingsService.setEncryptedSetting(
@@ -753,6 +776,63 @@ export function createAdminSettingsRoutes(
   });
 
   // --- Telegram routes ---
+  router.get('/mautic', async (_req, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({ error: { code: 'SETTINGS_UNAVAILABLE', message: 'Servicio de configuración no disponible.' } });
+      return;
+    }
+    try {
+      res.json({ mautic: maskMauticConfig(await loadMauticConfig(encryptedSettingsService)) });
+    } catch (error) {
+      res.status(500).json({ error: { code: 'SETTINGS_ERROR', message: error instanceof Error ? error.message : 'Error al obtener la configuración de Mautic.' } });
+    }
+  });
+
+  router.put('/mautic', async (req: RequestWithAdminSession, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({ error: { code: 'SETTINGS_UNAVAILABLE', message: 'Servicio de configuración no disponible.' } });
+      return;
+    }
+    const parsed = UpdateMauticSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Datos de configuración de Mautic inválidos.', issues: parsed.error.issues } });
+      return;
+    }
+    try {
+      await saveMauticConfig(encryptedSettingsService, parsed.data, req.adminUser?.email || 'admin');
+      res.json({
+        ok: true,
+        message: 'Configuración de Mautic guardada correctamente.',
+        mautic: maskMauticConfig(await loadMauticConfig(encryptedSettingsService)),
+      });
+    } catch (error) {
+      res.status(400).json({ error: { code: 'INVALID_MAUTIC_CONFIG', message: error instanceof Error ? error.message : 'Error al guardar la configuración de Mautic.' } });
+    }
+  });
+
+  router.post('/mautic/test', async (req: RequestWithAdminSession, res) => {
+    if (!encryptedSettingsService) {
+      res.status(503).json({ error: { code: 'SETTINGS_UNAVAILABLE', message: 'Servicio de configuración no disponible.' } });
+      return;
+    }
+    const actor = req.adminUser?.email || 'admin';
+    const config = await loadMauticConfig(encryptedSettingsService);
+    if (!hasMauticCredentials(config)) {
+      res.status(400).json({ error: { code: 'MAUTIC_NOT_CONFIGURED', message: 'Faltan la URL, la Clave Pública o la Clave Secreta de Mautic.' } });
+      return;
+    }
+    try {
+      const client = mauticClientFactory ? mauticClientFactory(config) : new MauticClient(mauticCredentials(config));
+      await client.verify();
+      await recordMauticTest(encryptedSettingsService, { ok: true }, actor);
+      res.json({ ok: true, message: 'Conexión con Mautic verificada.' });
+    } catch (error) {
+      const message = error instanceof MauticError ? error.message : 'No se pudo conectar con Mautic.';
+      await recordMauticTest(encryptedSettingsService, { ok: false, error: message }, actor);
+      res.status(502).json({ error: { code: 'MAUTIC_TEST_ERROR', message } });
+    }
+  });
+
   router.get('/telegram', async (_req, res) => {
     if (!encryptedSettingsService) {
       res.status(503).json({

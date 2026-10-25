@@ -431,6 +431,43 @@ export const apiClient = {
     return res.json();
   },
 
+  async getMauticSettings(): Promise<{ mautic: AdminMauticSettings }> {
+    const res = await fetch('/api/admin/settings/mautic');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'MAUTIC_SETTINGS_ERROR', err.error?.message || 'Error al obtener la configuración de Mautic');
+    }
+    return res.json();
+  },
+
+  async updateMauticSettings(
+    csrfToken: string,
+    input: UpdateAdminMauticSettingsInput
+  ): Promise<{ ok: boolean; message: string; mautic: AdminMauticSettings }> {
+    const res = await fetch('/api/admin/settings/mautic', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'UPDATE_MAUTIC_ERROR', err.error?.message || 'Error al guardar la configuración de Mautic');
+    }
+    return res.json();
+  },
+
+  async testMauticSettings(csrfToken: string): Promise<{ ok: boolean; message: string }> {
+    const res = await fetch('/api/admin/settings/mautic/test', {
+      method: 'POST',
+      headers: { 'x-csrf-token': csrfToken },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'TEST_MAUTIC_ERROR', err.error?.message || 'No se pudo conectar con Mautic');
+    }
+    return res.json();
+  },
+
   async getTelegramSettings(): Promise<{ telegram: AdminTelegramSettings }> {
     const res = await fetch('/api/admin/settings/telegram');
     if (!res.ok) {
@@ -550,6 +587,28 @@ export const apiClient = {
   },
 };
 
+export interface AdminMauticSettings {
+  baseUrl: string;
+  clientId: string;
+  hasClientSecret: boolean;
+  contactsEnabled: boolean;
+  applicantTemplateId: number | null;
+  teamTemplateId: number | null;
+  lastTestedAt?: string | null;
+  lastTestStatus?: 'ok' | 'error' | null;
+  lastTestError?: string | null;
+}
+
+export interface UpdateAdminMauticSettingsInput {
+  baseUrl?: string;
+  clientId?: string;
+  /** Vacío conserva la Clave Secreta guardada. */
+  clientSecret?: string;
+  contactsEnabled?: boolean;
+  applicantTemplateId?: number | null;
+  teamTemplateId?: number | null;
+}
+
 export interface AdminTelegramSettings {
   enabled: boolean;
   preinscriptionEnabled: boolean;
@@ -627,7 +686,7 @@ export interface AdminRecoveryDetail {
 export interface AdminEmailSettings {
   enabled: boolean;
   configured: boolean;
-  provider: 'smtp';
+  provider: 'smtp' | 'mautic';
   smtp: {
     host: string;
     port: number;
@@ -649,6 +708,7 @@ export interface AdminEmailSettings {
 
 export interface UpdateAdminEmailSettingsInput {
   enabled?: boolean;
+  provider?: 'smtp' | 'mautic';
   masterEmails?: string[];
   host?: string;
   port?: number;

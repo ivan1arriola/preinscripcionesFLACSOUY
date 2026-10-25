@@ -1,5 +1,6 @@
 import type { EncryptedSettingsService } from '../security/encrypted-settings.js';
 import { EmailProviderError } from './email-provider.js';
+import { hasMauticCredentials, loadMauticConfig, type MauticConfig } from '../mautic/mautic-config.js';
 
 export const SETTING_EMAIL_NOTIFICATIONS_ENABLED = 'email_notifications_enabled';
 export const SETTING_NOTIFICATION_MASTER_EMAILS = 'notification_master_emails';
@@ -118,9 +119,10 @@ export interface SmtpConfig {
 
 export interface ResolvedEmailConfig {
   enabled: boolean;
-  provider: 'smtp' | 'fake' | 'disabled';
+  provider: 'smtp' | 'mautic' | 'fake' | 'disabled';
   masterEmails: string[];
   smtp?: SmtpConfig;
+  mautic?: MauticConfig;
 }
 
 export interface LoadEmailConfigOptions {
@@ -211,7 +213,8 @@ async function loadSmtpConfig(settingsService: EncryptedSettingsService): Promis
   }
 
   const [provider, rawHost, rawPort, rawSecurity, rawUsername, password, rawFrom, rawReplyTo] = values;
-  if (provider?.trim().toLowerCase() !== 'smtp') return undefined;
+  const normalizedProvider = provider?.trim().toLowerCase();
+  if (normalizedProvider !== 'smtp' && normalizedProvider !== 'mautic') return undefined;
 
   const host = normalizeSmtpHost(rawHost);
   const port = normalizeSmtpPort(rawPort);
@@ -288,6 +291,16 @@ export async function loadEmailConfig(
   }
 
   const smtp = await loadSmtpConfig(settingsService);
+
+  // Mautic envía con plantillas propias; SMTP queda cargado como respaldo para volver atrás.
+  if ((await settingsService.getEncryptedSetting(SETTING_EMAIL_PROVIDER))?.trim().toLowerCase() === 'mautic') {
+    const mautic = await loadMauticConfig(settingsService);
+    const ready = hasMauticCredentials(mautic) && mautic.applicantTemplateId !== null && mautic.teamTemplateId !== null;
+    return ready
+      ? { enabled: true, provider: 'mautic', masterEmails, mautic, smtp }
+      : { enabled: true, provider: 'disabled', masterEmails, smtp };
+  }
+
   if (!smtp) {
     return {
       enabled: true,

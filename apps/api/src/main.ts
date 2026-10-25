@@ -26,9 +26,8 @@ import { PostgresSubmissionRecoveryRepository } from './infrastructure/database/
 import { PostgresTelegramAlertRepository } from './infrastructure/database/postgres-telegram-alert-repository.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
 import { TelegramRecoveryAlertDispatcher } from './application/telegram-recovery-alert-dispatcher.js';
-import { FakeEmailProvider } from './infrastructure/email/email-provider.js';
+import { createEmailProviderResolver } from './infrastructure/email/email-provider-resolver.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
-import { SmtpEmailProvider } from './infrastructure/email/smtp-email-provider.js';
 import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js';
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
@@ -157,21 +156,13 @@ try {
 
 const adminSessionStore = new PostgresAdminSessionStore(db, getAdminSessionTtlMs());
 
+const resolveEmailProvider = createEmailProviderResolver();
+
 const notificationDispatcher = new EmailNotificationDispatcher({
   repository: emailNotificationRepository,
   getProvider: async () => {
     try {
-      const emailConfig = await loadEmailConfig(encryptedSettingsService);
-      if (!emailConfig.enabled || emailConfig.provider === 'disabled') {
-        return null;
-      }
-      if (emailConfig.provider === 'fake') {
-        return new FakeEmailProvider();
-      }
-      if (emailConfig.provider === 'smtp' && emailConfig.smtp) {
-        return new SmtpEmailProvider(emailConfig.smtp);
-      }
-      return null;
+      return resolveEmailProvider(await loadEmailConfig(encryptedSettingsService));
     } catch (err) {
       console.warn('[Notification Dispatcher] Configuración de correo no disponible:', err instanceof Error ? err.message : err);
       return null;

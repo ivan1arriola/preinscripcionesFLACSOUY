@@ -1,3 +1,5 @@
+import type { MauticClient } from '../../infrastructure/mautic/mautic-client.js';
+import type { MauticConfig } from '../../infrastructure/mautic/mautic-config.js';
 import express, { type Express } from 'express';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../../ports/submission-repository.js';
@@ -60,6 +62,7 @@ export interface AppDependencies {
   getTelegramChatIds?: () => Promise<string[]> | string[];
   getTelegramPreinscriptionChatIds?: () => Promise<string[]> | string[];
   telegramProviderFactory?: (botToken: string) => TelegramProvider;
+  mauticClientFactory?: (config: MauticConfig) => Pick<MauticClient, 'verify'>;
   registrationLookup?: RegistrationLookup;
 }
 
@@ -239,6 +242,7 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.spreadsheetRepository,
     dependencies.telegramProviderFactory,
     dependencies.telegramAlertRepository,
+    dependencies.mauticClientFactory,
   ));
 
   // Central error handler

@@ -26,6 +26,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
 
   // Form fields
   const [enabled, setEnabled] = useState(false);
+  const [provider, setProvider] = useState<'smtp' | 'mautic'>('smtp');
   const [host, setHost] = useState('');
   const [port, setPort] = useState(587);
   const [security, setSecurity] = useState<'starttls' | 'tls'>('starttls');
@@ -64,6 +65,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
       const data = await apiClient.getAdminEmailSettings();
       setSettings(data);
       setEnabled(data.enabled);
+      setProvider(data.provider === 'mautic' ? 'mautic' : 'smtp');
       setHost(data.smtp.host || '');
       setPort(data.smtp.port || 587);
       setSecurity(data.smtp.security);
@@ -122,6 +124,7 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
       const updated = await apiClient.updateAdminEmailSettings(
         {
           enabled,
+          provider,
           host: host.trim(),
           port,
           security,
@@ -289,6 +292,24 @@ export const AdminNotificationsSettingsCard: React.FC<AdminNotificationsSettings
                 Al activar esta opción, cada preinscripción completada generará las notificaciones correspondientes para el postulante, la oferta y los destinatarios maestros.
               </p>
             </div>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <label htmlFor="email-provider-select" className="block text-sm font-semibold text-gray-900 mb-1">
+              Proveedor de envío
+            </label>
+            <select
+              id="email-provider-select"
+              value={provider}
+              onChange={(e) => setProvider(e.target.value === 'mautic' ? 'mautic' : 'smtp')}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="smtp">SMTP</option>
+              <option value="mautic">Mautic (plantillas)</option>
+            </select>
+            <p className="text-xs text-gray-600 mt-1">
+              Con Mautic se usan las plantillas configuradas en la sección Mautic. La configuración SMTP se conserva para volver atrás.
+            </p>
           </div>
 
           {/* Section 1: Conexión SMTP */}

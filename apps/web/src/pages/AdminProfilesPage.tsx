@@ -3,6 +3,7 @@ import { apiClient, ApiError } from '../api/client.js';
 import { AdminDriveSettingsCard } from '../components/AdminDriveSettingsCard.js';
 import { AdminSpreadsheetSettingsCard } from '../components/AdminSpreadsheetSettingsCard.js';
 import { AdminNotificationsSettingsCard } from '../components/AdminNotificationsSettingsCard.js';
+import { AdminMauticSettingsCard } from '../components/AdminMauticSettingsCard.js';
 import { AdminRecoverySettingsCard } from '../components/AdminRecoverySettingsCard.js';
 import { AdminFailedSubmissionsCard } from '../components/AdminFailedSubmissionsCard.js';
 import './admin-responsive.css';
@@ -167,7 +168,10 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
       ) : activeSection === 'spreadsheets' ? (
         <AdminSpreadsheetSettingsCard csrfToken={csrfToken} />
       ) : activeSection === 'notifications' ? (
-        <AdminNotificationsSettingsCard csrfToken={csrfToken} />
+        <div className="space-y-8">
+          <AdminNotificationsSettingsCard csrfToken={csrfToken} />
+          <AdminMauticSettingsCard csrfToken={csrfToken} />
+        </div>
       ) : activeSection === 'recovery' ? (
         <div className="space-y-8">
           <AdminFailedSubmissionsCard csrfToken={csrfToken} />

@@ -32,6 +32,16 @@ vi.mock('../api/client.js', async () => {
         counts: { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 },
         notifications: [],
       }),
+      getMauticSettings: vi.fn().mockResolvedValue({
+        mautic: {
+          baseUrl: '',
+          clientId: '',
+          hasClientSecret: false,
+          contactsEnabled: false,
+          applicantTemplateId: null,
+          teamTemplateId: null,
+        },
+      }),
       getTelegramSettings: vi.fn().mockResolvedValue({
         telegram: {
           enabled: false,
@@ -80,6 +90,16 @@ describe('AdminProfilesPage Component', () => {
       ok: true,
       counts: { pending: 0, processing: 0, sent: 0, failed: 0, unknown: 0, total: 0 },
       notifications: [],
+    });
+    vi.mocked(apiClient.getMauticSettings).mockResolvedValue({
+      mautic: {
+        baseUrl: '',
+        clientId: '',
+        hasClientSecret: false,
+        contactsEnabled: false,
+        applicantTemplateId: null,
+        teamTemplateId: null,
+      },
     });
     vi.mocked(apiClient.getTelegramSettings).mockResolvedValue({
       telegram: {

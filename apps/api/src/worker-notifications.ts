@@ -6,7 +6,7 @@ import { PostgresTelegramAlertRepository } from './infrastructure/database/postg
 import { PostgresSubmissionRecoveryRepository } from './infrastructure/database/postgres-submission-recovery-repository.js';
 import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
-import { SmtpEmailProvider } from './infrastructure/email/smtp-email-provider.js';
+import { createEmailProviderResolver } from './infrastructure/email/email-provider-resolver.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
 import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js';
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
@@ -31,15 +31,15 @@ const temporaryFileStorage = new TemporaryFileStorage({
   allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
 });
 
+const resolveEmailProvider = createEmailProviderResolver();
+
 const emailDispatcher = new EmailNotificationDispatcher({
   repository: notificationRepo,
   getProvider: async () => {
     try {
       const emailConfig = await loadEmailConfig(encryptedSettingsService);
-      if (emailConfig.enabled && emailConfig.provider === 'smtp' && emailConfig.smtp) {
-        return new SmtpEmailProvider(emailConfig.smtp);
-      }
-      return null;
+      // El worker nunca usa el proveedor 'fake' de desarrollo.
+      return emailConfig.provider === 'fake' ? null : resolveEmailProvider(emailConfig);
     } catch (err) {
       console.warn('[NotificationWorker] Configuración de correo no disponible o inválida:', err instanceof Error ? err.message : err);
       return null;
