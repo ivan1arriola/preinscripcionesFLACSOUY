@@ -1,7 +1,7 @@
 import type { FormDefinition } from '@flacso/contracts';
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import { getCanonicalFormDefinition } from '../domain/canonical-forms.js';
-import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
+import { normalizePermalink, resolvePermalinks } from '../domain/permalink-availability.js';
 
 export type GetTargetFormResult =
   | { ok: true; form: FormDefinition }
@@ -29,44 +29,43 @@ export async function getTargetForm(
     };
   }
 
-  if (target.kind === 'seminar') {
-    let allTargets;
-    try {
-      allTargets = await catalog.revalidateTargets();
-    } catch (error) {
-      console.warn(
-        '[Catalog] Revalidación de seminario no disponible; usando catálogo cacheado:',
-        error instanceof Error ? error.message : error,
-      );
-      allTargets = await catalog.listTargets();
-    }
-    const resolutions = resolveSeminarPermalinks(allTargets);
-    const rawUrl = target.urls?.legacyRegistration;
-    const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
-    const resolution = permalink ? resolutions.get(permalink) : undefined;
+  // Cohortes y ediciones: el enlace de preinscripción debe resolver a este destino.
+  let allTargets;
+  try {
+    allTargets = await catalog.revalidateTargets();
+  } catch (error) {
+    console.warn(
+      '[Catalog] Revalidación no disponible; usando catálogo cacheado:',
+      error instanceof Error ? error.message : error,
+    );
+    allTargets = await catalog.listTargets();
+  }
+  const resolutions = resolvePermalinks(allTargets);
+  const rawUrl = target.urls?.legacyRegistration;
+  const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
+  const resolution = permalink ? resolutions.get(permalink) : undefined;
 
-    if (resolution) {
-      if (resolution.status === 'conflict') {
-        return {
-          ok: false,
-          code: 'CLOSED',
-          message: 'La preinscripción para este seminario presenta un conflicto en el catálogo.',
-        };
-      }
-      if (resolution.status === 'closed' || resolution.targetId !== target.id) {
-        return {
-          ok: false,
-          code: 'CLOSED',
-          message: 'La preinscripción para este destino académico se encuentra cerrada.',
-        };
-      }
-    } else if (target.registrationAvailability === 'conflict' || target.registrationAvailability === 'closed') {
+  if (resolution) {
+    if (resolution.status === 'conflict') {
+      return {
+        ok: false,
+        code: 'CLOSED',
+        message: 'La preinscripción para este seminario presenta un conflicto en el catálogo.',
+      };
+    }
+    if (resolution.status === 'closed' || resolution.targetId !== target.id) {
       return {
         ok: false,
         code: 'CLOSED',
         message: 'La preinscripción para este destino académico se encuentra cerrada.',
       };
     }
+  } else if (target.registrationAvailability === 'conflict' || target.registrationAvailability === 'closed') {
+    return {
+      ok: false,
+      code: 'CLOSED',
+      message: 'La preinscripción para este destino académico se encuentra cerrada.',
+    };
   }
 
   const agreements = catalog.listAgreements

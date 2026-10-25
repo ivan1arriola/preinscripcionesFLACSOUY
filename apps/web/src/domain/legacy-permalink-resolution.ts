@@ -49,41 +49,33 @@ export function resolveLegacyPermalink(
     return { kind: 'not_found' };
   }
 
-  if (normalizedPath.startsWith('/oferta/')) {
-    const target = matchingTargets[0];
-    return target ? { kind: 'target', target } : { kind: 'not_found' };
-  }
+  // Misma regla para /oferta/ y /seminario/: el enlace lleva a su único destino abierto.
+  // La API ya resolvió disponibilidad y conflictos por enlace; acá sólo se lee ese resultado.
+  const title = matchingTargets[0]?.title;
 
-  // Seminarios
-  const seminarTargets = matchingTargets.filter((t) => t.kind === 'seminar');
-  if (seminarTargets.length === 0) {
-    return { kind: 'not_found' };
-  }
-
-  const title = seminarTargets[0]?.title;
-
-  const hasConflict = seminarTargets.some(
+  const hasConflict = matchingTargets.some(
     (t) =>
       t.registrationAvailability === 'conflict' ||
       t.issues.includes('multiple_open_seminar_editions') ||
+      t.issues.includes('multiple_open_cohorts') ||
       t.issues.includes('inconsistent_seminar_permalink')
   );
   if (hasConflict) {
     return { kind: 'conflict', title };
   }
 
-  const openEditions = seminarTargets.filter((t) => {
+  const openTargets = matchingTargets.filter((t) => {
     if (t.registrationAvailability !== undefined) {
       return t.registrationAvailability === 'open';
     }
     return Boolean(t.registrationOpen && t.status === 'operational');
   });
 
-  if (openEditions.length === 1 && openEditions[0]) {
-    return { kind: 'target', target: openEditions[0] };
+  if (openTargets.length === 1 && openTargets[0]) {
+    return { kind: 'target', target: openTargets[0] };
   }
 
-  if (openEditions.length > 1) {
+  if (openTargets.length > 1) {
     return { kind: 'conflict', title };
   }
 

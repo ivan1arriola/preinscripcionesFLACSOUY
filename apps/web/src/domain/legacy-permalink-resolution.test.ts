@@ -90,7 +90,7 @@ describe('resolveLegacyPermalink', () => {
     expect(result.kind).toBe('not_found');
   });
 
-  it('resolves academic offer path directly without seminar edition logic', () => {
+  it('resolves an academic offer path to its open cohort', () => {
     const targets = [
       baseAcademicOffer('oferta-1', 'https://flacso.edu.uy/oferta/davia/'),
     ];
@@ -100,5 +100,33 @@ describe('resolveLegacyPermalink', () => {
     if (result.kind === 'target') {
       expect(result.target.id).toBe('oferta-1');
     }
+  });
+
+  it('resolves an offer path to the open cohort even when an older closed cohort comes first', () => {
+    const permalink = 'https://flacso.edu.uy/oferta/diplomado-violencias/';
+    const closedCohort: DiagnosticTarget = {
+      ...baseAcademicOffer('cohorte-vieja', permalink),
+      registrationOpen: false,
+      registrationAvailability: 'closed',
+      status: 'closed',
+    };
+    const openCohort: DiagnosticTarget = { ...baseAcademicOffer('cohorte-nueva', permalink), registrationAvailability: 'open' };
+
+    const result = resolveLegacyPermalink([closedCohort, openCohort], '/oferta/diplomado-violencias/');
+    expect(result.kind).toBe('target');
+    if (result.kind === 'target') {
+      expect(result.target.id).toBe('cohorte-nueva');
+    }
+  });
+
+  it('returns closed for an offer path whose cohorts are all closed', () => {
+    const closedCohort: DiagnosticTarget = {
+      ...baseAcademicOffer('cohorte-vieja', 'https://flacso.edu.uy/oferta/davia/'),
+      registrationOpen: false,
+      registrationAvailability: 'closed',
+      status: 'closed',
+    };
+
+    expect(resolveLegacyPermalink([closedCohort], '/oferta/davia/').kind).toBe('closed');
   });
 });

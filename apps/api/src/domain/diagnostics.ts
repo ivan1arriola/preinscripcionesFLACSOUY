@@ -1,11 +1,11 @@
 import type { AcademicTarget, DiagnosticTarget, DiagnosticStatus, RegistrationAvailability } from '@flacso/contracts';
 import { SUPPORTED_OFFER_TYPES } from './form-profiles.js';
-import { normalizePermalink, type SeminarPermalinkResolution } from './seminar-permalink-availability.js';
+import { normalizePermalink, type PermalinkResolution } from './permalink-availability.js';
 
 export function diagnoseTarget(
   target: AcademicTarget,
   activeProfileTypes: Set<string> = new Set(SUPPORTED_OFFER_TYPES),
-  seminarResolutions?: Map<string, SeminarPermalinkResolution>
+  permalinkResolutions?: Map<string, PermalinkResolution>
 ): DiagnosticTarget {
   const issues: string[] = [];
 
@@ -25,61 +25,56 @@ export function diagnoseTarget(
   let registrationOpen = target.registrationOpen;
   let registrationAvailability: RegistrationAvailability | undefined = target.registrationAvailability;
 
-  if (target.kind === 'seminar') {
-    const rawUrl = target.urls?.legacyRegistration;
-    const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
-    const resolution = permalink && seminarResolutions ? seminarResolutions.get(permalink) : undefined;
+  // Misma regla para cohortes y ediciones: un enlace lleva a un único destino abierto.
+  const rawUrl = target.urls?.legacyRegistration;
+  const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
+  const resolution = permalink && permalinkResolutions ? permalinkResolutions.get(permalink) : undefined;
 
-    if (resolution) {
-      registrationAvailability = resolution.status;
-      if (resolution.status === 'conflict') {
-        issues.push(resolution.issue ?? 'multiple_open_seminar_editions');
-        status = 'incompatible';
-        registrationOpen = false;
-      } else if (resolution.status === 'closed') {
-        registrationOpen = false;
-        if (issues.length === 0) {
-          status = 'closed';
-        }
-      } else if (resolution.status === 'open') {
-        if (resolution.targetId === target.id) {
-          registrationOpen = true;
-          registrationAvailability = 'open';
-          if (issues.length === 0) {
-            status = 'operational';
-          }
-        } else {
-          registrationOpen = false;
-          registrationAvailability = 'closed';
-          if (issues.length === 0) {
-            status = 'closed';
-          }
-        }
+  if (resolution) {
+    registrationAvailability = resolution.status;
+    if (resolution.status === 'conflict') {
+      issues.push(resolution.issue ?? 'multiple_open_seminar_editions');
+      status = 'incompatible';
+      registrationOpen = false;
+    } else if (resolution.status === 'closed') {
+      registrationOpen = false;
+      if (issues.length === 0) {
+        status = 'closed';
       }
-    } else {
-      if (target.registrationAvailability === 'conflict') {
-        issues.push('multiple_open_seminar_editions');
-        status = 'incompatible';
-        registrationOpen = false;
-      } else if (target.registrationAvailability === 'closed') {
-        registrationOpen = false;
-        if (issues.length === 0) {
-          status = 'closed';
-        }
-      } else if (target.registrationAvailability === 'open') {
+    } else if (resolution.status === 'open') {
+      if (resolution.targetId === target.id) {
         registrationOpen = true;
+        registrationAvailability = 'open';
         if (issues.length === 0) {
           status = 'operational';
         }
-      } else if (!registrationOpen) {
+      } else {
+        registrationOpen = false;
+        registrationAvailability = 'closed';
         if (issues.length === 0) {
           status = 'closed';
         }
       }
     }
   } else {
-    if (!registrationOpen && issues.length === 0) {
-      status = 'closed';
+    if (target.registrationAvailability === 'conflict') {
+      issues.push(target.kind === 'seminar' ? 'multiple_open_seminar_editions' : 'multiple_open_cohorts');
+      status = 'incompatible';
+      registrationOpen = false;
+    } else if (target.registrationAvailability === 'closed') {
+      registrationOpen = false;
+      if (issues.length === 0) {
+        status = 'closed';
+      }
+    } else if (target.registrationAvailability === 'open') {
+      registrationOpen = true;
+      if (issues.length === 0) {
+        status = 'operational';
+      }
+    } else if (!registrationOpen) {
+      if (issues.length === 0) {
+        status = 'closed';
+      }
     }
   }
 

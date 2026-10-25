@@ -3,7 +3,7 @@ import type { SubmissionRepository } from '../ports/submission-repository.js';
 import { getCanonicalFormDefinition, CANONICAL_SCHEMA_VERSION } from '../domain/canonical-forms.js';
 import { validateSubmission } from '../domain/form-validation.js';
 import { normalizeIdentityValues } from '../domain/identity-validation.js';
-import { normalizePermalink, resolveSeminarPermalinks } from '../domain/seminar-permalink-availability.js';
+import { normalizePermalink, resolvePermalinks } from '../domain/permalink-availability.js';
 import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import type { AcademicTarget, FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { buildSpreadsheetSchema, buildSpreadsheetValues } from '../domain/spreadsheet-schema.js';
@@ -79,27 +79,26 @@ export async function submitPreinscription(
     };
   }
 
-  if (target.kind === 'seminar') {
-    const resolutions = resolveSeminarPermalinks(catalogTargets);
-    const rawUrl = target.urls?.legacyRegistration;
-    const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
-    const resolution = permalink ? resolutions.get(permalink) : undefined;
+  // Cohortes y ediciones: el enlace de preinscripción debe resolver a este destino.
+  const resolutions = resolvePermalinks(catalogTargets);
+  const rawUrl = target.urls?.legacyRegistration;
+  const permalink = rawUrl && rawUrl.trim() ? normalizePermalink(rawUrl) : null;
+  const resolution = permalink ? resolutions.get(permalink) : undefined;
 
-    if (resolution) {
-      if (resolution.status === 'conflict' || resolution.status === 'closed' || resolution.targetId !== target.id) {
-        return {
-          ok: false,
-          code: 'CLOSED',
-          message: 'La preinscripción para este destino académico se encuentra cerrada.',
-        };
-      }
-    } else if (target.registrationAvailability === 'conflict' || target.registrationAvailability === 'closed') {
+  if (resolution) {
+    if (resolution.status === 'conflict' || resolution.status === 'closed' || resolution.targetId !== target.id) {
       return {
         ok: false,
         code: 'CLOSED',
         message: 'La preinscripción para este destino académico se encuentra cerrada.',
       };
     }
+  } else if (target.registrationAvailability === 'conflict' || target.registrationAvailability === 'closed') {
+    return {
+      ok: false,
+      code: 'CLOSED',
+      message: 'La preinscripción para este destino académico se encuentra cerrada.',
+    };
   }
 
   // 3. Compose canonical form

@@ -1,11 +1,11 @@
 import type { AcademicTarget, RegistrationAvailability } from '@flacso/contracts';
 
-export type SeminarPermalinkIssue = 'multiple_open_seminar_editions' | 'inconsistent_seminar_permalink';
+export type PermalinkIssue = 'multiple_open_seminar_editions' | 'multiple_open_cohorts' | 'inconsistent_seminar_permalink';
 
-export interface SeminarPermalinkResolution {
+export interface PermalinkResolution {
   status: RegistrationAvailability;
   targetId?: string;
-  issue?: SeminarPermalinkIssue;
+  issue?: PermalinkIssue;
 }
 
 export function normalizePermalink(urlOrPath: string): string {
@@ -27,8 +27,13 @@ export function normalizePermalink(urlOrPath: string): string {
   return pathname.toLowerCase();
 }
 
-export function resolveSeminarPermalinks(targets: AcademicTarget[]): Map<string, SeminarPermalinkResolution> {
-  const resolutions = new Map<string, SeminarPermalinkResolution>();
+/**
+ * Un enlace de preinscripción (/oferta/… o /seminario/…) debe llevar a un único destino abierto.
+ * Resuelve, por enlace, cuál destino está abierto o si hay conflicto. Es la única regla de
+ * disponibilidad por enlace: la usan el catálogo público, el formulario y el envío.
+ */
+export function resolvePermalinks(targets: AcademicTarget[]): Map<string, PermalinkResolution> {
+  const resolutions = new Map<string, PermalinkResolution>();
   const seminarTargets = targets.filter((t) => t.kind === 'seminar');
 
   // 1. Group by seminar identity to check permalink consistency across editions of the same seminar
@@ -72,9 +77,9 @@ export function resolveSeminarPermalinks(targets: AcademicTarget[]): Map<string,
     });
   }
 
-  // 2. Group by normalized permalink for seminars that are not inconsistent
+  // 2. Group every target (cohorts and editions) by normalized permalink, skipping inconsistent seminars
   const permalinkGroups = new Map<string, AcademicTarget[]>();
-  for (const target of seminarTargets) {
+  for (const target of targets) {
     const rawUrl = target.urls?.legacyRegistration;
     if (!rawUrl || !rawUrl.trim()) continue;
 
@@ -90,11 +95,14 @@ export function resolveSeminarPermalinks(targets: AcademicTarget[]): Map<string,
 
   // 3. Resolve status for each permalink group
   for (const [permalink, editions] of permalinkGroups.entries()) {
+    const conflictIssue: PermalinkIssue = editions.some((e) => e.kind === 'seminar')
+      ? 'multiple_open_seminar_editions'
+      : 'multiple_open_cohorts';
     const hasExplicitConflict = editions.some((e) => e.registrationAvailability === 'conflict');
     if (hasExplicitConflict) {
       resolutions.set(permalink, {
         status: 'conflict',
-        issue: 'multiple_open_seminar_editions',
+        issue: conflictIssue,
       });
       continue;
     }
@@ -114,7 +122,7 @@ export function resolveSeminarPermalinks(targets: AcademicTarget[]): Map<string,
     } else if (openEditions.length > 1) {
       resolutions.set(permalink, {
         status: 'conflict',
-        issue: 'multiple_open_seminar_editions',
+        issue: conflictIssue,
       });
     } else {
       resolutions.set(permalink, {

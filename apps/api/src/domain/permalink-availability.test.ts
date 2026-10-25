@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import type { AcademicTarget } from '@flacso/contracts';
 import {
-  resolveSeminarPermalinks,
+  resolvePermalinks,
   normalizePermalink,
-} from './seminar-permalink-availability.js';
+} from './permalink-availability.js';
 
 describe('Seminar permalink availability resolution', () => {
   describe('normalizePermalink', () => {
@@ -16,7 +16,7 @@ describe('Seminar permalink availability resolution', () => {
     });
   });
 
-  describe('resolveSeminarPermalinks', () => {
+  describe('resolvePermalinks', () => {
     const baseSeminarTarget = (id: string, editionId: number, permalink: string, open: boolean, availability?: 'open' | 'closed' | 'conflict'): AcademicTarget => ({
       id,
       kind: 'seminar',
@@ -47,7 +47,7 @@ describe('Seminar permalink availability resolution', () => {
         baseSeminarTarget('target-ed-2', 2, 'https://flacso.edu.uy/seminario/curso-test/', true, 'open'),
       ];
 
-      const resolutions = resolveSeminarPermalinks(targets);
+      const resolutions = resolvePermalinks(targets);
       const res = resolutions.get('/seminario/curso-test/');
 
       expect(res).toBeDefined();
@@ -62,7 +62,7 @@ describe('Seminar permalink availability resolution', () => {
         baseSeminarTarget('target-ed-2', 2, 'https://flacso.edu.uy/seminario/curso-test/', false, 'closed'),
       ];
 
-      const resolutions = resolveSeminarPermalinks(targets);
+      const resolutions = resolvePermalinks(targets);
       const res = resolutions.get('/seminario/curso-test/');
 
       expect(res).toBeDefined();
@@ -77,7 +77,7 @@ describe('Seminar permalink availability resolution', () => {
         baseSeminarTarget('target-ed-2', 2, 'https://flacso.edu.uy/seminario/curso-test/', true, 'open'),
       ];
 
-      const resolutions = resolveSeminarPermalinks(targets);
+      const resolutions = resolvePermalinks(targets);
       const res = resolutions.get('/seminario/curso-test/');
 
       expect(res).toBeDefined();
@@ -94,11 +94,11 @@ describe('Seminar permalink availability resolution', () => {
         },
       ];
 
-      const resolutions = resolveSeminarPermalinks(targets);
+      const resolutions = resolvePermalinks(targets);
       expect(resolutions.size).toBe(0);
     });
 
-    it('ignores academic offers sharing the same path and only evaluates seminar targets', () => {
+    it('treats an open offer and an open seminar edition behind the same path as a conflict', () => {
       const targets: AcademicTarget[] = [
         {
           id: 'offer-target-1',
@@ -116,12 +116,33 @@ describe('Seminar permalink availability resolution', () => {
         baseSeminarTarget('target-ed-1', 1, 'https://flacso.edu.uy/seminario/curso-test/', true, 'open'),
       ];
 
-      const resolutions = resolveSeminarPermalinks(targets);
+      const resolutions = resolvePermalinks(targets);
       const res = resolutions.get('/seminario/curso-test/');
 
       expect(res).toBeDefined();
-      expect(res?.status).toBe('open');
-      expect(res?.targetId).toBe('target-ed-1');
+      expect(res?.status).toBe('conflict');
+      expect(res?.issue).toBe('multiple_open_seminar_editions');
+    });
+
+    it('resolves an offer link to its open cohort when an older closed cohort shares the link', () => {
+      const cohort = (id: string, open: boolean): AcademicTarget => ({
+        id,
+        kind: 'academic_offer',
+        title: id,
+        offerType: 'diplomado',
+        registrationOpen: open,
+        registrationAvailability: open ? 'open' : 'closed',
+        configRevision: 'rev-1',
+        orientations: [],
+        mentions: [],
+        urls: { legacyRegistration: 'https://preinscripciones.flacso.edu.uy/oferta/diplomado-violencias/' },
+      });
+
+      const open = resolvePermalinks([cohort('cohorte-vieja', false), cohort('cohorte-nueva', true)]).get('/oferta/diplomado-violencias/');
+      expect(open).toEqual({ status: 'open', targetId: 'cohorte-nueva' });
+
+      const both = resolvePermalinks([cohort('cohorte-a', true), cohort('cohorte-b', true)]).get('/oferta/diplomado-violencias/');
+      expect(both).toEqual({ status: 'conflict', issue: 'multiple_open_cohorts' });
     });
 
     it('marks conflict with inconsistent_seminar_permalink when editions of the same seminar have different permalinks', () => {
@@ -130,7 +151,7 @@ describe('Seminar permalink availability resolution', () => {
         baseSeminarTarget('target-ed-2', 2, 'https://flacso.edu.uy/seminario/curso-nuevo/', true, 'open'),
       ];
 
-      const resolutions = resolveSeminarPermalinks(targets);
+      const resolutions = resolvePermalinks(targets);
 
       const resViejo = resolutions.get('/seminario/curso-viejo/');
       const resNuevo = resolutions.get('/seminario/curso-nuevo/');
@@ -150,7 +171,7 @@ describe('Seminar permalink availability resolution', () => {
         baseSeminarTarget('target-ed-2', 2, 'https://flacso.edu.uy/seminario/curso-test/', true),
       ];
 
-      const resolutions = resolveSeminarPermalinks(targets);
+      const resolutions = resolvePermalinks(targets);
       const res = resolutions.get('/seminario/curso-test/');
 
       expect(res?.status).toBe('open');
