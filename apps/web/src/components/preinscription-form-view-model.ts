@@ -63,7 +63,7 @@ const fallbackGroups: Array<{
     description: 'Completá las declaraciones finales de tu solicitud.',
     category: 'declarations',
     stepIds: ['declaracion'],
-    keys: ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'],
+    keys: ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion', 'aceptaComunicaciones'],
   },
 ];
 

@@ -138,7 +138,7 @@ describe('AdminProfilesPage Component', () => {
       expect(screen.getByText('Administración de Preinscripciones')).toBeInTheDocument();
       expect(screen.getByText('web@flacso.edu.uy')).toBeInTheDocument();
       expect(screen.getByText(/Formularios Canónicos Activos/i)).toBeInTheDocument();
-      expect(screen.getByText(/canonical-v1/i)).toBeInTheDocument();
+      expect(screen.getByText(/canonical-v2/i)).toBeInTheDocument();
       expect(screen.getByText(/5 pasos/i)).toBeInTheDocument();
     });
   });
@@ -150,7 +150,7 @@ describe('AdminProfilesPage Component', () => {
 
     const navigation = screen.getByRole('tablist', { name: 'Secciones de administración' });
     expect(navigation).toHaveClass('admin-section-tabs');
-    expect(screen.getAllByRole('tab')).toHaveLength(5);
+    expect(screen.getAllByRole('tab')).toHaveLength(6);
     expect(screen.getAllByRole('tab').every((tab) => tab.classList.contains('admin-section-tab'))).toBe(true);
     expect(container.querySelector('.admin-section-content')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /Recuperación y Alertas/i }));

@@ -17,6 +17,7 @@ const choices: Record<string, Array<[string, string]>> = {
   genero: [['Mujer', 'Mujer'], ['Varon', 'Varón'], ['Mujer trans', 'Mujer trans'], ['Varon trans', 'Varón trans'], ['No binarie / no conforme', 'No binarie / no conforme'], ['Otra', 'Otra'], ['Prefiero no responder', 'Prefiero no responder']],
   tieneConvenio: [['No', 'No'], ['Si', 'Sí']],
   aceptaDifusion: [['No', 'No'], ['Si', 'Sí']],
+  aceptaComunicaciones: [['No', 'No'], ['Si', 'Sí']],
   posgradoFlacso: [['No', 'No'], ['Si', 'Sí']],
   fuente: [['Facebook', 'Facebook'], ['Twitter', 'Twitter'], ['Instagram', 'Instagram'], ['Linkedin', 'LinkedIn'], ['Web', 'Web'], ['Recomendacion', 'Recomendación'], ['Mailing', 'Mailing'], ['Otro', 'Otro']],
 };
@@ -43,7 +44,7 @@ const phonePlaceholders: Partial<Record<CountryCode, string>> = {
   ES: '612 345 678',
 };
 const phonePlaceholderFor = (country: CountryCode) => phonePlaceholders[country] ?? 'Número local';
-const yesNoKeys = new Set(['tieneConvenio', 'aceptaDifusion', 'posgradoFlacso']);
+const yesNoKeys = new Set(['tieneConvenio', 'aceptaDifusion', 'aceptaComunicaciones', 'posgradoFlacso']);
 
 export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values, errors, disabled, onChange, agreements = [] }) => {
   const [phoneCountry, setPhoneCountry] = useState<CountryCode>('UY');

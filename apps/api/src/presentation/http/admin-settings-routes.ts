@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import type { Router } from 'express';
+import { createAsyncRouter } from './async-router.js';
 import { z } from 'zod';
 import type { SystemSettingsRepository } from '../../ports/system-settings-repository.js';
 import {
@@ -226,7 +227,7 @@ export function createAdminSettingsRoutes(
   telegramAlertRepository?: TelegramAlertRepository,
   mauticClientFactory?: (config: MauticConfig) => Pick<MauticClient, 'verify'>,
 ): Router {
-  const router = Router();
+  const router = createAsyncRouter();
   const requireAdmin = createRequireAdminSession(sessionStore);
 
   router.use(requireAdmin);

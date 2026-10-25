@@ -233,4 +233,42 @@ integrationDescribe('PostgresEmailNotificationRepository (Integration with Postg
     const missingAfter = await repository.listMissingForSuccessfulSubmissions(10);
     expect(missingAfter).not.toContain(successfulSubmissionId);
   });
+
+  it('redacts personal data of notifications sent before the retention cutoff, and only those', async () => {
+    const oldSubmission = `sub_notif_old_${crypto.randomUUID().slice(0, 8)}`;
+    const recentSubmission = `sub_notif_new_${crypto.randomUUID().slice(0, 8)}`;
+    const pendingSubmission = `sub_notif_pend_${crypto.randomUUID().slice(0, 8)}`;
+    for (const id of [oldSubmission, recentSubmission, pendingSubmission]) await createTestSubmission(id);
+
+    const now = new Date('2026-10-25T12:00:00Z');
+    const day = 24 * 60 * 60 * 1000;
+    const ids: Record<string, string> = {};
+    for (const [label, submissionId] of [['old', oldSubmission], ['recent', recentSubmission], ['pending', pendingSubmission]] as const) {
+      const [record] = await repository.ensureForSubmission({
+        submissionId,
+        snapshot: { ...sampleSnapshot, submissionId },
+        recipients: [{ audience: 'applicant', email: 'postulante@example.com' }],
+        availableAt: now,
+      });
+      ids[label] = record!.id;
+    }
+    await repository.markSent(ids.old!, 'msg-old', new Date(now.getTime() - 120 * day));
+    await repository.markSent(ids.recent!, 'msg-new', new Date(now.getTime() - 10 * day));
+
+    const cutoff = new Date(now.getTime() - 90 * day);
+    expect(await repository.redactSentBefore(cutoff)).toBe(1);
+    // Una segunda pasada no vuelve a procesar lo ya redactado.
+    expect(await repository.redactSentBefore(cutoff)).toBe(0);
+
+    const old = await repository.findById(ids.old!);
+    expect(old?.status).toBe('sent');
+    expect(old?.payload.redactedAt).toBeDefined();
+    expect(old?.payload.values).toEqual({});
+    expect(old?.payload.applicantEmail).toBe('');
+    expect(JSON.stringify(old?.payload)).not.toContain('Ana');
+
+    expect((await repository.findById(ids.recent!))?.payload.applicantName).toBe('Ana Clara');
+    // Lo no entregado conserva su contenido para poder reintentarse.
+    expect((await repository.findById(ids.pending!))?.payload.applicantName).toBe('Ana Clara');
+  });
 });

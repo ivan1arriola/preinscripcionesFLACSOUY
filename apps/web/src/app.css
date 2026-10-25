@@ -214,6 +214,8 @@ textarea { min-height: 6.75rem; resize: vertical; }
 .home-state-error { border-color: #fecdca; background: #fff8f7; }
 .home-state-error .home-state-icon { background: #fee4e2; color: #b42318; }
 @keyframes home-spin { to { transform: rotate(360deg); } }
+/* El proyecto no incluye Tailwind: el indicador de carga necesita su animación definida a mano. */
+.animate-spin { animation: home-spin 1s linear infinite; }
 .catalog-section + .catalog-section { margin-top: 3.5rem; }
 .catalog-controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; padding: .45rem; border: 1px solid #dfe7f1; border-radius: .95rem; background: #fff; box-shadow: 0 4px 14px rgba(16, 51, 100, .045); }
 .catalog-tabs { display: inline-flex; gap: .25rem; }

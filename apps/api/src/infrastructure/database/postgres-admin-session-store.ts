@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { Kysely } from 'kysely';
 import type { DatabaseSchema } from './schema.js';
-import type { AdminUser } from '../../domain/form-profiles.js';
+import type { AdminUser } from '../../domain/admin-user.js';
 import {
   type AdminSession,
   type AdminSessionStore,

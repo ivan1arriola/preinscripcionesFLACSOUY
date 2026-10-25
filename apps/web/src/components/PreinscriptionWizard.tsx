@@ -44,6 +44,24 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   const currentStep = steps[currentStepIndex] || steps[0]!;
 
+  // Si el servidor rechaza campos al confirmar desde la pantalla de resumen, esa pantalla no los muestra:
+  // se vuelve al primer paso con error para que la persona vea qué corregir.
+  React.useEffect(() => {
+    const fieldKeys = Object.keys(serverErrors).filter((key) => key !== '_form');
+    if (!isReviewing || fieldKeys.length === 0) return;
+
+    const stepIdOf = (key: string) =>
+      form.inputs.find((input) => input.key === key)?.stepId
+      ?? (form.documents ?? []).find((document) => document.key === key)?.stepId;
+    const stepIndexes = fieldKeys
+      .map((key) => steps.findIndex((step) => step.id === stepIdOf(key)))
+      .filter((index) => index >= 0);
+
+    setIsReviewing(false);
+    setCurrentStepIndex(stepIndexes.length > 0 ? Math.min(...stepIndexes) : 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [serverErrors]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleInputChange = (key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }));
     setClientErrors((prev) => {
@@ -93,7 +111,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
         return ['estudios', 'posgradoFlacso', 'posgradoCual', 'orientacion', 'mencion', 'tituloDenominacion', 'sinTituloActual'].includes(i.key);
       }
       if (stepToValidate.id === 'declaracion') {
-        return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
+        return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion', 'aceptaComunicaciones'].includes(i.key);
       }
       return steps.findIndex((s) => s.id === stepToValidate.id) === 0;
     });
@@ -279,7 +297,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       return ['estudios', 'posgradoFlacso', 'posgradoCual', 'orientacion', 'mencion', 'tituloDenominacion', 'sinTituloActual'].includes(i.key);
     }
     if (currentStep.id === 'declaracion') {
-      return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
+      return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion', 'aceptaComunicaciones'].includes(i.key);
     }
     return currentStepIndex === 0;
   });

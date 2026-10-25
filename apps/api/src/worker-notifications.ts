@@ -14,6 +14,7 @@ import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
 import { TelegramRecoveryAlertDispatcher } from './application/telegram-recovery-alert-dispatcher.js';
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
+import { purgeNotificationPersonalData } from './application/purge-notification-personal-data.js';
 
 console.log('[Worker] Iniciando worker de despacho de notificaciones (SMTP, Telegram) y retención...');
 
@@ -57,7 +58,7 @@ const telegramDispatcher = new TelegramRecoveryAlertDispatcher({
   getProvider: async () => {
     try {
       const telegramConfig = await loadTelegramConfig(encryptedSettingsService);
-      if (telegramConfig.enabled && telegramConfig.botToken) {
+      if ((telegramConfig.enabled || telegramConfig.preinscriptionEnabled) && telegramConfig.botToken) {
         return new FetchTelegramProvider(telegramConfig.botToken);
       }
       return null;
@@ -116,6 +117,12 @@ const cleanupInterval = setInterval(async () => {
     }
   } catch (err) {
     console.error('[Cleanup] Error en la limpieza automática de recuperaciones y archivos temporales:', err);
+  }
+
+  try {
+    await purgeNotificationPersonalData({ repository: notificationRepo });
+  } catch (err) {
+    console.error('[Cleanup] Error al aplicar la retención de datos de las notificaciones:', err);
   }
 }, 15 * 60 * 1000);
 cleanupInterval.unref();

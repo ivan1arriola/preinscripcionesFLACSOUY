@@ -6,6 +6,7 @@ import type {
   EmailNotificationFilter,
   EmailNotificationCounts,
 } from '../../ports/email-notification-repository.js';
+import { redactNotificationSnapshot } from '../../application/notification-snapshot.js';
 
 export class InMemoryEmailNotificationRepository implements EmailNotificationRepository {
   private records: Map<string, EmailNotificationRecord> = new Map();
@@ -124,6 +125,17 @@ export class InMemoryEmailNotificationRepository implements EmailNotificationRep
     record.lastError = error;
     record.lockedUntil = undefined;
     record.updatedAt = new Date();
+  }
+
+  async redactSentBefore(sentBefore: Date, limit = 500): Promise<number> {
+    let redacted = 0;
+    for (const record of this.records.values()) {
+      if (redacted >= limit) break;
+      if (record.status !== 'sent' || !record.sentAt || record.sentAt >= sentBefore || record.payload.redactedAt) continue;
+      record.payload = redactNotificationSnapshot(record.payload);
+      redacted += 1;
+    }
+    return redacted;
   }
 
   async listMissingForSuccessfulSubmissions(_limit: number): Promise<string[]> {

@@ -130,7 +130,8 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                     accept={document.acceptedMimeTypes?.join(',')}
                     disabled={disabled || uploading[document.key]}
                     onChange={async (event) => {
-                      const file = event.target.files?.[0];
+                      const input = event.target;
+                      const file = input.files?.[0];
                       if (!file) return;
                       setUploading((current) => ({ ...current, [document.key]: true }));
                       try {
@@ -144,6 +145,8 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                         }));
                       } finally {
                         setUploading((current) => ({ ...current, [document.key]: false }));
+                        // Permite volver a elegir el mismo archivo después de quitarlo o de un error.
+                        input.value = '';
                       }
                     }}
                     className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"

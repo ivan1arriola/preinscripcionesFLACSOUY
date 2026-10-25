@@ -7,7 +7,7 @@ import type {
   InputDefinition,
 } from './catalog.js';
 
-export const CANONICAL_SCHEMA_VERSION = 'canonical-v1';
+export const CANONICAL_SCHEMA_VERSION = 'canonical-v2';
 
 export const CANONICAL_STEPS: FormStepDefinition[] = [
   { id: 'personal', title: 'Datos personales y demográficos', order: 1 },
@@ -54,6 +54,7 @@ export const CANONICAL_BASE_INPUTS: Array<Omit<InputDefinition, 'position'>> = [
   { key: 'convenioWordpressId', label: '¿Cuál convenio te corresponde?', type: 'text', required: false, stepId: 'declaracion', spreadsheetColumn: 'Convenio' },
   { key: 'fuente', label: '¿Cómo conociste esta propuesta?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: 'Cómo conociste la propuesta' },
   { key: 'aceptaDifusion', label: '¿Autorizás la difusión de imagen por parte de FLACSO Uruguay?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: 'Autoriza difusión' },
+  { key: 'aceptaComunicaciones', label: '¿Querés recibir novedades y propuestas académicas de FLACSO Uruguay por correo?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: 'Acepta comunicaciones' },
 ];
 
 export const CANONICAL_CORE_DOCUMENTS: DocumentDefinition[] = [

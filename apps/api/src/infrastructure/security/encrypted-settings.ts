@@ -15,6 +15,13 @@ export class EncryptedSettingsService {
     if (trimmed.length === 64 && /^[0-9a-fA-F]+$/.test(trimmed)) {
       return Buffer.from(trimmed, 'hex');
     }
+    // Una frase se acepta por compatibilidad, pero nunca el valor de ejemplo ni una clave corta: el
+    // marcador de .env.example es público y cifraría los secretos con una clave conocida.
+    if (/REEMPLAZAR|CAMBIAR|CHANGE_?ME|EXAMPLE/i.test(trimmed) || trimmed.length < 32) {
+      throw new Error(
+        'APP_SETTINGS_ENCRYPTION_KEY no es segura: usá 64 caracteres hexadecimales (openssl rand -hex 32).'
+      );
+    }
     return crypto.createHash('sha256').update(trimmed, 'utf8').digest();
   }
 

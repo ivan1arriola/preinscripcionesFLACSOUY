@@ -173,6 +173,8 @@ describe('PreinscriptionWizard Component', () => {
     // aceptaDifusion = Sí
     const yesRadios = screen.getAllByRole('radio', { name: 'Sí' });
     fireEvent.click(yesRadios[1]!);
+    // aceptaComunicaciones = Sí (consentimiento para el contacto en Mautic)
+    fireEvent.click(yesRadios[2]!);
 
     // Verify navigating back to step 1 and then back to step 5 via progress buttons
     const step1Btn = screen.getByRole('button', { name: /Datos personales y demográficos/i });

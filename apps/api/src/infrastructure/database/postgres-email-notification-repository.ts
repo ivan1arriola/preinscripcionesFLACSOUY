@@ -8,6 +8,7 @@ import type {
   EmailNotificationFilter,
   EmailNotificationCounts,
 } from '../../ports/email-notification-repository.js';
+import { redactNotificationSnapshot, type SubmissionNotificationSnapshot } from '../../application/notification-snapshot.js';
 
 function mapRow(row: Selectable<EmailNotificationsTable>): EmailNotificationRecord {
   return {
@@ -188,6 +189,30 @@ export class PostgresEmailNotificationRepository implements EmailNotificationRep
       })
       .where('id', '=', id)
       .execute();
+  }
+
+  async redactSentBefore(sentBefore: Date, limit = 500): Promise<number> {
+    const rows = await this.db
+      .selectFrom('email_notifications')
+      .select(['id', 'payload_json'])
+      .where('status', '=', 'sent')
+      .where('sent_at', '<', sentBefore)
+      .where('payload_json', 'not like', '%"redactedAt"%')
+      .orderBy('sent_at', 'asc')
+      .limit(limit)
+      .execute();
+
+    const now = new Date();
+    for (const row of rows) {
+      const redacted = redactNotificationSnapshot(JSON.parse(row.payload_json) as SubmissionNotificationSnapshot, now);
+      await this.db
+        .updateTable('email_notifications')
+        .set({ payload_json: JSON.stringify(redacted), updated_at: now })
+        .where('id', '=', row.id)
+        .where('status', '=', 'sent')
+        .execute();
+    }
+    return rows.length;
   }
 
   async listMissingForSuccessfulSubmissions(limit: number): Promise<string[]> {

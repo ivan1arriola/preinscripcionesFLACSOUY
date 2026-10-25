@@ -53,7 +53,8 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const input = event.target;
+    const file = input.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
@@ -64,6 +65,8 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
       setUploadError(err instanceof Error ? err.message : 'No se pudo cargar el archivo.');
     } finally {
       setUploading(false);
+      // Sin esto el navegador no vuelve a disparar `change` si se elige de nuevo el mismo archivo.
+      input.value = '';
     }
   };
 

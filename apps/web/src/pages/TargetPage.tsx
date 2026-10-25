@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { apiClient, ApiError } from '../api/client.js';
+import { getRecaptchaToken } from '../api/recaptcha.js';
 import { DynamicForm } from '../components/DynamicForm.js';
 
 interface TargetPageProps {
@@ -16,7 +17,15 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string[]>>({});
   const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [pendingProcessing, setPendingProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Un identificador por intento de envío: si la red falla o se vuelve a pulsar "Enviar", el servidor
+  // reconoce el reintento y no duplica la fila de la planilla ni los correos.
+  const clientSubmissionIdRef = useRef<string>(
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
 
   const copyTrackingCode = async () => {
     if (!submissionId || !navigator.clipboard) return;
@@ -57,7 +66,9 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
     setServerErrors({});
 
     try {
-      const res = await apiClient.submit(targetId, form.effectiveRevision, values, files);
+      const recaptchaToken = await getRecaptchaToken();
+      const res = await apiClient.submit(targetId, form.effectiveRevision, values, files, clientSubmissionIdRef.current, recaptchaToken);
+      setPendingProcessing(res.status === 'pending_processing');
       setSubmissionId(res.submissionId);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -105,6 +116,12 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
             </button>
           </div>
         </div>
+        {pendingProcessing && (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm text-amber-900" role="status">
+            Recibimos tu preinscripción, pero su procesamiento técnico quedó pendiente. El equipo de FLACSO la
+            completará: no hace falta que la vuelvas a enviar. Guardá el código de seguimiento.
+          </p>
+        )}
         <p className="text-sm text-gray-600">El equipo de FLACSO revisará la información y se comunicará contigo si necesita algo más.</p>
         <div className="pt-4">
           <button

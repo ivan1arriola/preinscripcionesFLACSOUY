@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, tests y compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: preinscripciones_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U test -d preinscripciones_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # Activa los tests de integración con PostgreSQL, que sin esta variable se saltan.
+      PREINSCRIPTIONS_TEST_DATABASE_URL: postgres://test:test@localhost:5432/preinscripciones_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.8.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      # La API y la web resuelven @flacso/contracts desde dist/, así que se compila primero.
+      - name: Compilar contratos
+        run: pnpm --filter @flacso/contracts build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests
+        run: pnpm test
+
+      # Detecta claves duplicadas, variables obligatorias sin definir y errores de sintaxis en los compose.
+      - name: Validar docker-compose de producción
+        run: docker compose --env-file .env.production.example -f deploy/docker-compose.production.yml config --quiet
+
+      - name: Validar docker-compose de desarrollo
+        run: docker compose -f docker-compose.yml config --quiet

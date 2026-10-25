@@ -1,5 +1,5 @@
 import type { AcademicTarget, DiagnosticTarget, DiagnosticStatus, RegistrationAvailability } from '@flacso/contracts';
-import { SUPPORTED_OFFER_TYPES } from './form-profiles.js';
+import { SUPPORTED_OFFER_TYPES } from './offer-types.js';
 import { normalizePermalink, type PermalinkResolution } from './permalink-availability.js';
 
 export function diagnoseTarget(

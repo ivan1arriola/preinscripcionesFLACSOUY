@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
-import type { AdminUser } from '../domain/form-profiles.js';
+import type { AdminUser } from '../domain/admin-user.js';
 
 export const getAllowedAdminEmails = (): string[] => {
   const envVal = process.env.ADMIN_ALLOWED_EMAILS;
@@ -107,6 +107,14 @@ function extractSessionId(req: Request): string | null {
   return decodeURIComponent(match.split('=')[1] ?? '');
 }
 
+/** Comparación en tiempo constante: el token CSRF no debe poder deducirse midiendo respuestas. */
+function csrfTokenMatches(provided: string | string[] | undefined, expected: string): boolean {
+  if (typeof provided !== 'string' || provided.length === 0) return false;
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+  return providedBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
 export function createRequireAdminSession(sessionStore: AdminSessionStore) {
   return async (req: RequestWithAdminSession, res: Response, next: NextFunction): Promise<void> => {
     const sessionId = extractSessionId(req);
@@ -138,8 +146,7 @@ export function createRequireAdminSession(sessionStore: AdminSessionStore) {
     // CSRF check for state mutations
     const isMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method.toUpperCase());
     if (isMutation) {
-      const csrfHeader = req.headers['x-csrf-token'];
-      if (!csrfHeader || csrfHeader !== session.csrfToken) {
+      if (!csrfTokenMatches(req.headers['x-csrf-token'], session.csrfToken)) {
         res.status(403).json({
           error: {
             code: 'INVALID_CSRF_TOKEN',

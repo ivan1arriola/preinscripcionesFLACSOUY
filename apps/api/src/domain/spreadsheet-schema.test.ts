@@ -4,6 +4,7 @@ import {
   buildSpreadsheetSchema,
   buildSpreadsheetValues,
   collapseLegacySpreadsheetRow,
+  escapeSheetText,
   extractPhoneCountryCode,
   SPREADSHEET_TRACKING_COLUMN,
   SPREADSHEET_DATE_COLUMN,
@@ -140,7 +141,8 @@ describe('spreadsheet schema', () => {
     // Fused gender
     expect(values['Identidad de género']).toBe('No binario');
     // Phone country
-    expect(values['Celular']).toBe('+59899123456');
+    // El `+` inicial se escapa para que USER_ENTERED no lo convierta en número.
+    expect(values['Celular']).toBe("'+59899123456");
     expect(values['País del celular']).toBe('UY');
     // Fused title
     expect(values['Denominación del título']).toBe('Licenciada en Educación');
@@ -197,5 +199,62 @@ describe('spreadsheet schema', () => {
     );
 
     expect(migrated).toEqual(['', 'No', 'No']);
+  });
+
+  it('keeps existing Posgrado and Convenio values when the sheet is already consolidated', () => {
+    const migrated = collapseLegacySpreadsheetRow(
+      ['ID de seguimiento', 'Posgrado en FLACSO', 'Convenio'],
+      ['sub_1', 'Maestría en Género', 'Convenio IIN'],
+      ['ID de seguimiento', 'Posgrado en FLACSO', 'Convenio'],
+    );
+
+    expect(migrated).toEqual(['sub_1', 'Maestría en Género', 'Convenio IIN']);
+  });
+
+  describe('escapeSheetText', () => {
+    it('neutralizes formulas and keeps text that Sheets would reinterpret', () => {
+      expect(escapeSheetText('=IMPORTXML("https://evil","//a")')).toBe('\'=IMPORTXML("https://evil","//a")');
+      expect(escapeSheetText('@SUM(A1)')).toBe("'@SUM(A1)");
+      expect(escapeSheetText('-1+1')).toBe("'-1+1");
+      expect(escapeSheetText('+59899123456')).toBe("'+59899123456");
+      expect(escapeSheetText('01234567')).toBe("'01234567");
+    });
+
+    it('leaves ordinary text untouched', () => {
+      expect(escapeSheetText('María José')).toBe('María José');
+      expect(escapeSheetText('1.234.567-8')).toBe('1.234.567-8');
+      expect(escapeSheetText('')).toBe('');
+    });
+  });
+
+  it('escapes formulas typed by the applicant but keeps the generated Drive hyperlinks', () => {
+    const form = {
+      targetId: 't1',
+      kind: 'academic_offer',
+      title: 'Diploma',
+      offerType: 'diploma',
+      profileVersionId: 'canonical-v2',
+      effectiveRevision: 'rev',
+      registrationOpen: true,
+      configRevision: 'rev',
+      steps: [],
+      inputs: [{ key: 'nombre1', label: 'Primer nombre', type: 'text', required: true, spreadsheetColumn: 'Primer nombre' }],
+      documents: [{ key: 'cv', label: 'Curriculum Vitae', required: true, canDefer: false, maxFiles: 1, maxBytes: 1, acceptedMimeTypes: ['application/pdf'] }],
+      orientations: [],
+      mentions: [],
+      agreements: [],
+    } as unknown as FormDefinition;
+
+    const values = buildSpreadsheetValues(
+      form,
+      { nombre1: '=HYPERLINK("https://evil.example"; "Click")' },
+      'sub_1',
+      new Date('2026-10-24T00:00:00Z'),
+      { documentsFolderUrl: 'https://drive.google.com/drive/folders/abc', files: [{ fieldKey: 'cv', driveFileId: 'file1' }] },
+    );
+
+    expect(values['Primer nombre']).toBe('\'=HYPERLINK("https://evil.example"; "Click")');
+    expect(values['Curriculum Vitae']).toMatch(/^=HYPERLINK\("https:\/\/drive\.google\.com\/file\/d\/file1\/view"/);
+    expect(values[SPREADSHEET_DOCUMENTS_FOLDER_COLUMN]).toMatch(/^=HYPERLINK\("https:\/\/drive\.google\.com\/drive\/folders\/abc"/);
   });
 });

@@ -43,6 +43,8 @@ describe('resolveLegacyPermalink', () => {
   it('normalizes paths correctly with trailing slash', () => {
     expect(normalizePath('/seminario/curso')).toBe('/seminario/curso/');
     expect(normalizePath('/seminario/curso/')).toBe('/seminario/curso/');
+    expect(normalizePath('/ofertas/maestria-genero')).toBe('/oferta/maestria-genero/');
+    expect(normalizePath('/seminarios/curso-a/')).toBe('/seminario/curso-a/');
     expect(normalizePath('/')).toBe('/');
   });
 

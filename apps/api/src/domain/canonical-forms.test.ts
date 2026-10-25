@@ -38,14 +38,14 @@ describe('Canonical Forms Specification', () => {
     ]);
   });
 
-  it('composes standard form with canonical-v1 revision and 4 base documents for non-maestria', () => {
+  it('composes standard form with canonical-v2 revision and 4 base documents for non-maestria', () => {
     const result = getCanonicalFormDefinition(baseTarget);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
     const form = result.value;
     expect(form.profileVersionId).toBe(CANONICAL_SCHEMA_VERSION);
-    expect(form.effectiveRevision).toBe('wp-rev-100:canonical-v1');
+    expect(form.effectiveRevision).toBe('wp-rev-100:canonical-v2');
     expect(form.steps).toHaveLength(5);
 
     // Documents check

@@ -89,12 +89,18 @@ export const apiClient = {
     id: string,
     configRevision: string,
     values: Record<string, string>,
-    files: SubmissionFileToken[] = []
-  ): Promise<{ submissionId: string }> {
+    files: SubmissionFileToken[] = [],
+    clientSubmissionId?: string,
+    recaptchaToken?: string
+  ): Promise<{ submissionId: string; status?: string }> {
     const res = await fetch(`/api/targets/${encodeURIComponent(id)}/submissions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-preinscription-session': apiClient.sessionId() },
-      body: JSON.stringify({ configRevision, values, files }),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-preinscription-session': apiClient.sessionId(),
+        ...(recaptchaToken ? { 'x-recaptcha-token': recaptchaToken } : {}),
+      },
+      body: JSON.stringify({ configRevision, values, files, clientSubmissionId }),
     });
 
     if (!res.ok) {
@@ -117,11 +123,11 @@ export const apiClient = {
     return res.json();
   },
 
-  async adminLogin(code: string, redirectUri: string, nonce?: string): Promise<{ user: any; csrfToken: string }> {
+  async adminLogin(code: string, redirectUri: string, state: string): Promise<{ user: any; csrfToken: string }> {
     const res = await fetch('/api/admin/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, redirectUri, nonce }),
+      body: JSON.stringify({ code, redirectUri, state }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -144,55 +150,6 @@ export const apiClient = {
       throw new ApiError(res.status, err.error?.code || 'UNAUTHORIZED', err.error?.message || 'No autenticado');
     }
     return res.json();
-  },
-
-  async listAdminProfiles(): Promise<any[]> {
-    const res = await fetch('/api/admin/profiles');
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, err.error?.code || 'PROFILES_ERROR', err.error?.message || 'Error al listar perfiles');
-    }
-    const data = await res.json();
-    return data.profiles;
-  },
-
-  async getAdminProfile(type: string): Promise<{ profile: any; activeVersion: any; versions: any[] }> {
-    const res = await fetch(`/api/admin/profiles/${encodeURIComponent(type)}`);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, err.error?.code || 'PROFILE_ERROR', err.error?.message || 'Error al obtener perfil');
-    }
-    return res.json();
-  },
-
-  async createProfileVersion(type: string, definition: any, csrfToken: string): Promise<any> {
-    const res = await fetch(`/api/admin/profiles/${encodeURIComponent(type)}/versions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-csrf-token': csrfToken,
-      },
-      body: JSON.stringify({ definition }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, err.error?.code || 'CREATE_VERSION_ERROR', err.error?.message || 'Error al crear versión');
-    }
-    const data = await res.json();
-    return data.version;
-  },
-
-  async activateProfileVersion(type: string, versionId: string, csrfToken: string): Promise<void> {
-    const res = await fetch(`/api/admin/profiles/${encodeURIComponent(type)}/activate/${encodeURIComponent(versionId)}`, {
-      method: 'POST',
-      headers: {
-        'x-csrf-token': csrfToken,
-      },
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new ApiError(res.status, err.error?.code || 'ACTIVATE_VERSION_ERROR', err.error?.message || 'Error al activar versión');
-    }
   },
 
   async getAdminSettings(): Promise<{
@@ -456,6 +413,37 @@ export const apiClient = {
     return res.json();
   },
 
+  async getPublicConfig(): Promise<PublicConfig> {
+    const res = await fetch('/api/config');
+    if (!res.ok) throw new ApiError(res.status, 'PUBLIC_CONFIG_ERROR', 'No se pudo obtener la configuración pública.');
+    return res.json();
+  },
+
+  async getRecaptchaSettings(): Promise<{ recaptcha: AdminRecaptchaSettings }> {
+    const res = await fetch('/api/admin/settings/recaptcha');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'RECAPTCHA_SETTINGS_ERROR', err.error?.message || 'Error al obtener la configuración de reCAPTCHA');
+    }
+    return res.json();
+  },
+
+  async updateRecaptchaSettings(
+    csrfToken: string,
+    input: UpdateAdminRecaptchaSettingsInput
+  ): Promise<{ ok: boolean; message: string; recaptcha: AdminRecaptchaSettings }> {
+    const res = await fetch('/api/admin/settings/recaptcha', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'UPDATE_RECAPTCHA_ERROR', err.error?.message || 'Error al guardar la configuración de reCAPTCHA');
+    }
+    return res.json();
+  },
+
   async testMauticSettings(csrfToken: string): Promise<{ ok: boolean; message: string }> {
     const res = await fetch('/api/admin/settings/mautic/test', {
       method: 'POST',
@@ -586,6 +574,25 @@ export const apiClient = {
     return res.json();
   },
 };
+
+export interface PublicConfig {
+  recaptcha: { enabled: boolean; siteKey?: string; action?: string };
+}
+
+export interface AdminRecaptchaSettings {
+  enabled: boolean;
+  siteKey: string;
+  hasSecretKey: boolean;
+  minScore: number;
+}
+
+export interface UpdateAdminRecaptchaSettingsInput {
+  enabled?: boolean;
+  siteKey?: string;
+  /** Vacío conserva la clave secreta guardada. */
+  secretKey?: string;
+  minScore?: number;
+}
 
 export interface AdminMauticSettings {
   baseUrl: string;

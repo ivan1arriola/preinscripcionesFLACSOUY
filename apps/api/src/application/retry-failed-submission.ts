@@ -147,11 +147,7 @@ export async function retryFailedSubmission(
       safeError,
       now,
     });
-    if (dependencies.submissionRepository.recordProcessingFailure) {
-      await dependencies.submissionRepository.recordProcessingFailure(submissionId, 'sheets', safeError, 7);
-    } else {
-      await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
-    }
+    await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
     return {
       ok: false,
       code: 'CONFIGURATION_ERROR',
@@ -178,7 +174,25 @@ export async function retryFailedSubmission(
     ? await dependencies.catalog.listAgreements()
     : [];
   const composition = getCanonicalFormDefinition(target, agreements);
-  const form = composition.ok ? composition.value : (target as any);
+  if (!composition.ok) {
+    const safeError = sanitizeSafeError(
+      new Error(composition.error.message),
+      'El formulario de la oferta no es compatible con el formulario canónico.'
+    );
+    await dependencies.recoveryRepository.markRetryResult(recovery.id, {
+      success: false,
+      stage: 'sheets',
+      safeError,
+      now,
+    });
+    await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
+    return {
+      ok: false,
+      code: 'CONFIGURATION_ERROR',
+      message: safeError,
+    };
+  }
+  const form = composition.value;
   const normalizedValues = normalizeIdentityValues(storedValues);
   const driveTarget = driveTargetDescriptor(target);
 
@@ -230,11 +244,7 @@ export async function retryFailedSubmission(
           safeError: missingMsg,
           now,
         });
-        if (dependencies.submissionRepository.recordProcessingFailure) {
-          await dependencies.submissionRepository.recordProcessingFailure(submissionId, 'drive', missingMsg, 7);
-        } else {
-          await dependencies.submissionRepository.markProcessing(submissionId, 'failed', missingMsg);
-        }
+        await dependencies.submissionRepository.markProcessing(submissionId, 'failed', missingMsg);
         return {
           ok: false,
           code: 'MISSING_FILE',
@@ -270,11 +280,7 @@ export async function retryFailedSubmission(
           safeError,
           now,
         });
-        if (dependencies.submissionRepository.recordProcessingFailure) {
-          await dependencies.submissionRepository.recordProcessingFailure(submissionId, 'drive', safeError, 7);
-        } else {
-          await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
-        }
+        await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
         return {
           ok: false,
           code: 'DRIVE_ERROR',
@@ -332,11 +338,7 @@ export async function retryFailedSubmission(
         safeError,
         now,
       });
-      if (dependencies.submissionRepository.recordProcessingFailure) {
-        await dependencies.submissionRepository.recordProcessingFailure(submissionId, 'sheets', safeError, 7);
-      } else {
-        await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
-      }
+      await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
       return {
         ok: false,
         code: 'SHEETS_ERROR',

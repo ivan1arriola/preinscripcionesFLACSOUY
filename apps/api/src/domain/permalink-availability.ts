@@ -24,7 +24,31 @@ export function normalizePermalink(urlOrPath: string): string {
   if (!pathname.endsWith('/')) {
     pathname = `${pathname}/`;
   }
-  return pathname.toLowerCase();
+  return pathname
+    .toLowerCase()
+    .replace(/^\/ofertas\/([^/]+)\/$/, '/oferta/$1/')
+    .replace(/^\/seminarios\/([^/]+)\/$/, '/seminario/$1/');
+}
+
+function extractSeminarSlugFromPermalink(permalink: string): string | null {
+  const match = /^\/seminario\/([^/]+)\/$/.exec(permalink);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]).toLowerCase();
+  } catch {
+    return match[1].toLowerCase();
+  }
+}
+
+function isInheritedIntegratedComponent(target: AcademicTarget, allSeminarSlugs: Set<string>): boolean {
+  if (target.kind !== 'seminar') return false;
+  const ownSlug = target.seminar?.slug?.trim().toLowerCase();
+  const rawUrl = target.urls?.legacyRegistration;
+  if (!ownSlug || !rawUrl || !rawUrl.trim()) return false;
+  const permalink = normalizePermalink(rawUrl);
+  const permalinkSlug = extractSeminarSlugFromPermalink(permalink);
+  if (!permalinkSlug || permalinkSlug === ownSlug) return false;
+  return allSeminarSlugs.has(permalinkSlug);
 }
 
 /**
@@ -35,10 +59,20 @@ export function normalizePermalink(urlOrPath: string): string {
 export function resolvePermalinks(targets: AcademicTarget[]): Map<string, PermalinkResolution> {
   const resolutions = new Map<string, PermalinkResolution>();
   const seminarTargets = targets.filter((t) => t.kind === 'seminar');
+  const allSeminarSlugs = new Set<string>();
+  for (const target of seminarTargets) {
+    const slug = target.seminar?.slug?.trim().toLowerCase();
+    if (slug) {
+      allSeminarSlugs.add(slug);
+    }
+  }
 
   // 1. Group by seminar identity to check permalink consistency across editions of the same seminar
   const seminarGroups = new Map<string, AcademicTarget[]>();
   for (const target of seminarTargets) {
+    if (isInheritedIntegratedComponent(target, allSeminarSlugs)) {
+      continue;
+    }
     const seminarKey = String(
       target.wordpress?.seminarId ??
       target.seminar?.id ??
@@ -94,7 +128,12 @@ export function resolvePermalinks(targets: AcademicTarget[]): Map<string, Permal
   }
 
   // 3. Resolve status for each permalink group
-  for (const [permalink, editions] of permalinkGroups.entries()) {
+  for (const [permalink, rawEditions] of permalinkGroups.entries()) {
+    // Si una edición componente heredó el link de un seminario integrado presente en el grupo,
+    // la preinscripción corresponde únicamente al seminario integrado.
+    const nativeEditions = rawEditions.filter((e) => !isInheritedIntegratedComponent(e, allSeminarSlugs));
+    const editions = nativeEditions.length > 0 ? nativeEditions : rawEditions;
+
     const conflictIssue: PermalinkIssue = editions.some((e) => e.kind === 'seminar')
       ? 'multiple_open_seminar_editions'
       : 'multiple_open_cohorts';

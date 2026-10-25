@@ -181,4 +181,45 @@ describe('HomePage Component', () => {
     expect(screen.getByText('Seminario Cualitativo Edición 2')).toBeInTheDocument();
     expect(screen.queryByText('Seminario Cualitativo Edición 1')).not.toBeInTheDocument();
   });
+
+  it('does not duplicate academic offer cards for historical cohorts under the same permalink', async () => {
+    const targetsWithCohorts: DiagnosticTarget[] = [
+      {
+        id: 'mg-c10',
+        kind: 'academic_offer',
+        title: 'Maestría en Género Cohorte 10',
+        offerType: 'maestria',
+        registrationOpen: false,
+        registrationAvailability: 'closed',
+        configRevision: 'rev-1',
+        status: 'closed',
+        issues: [],
+        urls: {
+          legacyRegistration: 'https://preinscripciones.flacso.edu.uy/oferta/maestria-genero/',
+        },
+      },
+      {
+        id: 'mg-c11',
+        kind: 'academic_offer',
+        title: 'Maestría en Género Cohorte 11',
+        offerType: 'maestria',
+        registrationOpen: true,
+        registrationAvailability: 'open',
+        configRevision: 'rev-2',
+        status: 'operational',
+        issues: [],
+        urls: {
+          legacyRegistration: 'https://preinscripciones.flacso.edu.uy/oferta/maestria-genero/',
+        },
+      },
+    ];
+
+    vi.mocked(apiClient.listTargets).mockResolvedValue(targetsWithCohorts);
+
+    render(<HomePage onSelectTarget={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByText('Maestría en Género Cohorte 11')).toBeInTheDocument());
+    expect(screen.queryByText('Maestría en Género Cohorte 10')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('1 propuesta disponible')).toBeInTheDocument();
+  });
 });

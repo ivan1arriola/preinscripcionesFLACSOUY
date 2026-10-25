@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createKyselyDb } from './kysely.js';
 import { runMigrations } from './migrate.js';
 import { PostgresAdminSessionStore } from './postgres-admin-session-store.js';
-import type { AdminUser } from '../../domain/form-profiles.js';
+import type { AdminUser } from '../../domain/admin-user.js';
 
 const dbUrl = process.env.PREINSCRIPTIONS_TEST_DATABASE_URL;
 const integrationDescribe = dbUrl ? describe : describe.skip;

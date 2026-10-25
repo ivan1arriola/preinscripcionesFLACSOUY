@@ -22,6 +22,31 @@ export interface SubmissionNotificationSnapshot {
   spreadsheetRowUrl: string;
   documentsFolderUrl: string;
   templateVersion: 'preinscription-notification-v1';
+  /** Fecha en que se eliminaron los datos personales del postulante (política de retención). */
+  redactedAt?: string;
+}
+
+/**
+ * Quita del snapshot todo dato del postulante y los enlaces a su planilla y carpeta de Drive; conserva
+ * lo necesario para auditar el envío (qué preinscripción, a qué destino y cuándo se redactó).
+ */
+export function redactNotificationSnapshot(
+  snapshot: SubmissionNotificationSnapshot,
+  redactedAt: Date = new Date(),
+): SubmissionNotificationSnapshot {
+  return {
+    submissionId: snapshot.submissionId,
+    targetId: snapshot.targetId,
+    targetTitle: snapshot.targetTitle,
+    targetKind: snapshot.targetKind,
+    applicantEmail: '',
+    values: {},
+    orderedFieldKeys: [],
+    spreadsheetRowUrl: '',
+    documentsFolderUrl: '',
+    templateVersion: snapshot.templateVersion,
+    redactedAt: redactedAt.toISOString(),
+  };
 }
 
 export interface FormFieldInfo {

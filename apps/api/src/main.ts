@@ -26,11 +26,14 @@ import { PostgresSubmissionRecoveryRepository } from './infrastructure/database/
 import { PostgresTelegramAlertRepository } from './infrastructure/database/postgres-telegram-alert-repository.js';
 import { EmailNotificationDispatcher } from './application/email-notification-dispatcher.js';
 import { TelegramRecoveryAlertDispatcher } from './application/telegram-recovery-alert-dispatcher.js';
+import { MauticContactSyncDispatcher } from './application/mautic-contact-sync-dispatcher.js';
+import { createMauticClientCache, hasMauticCredentials, loadMauticConfig } from './infrastructure/mautic/mautic-config.js';
 import { createEmailProviderResolver } from './infrastructure/email/email-provider-resolver.js';
 import { loadEmailConfig } from './infrastructure/email/email-config.js';
 import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js';
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
+import { purgeNotificationPersonalData } from './application/purge-notification-personal-data.js';
 
 const port = Number(process.env.PORT || 3000);
 const db = createKyselyDb();
@@ -194,6 +197,39 @@ if (process.env.NODE_ENV !== 'test') {
   telegramAlertDispatcher.start(15_000);
 }
 
+const mauticClientFor = createMauticClientCache();
+const mauticContactSyncDispatcher = new MauticContactSyncDispatcher(db, {
+  getClient: async () => {
+    try {
+      const config = await loadMauticConfig(encryptedSettingsService);
+      return hasMauticCredentials(config) ? mauticClientFor(config) : null;
+    } catch (err) {
+      console.warn('[MauticContacts] Configuración de Mautic no disponible:', err instanceof Error ? err.message : err);
+      return null;
+    }
+  },
+  onPermanentFailure: async ({ submissionId, safeCode }) => {
+    const telegramConfig = await loadTelegramConfig(encryptedSettingsService);
+    if (!telegramConfig.enabled) return;
+    await telegramAlertRepository.ensureForSubmission(telegramConfig.chatIds.map((chatId) => ({
+      submissionId,
+      chatId,
+      eventType: 'recovery' as const,
+      dedupeKey: `${submissionId}:${chatId}:mautic_contact_failed`,
+      message: [
+        '⚠️ No se pudo registrar el contacto del postulante en Mautic',
+        `ID: ${submissionId}`,
+        `Motivo: ${safeCode}`,
+        'Revisar la configuración de Mautic (mautic_contact_sync).',
+      ].join('\n'),
+    })));
+  },
+});
+
+if (process.env.NODE_ENV !== 'test') {
+  mauticContactSyncDispatcher.start(10_000);
+}
+
 const app = createApp({
   catalog,
   repository,
@@ -228,9 +264,56 @@ const cleanupInterval = setInterval(async () => {
   } catch (err) {
     console.error('[Cleanup] Error en la limpieza automática de recuperaciones y archivos temporales:', err);
   }
+
+  try {
+    const redacted = await purgeNotificationPersonalData({ repository: emailNotificationRepository });
+    if (redacted > 0) {
+      console.log(`[Cleanup] Se eliminaron los datos personales de ${redacted} notificación(es) enviada(s) fuera del plazo de retención.`);
+    }
+  } catch (err) {
+    console.error('[Cleanup] Error al aplicar la retención de datos de las notificaciones:', err);
+  }
+
+  try {
+    const expiredSessions = await adminSessionStore.cleanExpiredSessions();
+    if (expiredSessions > 0) {
+      console.log(`[Cleanup] Se eliminaron ${expiredSessions} sesión(es) administrativa(s) vencida(s).`);
+    }
+  } catch (err) {
+    console.error('[Cleanup] Error al purgar sesiones administrativas vencidas:', err);
+  }
 }, 15 * 60 * 1000);
 cleanupInterval.unref();
 
-app.listen(port, () => {
+// Un rechazo sin manejar (p. ej. un corte momentáneo de PostgreSQL) no debe tumbar el servidor y cortar
+// los envíos en curso; una excepción no capturada deja el proceso en estado indefinido y sí lo reinicia.
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process] Promesa rechazada sin manejar:', reason instanceof Error ? reason.message : reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('[Process] Excepción no capturada, se reinicia el servicio:', error);
+  process.exit(1);
+});
+
+const server = app.listen(port, () => {
   console.log(`API server listening on port ${port}`);
 });
+
+// Apagado ordenado: deja terminar las peticiones en curso (envíos con Drive/Sheets) antes de cerrar.
+let shuttingDown = false;
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[Process] ${signal} recibido: cerrando el servidor...`);
+  const forceExit = setTimeout(() => process.exit(1), 25_000);
+  forceExit.unref();
+  server.close(async () => {
+    try {
+      await db.destroy();
+    } finally {
+      process.exit(0);
+    }
+  });
+}
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));

@@ -13,6 +13,7 @@ import type { SubmissionRecoveryRepository } from '../../ports/submission-recove
 import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
 import { enqueuePreinscriptionTelegramNotifications } from '../../application/preinscription-telegram-notification.js';
 import { buildSpreadsheetValues } from '../../domain/spreadsheet-schema.js';
+import { RateLimiter, rateLimitedResponse, type RateLimitOptions } from './rate-limit.js';
 
 export function sanitizeSafeError(error: unknown, fallback: string = 'Error de procesamiento técnico.'): string {
   if (!error) return fallback;
@@ -68,15 +69,21 @@ async function tryEnqueueTelegramAlert(
   }
 }
 
+const MAX_SUBMISSION_FILES = 20;
+
 const submissionSchema = z.object({
-  clientSubmissionId: z.string().optional(),
+  // La columna es varchar(128): un identificador más largo provocaría un 500 al guardar.
+  clientSubmissionId: z.string().min(1).max(128).optional(),
   configRevision: z.string({ required_error: 'La revisión de configuración es obligatoria.' }),
-  values: z.record(z.string(), {
+  values: z.record(z.string().max(5000), {
     required_error: 'Los valores del formulario son obligatorios.',
   }),
   files: z.array(z.object({
     token: z.string(), fieldKey: z.string(), originalName: z.string(), size: z.number(), mimeType: z.string(),
-  })).optional(),
+  })).max(MAX_SUBMISSION_FILES).default([]).refine(
+    (files) => new Set(files.map((file) => file.token)).size === files.length,
+    { message: 'Un mismo archivo no puede adjuntarse más de una vez.' },
+  ),
 });
 
 interface SubmissionFileDependencies {
@@ -116,8 +123,10 @@ export function createSubmissionRoutes(
   recoveryDependencies?: SubmissionRecoveryDependencies,
   telegramDependencies?: SubmissionTelegramDependencies,
   mauticDependencies?: { isContactSyncEnabled: () => Promise<boolean> },
+  limits?: { perEmail?: RateLimitOptions },
 ): Router {
   const router = Router({ mergeParams: true });
+  const emailLimiter = limits?.perEmail ? new RateLimiter(limits.perEmail) : undefined;
 
   router.post('/', async (req, res, next) => {
     try {
@@ -134,6 +143,46 @@ export function createSubmissionRoutes(
           },
         });
         return;
+      }
+
+      // Reintento del mismo envío (doble clic, corte de red): se devuelve el resultado original sin repetir
+      // Drive, planilla, correos ni alertas, y sin marcar como fallido un envío que ya terminó bien.
+      if (parsed.data.clientSubmissionId && repository.findByClientSubmissionId) {
+        const previous = await repository.findByClientSubmissionId(parsed.data.clientSubmissionId);
+        if (previous) {
+          res.status(200).json({ submissionId: previous.id, existing: true });
+          return;
+        }
+      }
+
+      // Cada token debe existir en la sesión del postulante y haberse subido para el campo que declara;
+      // de lo contrario un mismo archivo podría presentarse como CV, título e identidad a la vez.
+      const sessionHeader = req.header('x-preinscription-session')?.trim();
+      if (parsed.data.files.length > 0 && sessionHeader && fileDependencies?.storage.listBySession) {
+        const uploaded = new Map(
+          (await fileDependencies.storage.listBySession(sessionHeader)).map((record) => [record.token, record]),
+        );
+        const mismatched = parsed.data.files.find((file) => uploaded.get(file.token)?.fieldKey !== file.fieldKey);
+        if (mismatched) {
+          res.status(400).json({
+            error: {
+              code: 'INVALID_FILE',
+              message: 'Uno de los archivos adjuntos no corresponde al campo indicado. Volvé a cargarlo.',
+              field: mismatched.fieldKey,
+            },
+          });
+          return;
+        }
+      }
+
+      const emailKey = parsed.data.values.email?.trim().toLowerCase();
+      if (emailLimiter && emailKey) {
+        const decision = emailLimiter.peek(emailKey);
+        if (!decision.allowed) {
+          res.setHeader('Retry-After', String(decision.retryAfterSeconds));
+          res.status(429).json(rateLimitedResponse(decision.retryAfterSeconds));
+          return;
+        }
       }
 
       const result = await submitPreinscription(catalog, repository, {
@@ -202,7 +251,15 @@ export function createSubmissionRoutes(
         }
       }
 
-      const files = parsed.data.files ?? [];
+      // Carrera entre dos peticiones con el mismo identificador: la otra ya ejecuta los efectos.
+      if (result.existing) {
+        res.status(200).json({ submissionId: result.submissionId, existing: true });
+        return;
+      }
+
+      if (emailLimiter && emailKey) emailLimiter.hit(emailKey);
+
+      const files = parsed.data.files;
       let storedDriveFiles: Array<{ token: string; driveFileId?: string }> = [];
       let documentsFolderUrl = '';
       if (files.length > 0) {
@@ -242,13 +299,9 @@ export function createSubmissionRoutes(
           for (const file of files) {
             await repository.markFileFailed(file.token, safeError);
           }
-          if (repository.recordProcessingFailure) {
-            await repository.recordProcessingFailure(result.submissionId, 'drive', safeError, 7);
-          } else {
-            await repository.markProcessing(result.submissionId, 'failed', safeError);
-          }
           let recoveryRecord;
           if (recoveryDependencies?.repository) {
+            await repository.markProcessing(result.submissionId, 'failed', safeError);
             recoveryRecord = await recoveryDependencies.repository.recordFailure({
               submissionId: result.submissionId,
               targetId,
@@ -256,6 +309,10 @@ export function createSubmissionRoutes(
               safeError,
               retentionDays: 7,
             });
+          } else if (repository.recordProcessingFailure) {
+            await repository.recordProcessingFailure(result.submissionId, 'drive', safeError, 7);
+          } else {
+            await repository.markProcessing(result.submissionId, 'failed', safeError);
           }
           if (fileDependencies?.storage.extendRetention && files.length > 0) {
             const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -281,43 +338,7 @@ export function createSubmissionRoutes(
       let spreadsheetRowUrl = '';
       if (spreadsheetDependencies) {
         try {
-          const target = await catalog.revalidateTarget(targetId);
-          if (!target) {
-            const safeError = 'No se encontró el destino académico para crear su planilla.';
-            if (repository.recordProcessingFailure) {
-              await repository.recordProcessingFailure(result.submissionId, 'sheets', safeError, 7);
-            } else {
-              await repository.markProcessing(result.submissionId, 'failed', safeError);
-            }
-            let recoveryRecord;
-            if (recoveryDependencies?.repository) {
-              recoveryRecord = await recoveryDependencies.repository.recordFailure({
-                submissionId: result.submissionId,
-                targetId,
-                stage: 'sheets',
-                safeError,
-                retentionDays: 7,
-              });
-            }
-            if (fileDependencies?.storage.extendRetention && files.length > 0) {
-              const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-              await fileDependencies.storage.extendRetention(files.map((f) => f.token), retentionExpiresAt);
-            }
-            await tryEnqueueTelegramAlert(
-              recoveryDependencies,
-              recoveryRecord?.id,
-              result.submissionId,
-              targetId,
-              'sheets',
-              safeError
-            );
-            res.status(202).json({
-              submissionId: result.submissionId,
-              status: 'pending_processing',
-              message: 'La preinscripción fue recibida y se encuentra pendiente de procesamiento técnico.',
-            });
-            return;
-          }
+          const target = result.target;
           const spreadsheet = await spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);
 
           const fileIdByToken = new Map<string, string>();
@@ -352,13 +373,9 @@ export function createSubmissionRoutes(
           }
         } catch (error) {
           const safeError = sanitizeSafeError(error, 'No se pudo crear o guardar la planilla de la preinscripción.');
-          if (repository.recordProcessingFailure) {
-            await repository.recordProcessingFailure(result.submissionId, 'sheets', safeError, 7);
-          } else {
-            await repository.markProcessing(result.submissionId, 'failed', safeError);
-          }
           let recoveryRecord;
           if (recoveryDependencies?.repository) {
+            await repository.markProcessing(result.submissionId, 'failed', safeError);
             recoveryRecord = await recoveryDependencies.repository.recordFailure({
               submissionId: result.submissionId,
               targetId,
@@ -366,6 +383,10 @@ export function createSubmissionRoutes(
               safeError,
               retentionDays: 7,
             });
+          } else if (repository.recordProcessingFailure) {
+            await repository.recordProcessingFailure(result.submissionId, 'sheets', safeError, 7);
+          } else {
+            await repository.markProcessing(result.submissionId, 'failed', safeError);
           }
           if (fileDependencies?.storage.extendRetention && files.length > 0) {
             const retentionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);

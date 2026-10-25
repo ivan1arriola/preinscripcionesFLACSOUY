@@ -92,6 +92,31 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(mockClient.appendValues).not.toHaveBeenCalled();
   });
 
+  it('serializes concurrent appends so two applicants never write to the same row', async () => {
+    const calls: string[] = [];
+    const mockClient: SheetsClient = {
+      getValues: vi.fn().mockResolvedValue([['Nombre']]),
+      insertRows: vi.fn(async () => {
+        calls.push('insert');
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }),
+      updateValues: vi.fn(async (_id: string, _range: string, values: string[][]) => {
+        calls.push(`write:${values[0]?.[0]}`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }),
+      appendValues: vi.fn(),
+    };
+
+    const repo = new GoogleSheetsRepository(mockClient);
+    await Promise.all([
+      repo.appendByHeaders('sheet_123', { Nombre: 'Ana' }, ['Nombre']),
+      repo.appendByHeaders('sheet_123', { Nombre: 'Beto' }, ['Nombre']),
+    ]);
+
+    // Cada postulante inserta y escribe su fila antes de que empiece el siguiente.
+    expect(calls).toEqual(['insert', 'write:Ana', 'insert', 'write:Beto']);
+  });
+
   it('resolves real sheetId from getSheetMetadata and constructs accurate direct row URL', async () => {
     const mockClient: SheetsClient = {
       getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]),

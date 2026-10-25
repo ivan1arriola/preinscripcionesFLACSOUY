@@ -133,6 +133,7 @@ describe('Document Rules Domain Specification', () => {
       tieneConvenio: 'No',
       fuente: 'Redes sociales',
       aceptaDifusion: 'Si',
+      aceptaComunicaciones: 'Si',
     };
 
     const baseFiles: SubmissionFileToken[] = [
@@ -264,6 +265,7 @@ describe('Document Rules Domain Specification', () => {
       tieneConvenio: 'No',
       fuente: 'Correo electrónico',
       aceptaDifusion: 'Si',
+      aceptaComunicaciones: 'Si',
     };
 
     const baseFiles: SubmissionFileToken[] = [

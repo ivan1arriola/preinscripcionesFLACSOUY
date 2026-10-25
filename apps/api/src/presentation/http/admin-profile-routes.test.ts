@@ -4,7 +4,8 @@ import { createApp } from './app.js';
 import { FixtureAcademicCatalog } from '../../infrastructure/fixtures/fixture-academic-catalog.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
 import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/google-oidc.js';
-import { getDefaultProfileDefinition } from '../../domain/form-profiles.js';
+
+const removedProfileDefinition = { steps: [], fields: [], documents: [] };
 
 describe('Admin Profile HTTP Routes', () => {
   let server: Server;
@@ -13,6 +14,7 @@ describe('Admin Profile HTTP Routes', () => {
   let csrfToken: string;
 
   const mockVerifier: GoogleIdentityVerifierPort = {
+    generateAuthUrl: (_redirectUri, state) => `https://accounts.example.test/auth?state=${state}`,
     verify: async () => ({
       sub: 'sub-webmaster-1',
       email: 'web@flacso.edu.uy',
@@ -42,10 +44,12 @@ describe('Admin Profile HTTP Routes', () => {
     });
 
     // Authenticate as web@flacso.edu.uy to obtain session
+    const urlRes = await fetch(`${baseUrl}/api/admin/auth/google/url?redirectUri=${encodeURIComponent('https://example.com')}`);
+    const { state } = await urlRes.json();
     const authRes = await fetch(`${baseUrl}/api/admin/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: 'valid-code', redirectUri: 'https://example.com' }),
+      body: JSON.stringify({ code: 'valid-code', redirectUri: 'https://example.com', state }),
     });
     const setCookie = authRes.headers.get('set-cookie');
     sessionCookie = (setCookie?.split(';')[0]) ?? '';
@@ -64,7 +68,7 @@ describe('Admin Profile HTTP Routes', () => {
     const postRes = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ definition: getDefaultProfileDefinition('diploma') }),
+      body: JSON.stringify({ definition: removedProfileDefinition }),
     });
     expect(postRes.status).toBe(404);
   });
@@ -77,7 +81,7 @@ describe('Admin Profile HTTP Routes', () => {
         Cookie: sessionCookie,
         'x-csrf-token': 'wrong-csrf-token',
       },
-      body: JSON.stringify({ definition: getDefaultProfileDefinition('diploma') }),
+      body: JSON.stringify({ definition: removedProfileDefinition }),
     });
     expect(res.status).toBe(404);
   });
@@ -105,7 +109,7 @@ describe('Admin Profile HTTP Routes', () => {
         'x-csrf-token': csrfToken,
       },
       body: JSON.stringify({
-        definition: getDefaultProfileDefinition('diploma'),
+        definition: removedProfileDefinition,
       }),
     });
     expect(res.status).toBe(404);

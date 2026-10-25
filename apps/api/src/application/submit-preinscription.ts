@@ -41,6 +41,8 @@ export type SubmitPreinscriptionResult =
   | {
       ok: true;
       submissionId: string;
+      /** true cuando el clientSubmissionId ya existía: los efectos (Drive, planilla, avisos) ya se ejecutaron. */
+      existing: boolean;
       spreadsheet: {
         valuesByColumnName: Record<string, string>;
         requiredColumns: string[];
@@ -135,8 +137,14 @@ export async function submitPreinscription(
   const form = composition.value;
 
   // 4. Normalize identity values & validate
-  const normalizedValues = normalizeIdentityValues(command.values);
-  const validation = validateSubmission(form, normalizedValues, command.configRevision, command.files);
+  // Sólo se conservan las claves que el formulario define: el resto se descarta para que un envío manual
+  // no pueda crear definiciones de campos ni filas arbitrarias en la base.
+  const allowedKeys = new Set(form.inputs.map((input) => input.key));
+  const normalizedValues = Object.fromEntries(
+    Object.entries(normalizeIdentityValues(command.values)).filter(([key]) => allowedKeys.has(key)),
+  );
+  // Omitir `files` equivale a no adjuntar nada: los documentos obligatorios se exigen igual.
+  const validation = validateSubmission(form, normalizedValues, command.configRevision, command.files ?? []);
   if (!validation.valid) {
     if (validation.fieldErrors._form) {
       return {
@@ -178,6 +186,7 @@ export async function submitPreinscription(
   return {
     ok: true,
     submissionId: saved.id,
+    existing: saved.existing === true,
     spreadsheet: {
       valuesByColumnName: buildSpreadsheetValues(form, normalizedValues, saved.id),
       requiredColumns: spreadsheetSchema.requiredColumns,

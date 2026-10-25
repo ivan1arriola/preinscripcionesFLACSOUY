@@ -8,6 +8,17 @@ const GENDER_VALUES = new Set([
   'No binarie / no conforme', 'Otra', 'Prefiero no responder',
 ]);
 const YES_NO_VALUES = new Set(['Si', 'No']);
+/** Tope por campo: evita que un envío manual guarde textos arbitrariamente largos en la base y la planilla. */
+const MAX_VALUE_LENGTH = 5000;
+
+function isPlausibleDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const isReal = date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  return isReal && year >= 1900 && date.getTime() <= Date.now();
+}
 
 export function validateSubmission(
   form: FormDefinition,
@@ -48,8 +59,14 @@ export function validateSubmission(
     }
 
     if (val.length > 0) {
+      if (val.length > MAX_VALUE_LENGTH) {
+        addError(input.key, `El campo ${input.label} supera los ${MAX_VALUE_LENGTH} caracteres permitidos.`);
+      }
       if (input.type === 'email' && !EMAIL_REGEX.test(val)) {
         addError(input.key, 'El correo electrónico no tiene un formato válido.');
+      }
+      if (input.type === 'date' && !isPlausibleDate(val)) {
+        addError(input.key, `El campo ${input.label} debe ser una fecha válida (AAAA-MM-DD).`);
       }
     }
   }
@@ -126,6 +143,11 @@ export function validateSubmission(
   const aceptaDifusion = values.aceptaDifusion?.trim();
   if (aceptaDifusion && !YES_NO_VALUES.has(aceptaDifusion)) {
     addError('aceptaDifusion', 'La respuesta sobre difusión no es válida.');
+  }
+
+  const aceptaComunicaciones = values.aceptaComunicaciones?.trim();
+  if (aceptaComunicaciones && !YES_NO_VALUES.has(aceptaComunicaciones)) {
+    addError('aceptaComunicaciones', 'La respuesta sobre comunicaciones no es válida.');
   }
 
   const posgradoFlacso = values.posgradoFlacso?.trim();

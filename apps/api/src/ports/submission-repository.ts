@@ -25,6 +25,8 @@ export interface SavedSubmissionResult {
 export interface SubmissionRepository {
   save(submission: ValidatedSubmissionRecord): Promise<SavedSubmissionResult>;
   saveOrGet(submission: ValidatedSubmissionRecord): Promise<SavedSubmissionResult>;
+  /** Permite reconocer un reintento (mismo clientSubmissionId) antes de repetir validaciones y efectos. */
+  findByClientSubmissionId?(clientSubmissionId: string): Promise<{ id: string } | null>;
   markProcessing(id: string, status: 'pending' | 'success' | 'failed' | 'unknown', errorMessage?: string): Promise<void>;
   markFileStored(token: string, driveFileId: string): Promise<void>;
   markFileFailed(token: string, errorMessage: string): Promise<void>;

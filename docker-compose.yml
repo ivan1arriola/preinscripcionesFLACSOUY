@@ -31,8 +31,10 @@ services:
       WORDPRESS_CATALOG_TOKEN: ${WORDPRESS_CATALOG_TOKEN:-}
       ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:-web@flacso.edu.uy}
       APP_SETTINGS_ENCRYPTION_KEY: ${APP_SETTINGS_ENCRYPTION_KEY:-}
+      UPLOAD_TMP_DIR: /tmp/flacso-preinscripciones
     volumes:
       - ./.secrets:/app/.secrets:ro
+      - upload_tmp:/tmp/flacso-preinscripciones
     ports:
       - "3000:3000"
     healthcheck:
@@ -66,11 +68,15 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://flacso:flacso_password@postgres:5432/flacso_preinscripciones
+      APP_SETTINGS_ENCRYPTION_KEY: ${APP_SETTINGS_ENCRYPTION_KEY:-}
+      UPLOAD_TMP_DIR: /tmp/flacso-preinscripciones
     volumes:
       - ./.secrets:/app/.secrets:ro
+      - upload_tmp:/tmp/flacso-preinscripciones
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   postgres_data:
+  upload_tmp:

@@ -53,6 +53,7 @@ const values = {
   convenioWordpressId: '',
   fuente: 'Web',
   aceptaDifusion: 'No',
+  aceptaComunicaciones: 'Si',
   estudios: 'Licenciatura',
   posgradoFlacso: 'No',
   tituloDenominacion: 'Licenciatura',
@@ -68,7 +69,7 @@ const testFiles = [
 ];
 
 async function setup(drive: GoogleDriveRepositoryPort, spreadsheet?: SpreadsheetRepository) {
-  const effectiveRevision = `${target.configRevision}:canonical-v1`;
+  const effectiveRevision = `${target.configRevision}:canonical-v2`;
 
   const catalog: AcademicCatalog = {
     getTarget: async () => target,

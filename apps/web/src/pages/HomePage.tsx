@@ -18,19 +18,19 @@ const ACADEMIC_GROUPS = [
 
 const offerTypeOf = (target: DiagnosticTarget) => target.offerType ?? 'otros';
 
-const groupSeminarsByPermalink = (seminarTargets: DiagnosticTarget[]): DiagnosticTarget[] => {
+const groupTargetsByPermalink = (items: DiagnosticTarget[]): DiagnosticTarget[] => {
   const groups = new Map<string, DiagnosticTarget[]>();
-  for (const sem of seminarTargets) {
-    const permalink = legacyPathForTarget(sem) ?? sem.id;
+  for (const item of items) {
+    const permalink = legacyPathForTarget(item) ?? item.id;
     const list = groups.get(permalink) ?? [];
-    list.push(sem);
+    list.push(item);
     groups.set(permalink, list);
   }
 
-  const representativeSeminars: DiagnosticTarget[] = [];
+  const representativeTargets: DiagnosticTarget[] = [];
   for (const editions of groups.values()) {
     if (editions.length === 1 && editions[0]) {
-      representativeSeminars.push(editions[0]);
+      representativeTargets.push(editions[0]);
       continue;
     }
 
@@ -38,6 +38,7 @@ const groupSeminarsByPermalink = (seminarTargets: DiagnosticTarget[]): Diagnosti
       (e) =>
         e.registrationAvailability === 'conflict' ||
         e.issues.includes('multiple_open_seminar_editions') ||
+        e.issues.includes('multiple_open_cohorts') ||
         e.issues.includes('inconsistent_seminar_permalink')
     );
 
@@ -50,18 +51,19 @@ const groupSeminarsByPermalink = (seminarTargets: DiagnosticTarget[]): Diagnosti
 
     if (hasConflict || openEditions.length > 1) {
       const base = editions[0]!;
-      representativeSeminars.push({
+      const conflictIssue = base.kind === 'seminar' ? 'multiple_open_seminar_editions' : 'multiple_open_cohorts';
+      representativeTargets.push({
         ...base,
         registrationOpen: false,
         registrationAvailability: 'conflict',
         status: 'incompatible',
-        issues: ['multiple_open_seminar_editions'],
+        issues: [conflictIssue],
       });
     } else if (openEditions.length === 1 && openEditions[0]) {
-      representativeSeminars.push(openEditions[0]);
+      representativeTargets.push(openEditions[0]);
     } else {
-      const base = editions[0]!;
-      representativeSeminars.push({
+      const base = editions[editions.length - 1] ?? editions[0]!;
+      representativeTargets.push({
         ...base,
         registrationOpen: false,
         registrationAvailability: 'closed',
@@ -70,7 +72,7 @@ const groupSeminarsByPermalink = (seminarTargets: DiagnosticTarget[]): Diagnosti
     }
   }
 
-  return representativeSeminars;
+  return representativeTargets;
 };
 
 export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
@@ -127,15 +129,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectTarget }) => {
     );
   }
 
-  const academicOffers = targets.filter((target) => target.kind === 'academic_offer');
+  const rawAcademicOffers = targets.filter((target) => target.kind === 'academic_offer');
+  const academicOffers = groupTargetsByPermalink(rawAcademicOffers);
   const rawSeminars = targets.filter((target) => target.kind === 'seminar');
-  const seminars = groupSeminarsByPermalink(rawSeminars);
+  const seminars = groupTargetsByPermalink(rawSeminars);
   const normalizedQuery = query.trim().toLocaleLowerCase('es-UY');
   const matchesQuery = (target: DiagnosticTarget) =>
     !normalizedQuery || target.title.toLocaleLowerCase('es-UY').includes(normalizedQuery);
   const visibleAcademicOffers = academicOffers.filter(matchesQuery);
   const visibleSeminars = seminars.filter(matchesQuery);
-  const availableCount = targets.filter((target) => target.status === 'operational').length;
+  const availableCount = [...academicOffers, ...seminars].filter((target) => target.status === 'operational').length;
 
   const selectTab = (tab: 'academic' | 'seminars') => {
     setActiveTab(tab);

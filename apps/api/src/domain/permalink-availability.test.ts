@@ -13,6 +13,8 @@ describe('Seminar permalink availability resolution', () => {
       expect(normalizePermalink('/seminario/curso-a')).toBe('/seminario/curso-a/');
       expect(normalizePermalink('seminario/curso-a/')).toBe('/seminario/curso-a/');
       expect(normalizePermalink('https://flacso.edu.uy/Seminario/Curso-A/')).toBe('/seminario/curso-a/');
+      expect(normalizePermalink('https://preinscripciones.flacso.edu.uy/ofertas/maestria-genero/')).toBe('/oferta/maestria-genero/');
+      expect(normalizePermalink('https://preinscripciones.flacso.edu.uy/seminarios/curso-a/')).toBe('/seminario/curso-a/');
     });
   });
 
@@ -176,6 +178,35 @@ describe('Seminar permalink availability resolution', () => {
 
       expect(res?.status).toBe('open');
       expect(res?.targetId).toBe('target-ed-2');
+    });
+
+    it('resolves integrated seminar permalink to the integrated edition when a component edition inherits the link', () => {
+      const targets: AcademicTarget[] = [
+        {
+          ...baseSeminarTarget('target-int-1', 10, 'https://preinscripciones.flacso.edu.uy/seminario/seminario-integrado/', true, 'open'),
+          wordpress: { seminarId: 500, editionId: 10 },
+          seminar: { id: 500, slug: 'seminario-integrado', name: 'Seminario Integrado', type: 'seminar' },
+        },
+        {
+          ...baseSeminarTarget('target-comp-old', 11, 'https://preinscripciones.flacso.edu.uy/seminario/modulo-uno/', false, 'closed'),
+          wordpress: { seminarId: 501, editionId: 11 },
+          seminar: { id: 501, slug: 'modulo-uno', name: 'Módulo Uno', type: 'seminar' },
+        },
+        {
+          ...baseSeminarTarget('target-comp-inherited', 12, 'https://preinscripciones.flacso.edu.uy/seminario/seminario-integrado/', true, 'open'),
+          wordpress: { seminarId: 501, editionId: 12 },
+          seminar: { id: 501, slug: 'modulo-uno', name: 'Módulo Uno', type: 'seminar' },
+        },
+      ];
+
+      const resolutions = resolvePermalinks(targets);
+      expect(resolutions.get('/seminario/seminario-integrado/')).toEqual({
+        status: 'open',
+        targetId: 'target-int-1',
+      });
+      expect(resolutions.get('/seminario/modulo-uno/')).toEqual({
+        status: 'closed',
+      });
     });
   });
 });

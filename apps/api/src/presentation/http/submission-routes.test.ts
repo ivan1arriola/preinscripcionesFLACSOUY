@@ -39,6 +39,7 @@ describe('Submission HTTP Routes', () => {
       tieneConvenio: 'No',
       fuente: 'Web',
       aceptaDifusion: 'No',
+      aceptaComunicaciones: 'Si',
       estudios: 'Profesorado',
       posgradoFlacso: 'No',
       posgradoCual: '',
@@ -125,6 +126,55 @@ describe('Submission HTTP Routes', () => {
     expect(applicantNotif).toBeDefined();
     expect(applicantNotif?.recipientEmail).toBe('lucia@example.com');
     expect(applicantNotif?.payload.documentsFolderUrl).toBe('https://drive.google.com/drive/folders/folder-1');
+  });
+
+  it('rejects a submission that omits `files` instead of skipping the mandatory documents', async () => {
+    const { files: _omitted, ...withoutFiles } = validPayload;
+    const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 'session-test' },
+      body: JSON.stringify(withoutFiles),
+    });
+
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error.code).toBe('VALIDATION_ERROR');
+    expect(Object.keys(data.error.fieldErrors)).toEqual(expect.arrayContaining(['identidad', 'cv']));
+  });
+
+  it('rejects the same file token attached twice', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 'session-test' },
+      body: JSON.stringify({
+        ...validPayload,
+        files: validPayload.files.map((file) => ({ ...file, token: 'tok_shared' })),
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe('INVALID_REQUEST');
+  });
+
+  it('returns the original submission for a repeated clientSubmissionId without repeating side effects', async () => {
+    const send = () => fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 'session-test' },
+      body: JSON.stringify({ ...validPayload, clientSubmissionId: 'client-idempotent-1' }),
+    });
+
+    const first = await send();
+    expect(first.status).toBe(201);
+    const firstBody = await first.json();
+    const notificationsAfterFirst = (await notificationRepository.listNotifications({ submissionId: firstBody.submissionId })).length;
+
+    const second = await send();
+    expect(second.status).toBe(200);
+    const secondBody = await second.json();
+    expect(secondBody).toEqual({ submissionId: firstBody.submissionId, existing: true });
+
+    const notificationsAfterSecond = (await notificationRepository.listNotifications({ submissionId: firstBody.submissionId })).length;
+    expect(notificationsAfterSecond).toBe(notificationsAfterFirst);
   });
 
   it('POST /api/targets/:id/submissions returns 409 when target is closed', async () => {
@@ -386,6 +436,7 @@ describe('Submission HTTP Routes', () => {
         expect(recovery).not.toBeNull();
         expect(recovery?.stage).toBe('drive');
         expect(recovery?.status).toBe('pending');
+        expect(recovery?.attemptCount).toBe(1);
         expect(recovery?.safeError).toContain('Drive error');
       } finally {
         await new Promise<void>((resolve) => tempServer.close(() => resolve()));

@@ -11,7 +11,7 @@ export async function getTargetForm(
   catalog: AcademicCatalog,
   targetId: string = '',
 ): Promise<GetTargetFormResult> {
-  const target = await catalog.getTarget(targetId);
+  let target = await catalog.getTarget(targetId);
 
   if (!target) {
     return {
@@ -39,6 +39,24 @@ export async function getTargetForm(
       error instanceof Error ? error.message : error,
     );
     allTargets = await catalog.listTargets();
+  }
+  // El destino leído al inicio puede venir de la caché: se compone el formulario con el revalidado.
+  const initialTargetId = target.id;
+  const refreshed = allTargets.find((candidate) => candidate.id === initialTargetId);
+  if (!refreshed) {
+    return {
+      ok: false,
+      code: 'NOT_FOUND',
+      message: `No se encontró el destino académico con ID "${targetId}".`,
+    };
+  }
+  target = refreshed;
+  if (!target.registrationOpen) {
+    return {
+      ok: false,
+      code: 'CLOSED',
+      message: 'La preinscripción para este destino académico se encuentra cerrada.',
+    };
   }
   const resolutions = resolvePermalinks(allTargets);
   const rawUrl = target.urls?.legacyRegistration;

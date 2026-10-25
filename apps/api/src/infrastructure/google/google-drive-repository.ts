@@ -25,6 +25,11 @@ interface GoogleDriveRepositoryOptions {
   timeoutMs?: number;
 }
 
+/** Escapa un valor para la sintaxis `q` de Drive (barra invertida y comilla simple). */
+function escapeDriveQueryValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export class GoogleDriveRepository implements GoogleDriveRepositoryPort, SpreadsheetDiscoveryPort {
 
   private readonly tokenProvider: () => Promise<string>;
@@ -103,6 +108,9 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
     const result: StoredDriveFile[] = [];
     const ordinals = new Map<string, number>();
     for (const file of command.files) {
+      const ordinal = (ordinals.get(file.fieldKey ?? '') ?? 0) + 1;
+      ordinals.set(file.fieldKey ?? '', ordinal);
+
       const existingFileId = await this.findExistingFile(uploadFolderId, command.submissionId, file.token, token);
       if (existingFileId) {
         result.push({ token: file.token, driveFileId: existingFileId });
@@ -110,8 +118,6 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
       }
 
       const boundary = `flacso-${command.submissionId}-${file.token}`;
-      const ordinal = (ordinals.get(file.fieldKey ?? '') ?? 0) + 1;
-      ordinals.set(file.fieldKey ?? '', ordinal);
       const fileName = command.target && command.values
         ? buildSemanticDriveFileName({
             submissionId: command.submissionId,
@@ -168,9 +174,9 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
     token: string
   ): Promise<string | null> {
     const query = [
-      `'${folderId.replace(/'/g, "\\'")}' in parents`,
-      `appProperties has { key='flacsoSubmissionId' and value='${submissionId.replace(/'/g, "\\'")}' }`,
-      `appProperties has { key='flacsoFileToken' and value='${fileToken.replace(/'/g, "\\'")}' }`,
+      `'${escapeDriveQueryValue(folderId)}' in parents`,
+      `appProperties has { key='flacsoSubmissionId' and value='${escapeDriveQueryValue(submissionId)}' }`,
+      `appProperties has { key='flacsoFileToken' and value='${escapeDriveQueryValue(fileToken)}' }`,
       'trashed = false',
     ].join(' and ');
     const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
@@ -187,8 +193,8 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
 
   private async ensureChildFolder(parentId: string, name: string, token: string): Promise<string> {
     const query = [
-      `'${parentId.replace(/'/g, "\\'")}' in parents`,
-      `name = '${name.replace(/'/g, "\\'")}'`,
+      `'${escapeDriveQueryValue(parentId)}' in parents`,
+      `name = '${escapeDriveQueryValue(name)}'`,
       `mimeType = 'application/vnd.google-apps.folder'`,
       'trashed = false',
     ].join(' and ');
@@ -232,7 +238,7 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
       "mimeType = 'application/vnd.google-apps.spreadsheet'",
       'trashed = false',
       "appProperties has { key='flacsoResource' and value='preinscription-spreadsheet' }",
-      `appProperties has { key='flacsoTargetId' and value='${targetId.replace(/'/g, "\\'")}' }`,
+      `appProperties has { key='flacsoTargetId' and value='${escapeDriveQueryValue(targetId)}' }`,
       "not appProperties has { key='flacsoDetached' and value='true' }",
     ].join(' and ');
     const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,parents,webViewLink,appProperties)&supportsAllDrives=true&includeItemsFromAllDrives=true`;

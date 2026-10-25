@@ -26,6 +26,9 @@ services:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL es obligatorio}
       WORDPRESS_URL: ${WORDPRESS_URL:?WORDPRESS_URL es obligatorio}
+      # Debe coincidir con FLACSO_PREINSCRIPCIONES_CATALOG_TOKEN de wp-config.php; sin él WordPress
+      # entrega el catálogo sin los correos de notificación de cada oferta.
+      WORDPRESS_CATALOG_TOKEN: ${WORDPRESS_CATALOG_TOKEN:?WORDPRESS_CATALOG_TOKEN es obligatorio}
       GOOGLE_OIDC_CLIENT_ID: ${GOOGLE_OIDC_CLIENT_ID:-}
       GOOGLE_OIDC_CLIENT_SECRET: ${GOOGLE_OIDC_CLIENT_SECRET:-}
       GOOGLE_OIDC_REDIRECT_URI: ${GOOGLE_OIDC_REDIRECT_URI:-}
@@ -33,6 +36,9 @@ services:
       ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:?ADMIN_ALLOWED_EMAILS es obligatorio}
       APP_SETTINGS_ENCRYPTION_KEY: ${APP_SETTINGS_ENCRYPTION_KEY:?APP_SETTINGS_ENCRYPTION_KEY es obligatorio}
       UPLOAD_TMP_DIR: /tmp/flacso-preinscripciones
+      # Proxies delante de la API (Apache del servidor → nginx del contenedor web). Con esto el límite de
+      # frecuencia distingue a cada visitante; sin él todos compartirían la IP del proxy.
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
     volumes:
       - ${SECRETS_DIR:?SECRETS_DIR es obligatorio}:/app/.secrets:ro
       - upload_tmp:/tmp/flacso-preinscripciones

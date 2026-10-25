@@ -80,7 +80,7 @@ describe('getTargetForm Use Case', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.form.targetId).toBe('sem-2');
-      expect(result.form.profileVersionId).toBe('canonical-v1');
+      expect(result.form.profileVersionId).toBe('canonical-v2');
       expect(result.form.steps).toHaveLength(5);
       expect(result.form.documents).toHaveLength(3);
     }
@@ -117,7 +117,7 @@ describe('getTargetForm Use Case', () => {
     const result = await getTargetForm(catalog, 'maestria-test');
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.form.profileVersionId).toBe('canonical-v1');
+      expect(result.form.profileVersionId).toBe('canonical-v2');
       expect(result.form.recommendationLettersCount).toBe(2);
       expect(result.form.documents).toHaveLength(6);
       const keys = result.form.documents.map((d) => d.key);

@@ -57,6 +57,7 @@ describe('mautic contact', () => {
       fechaNacimiento: '1990-05-15',
       paisResidencia: 'Uruguay',
       ocupacion: 'Docente',
+      aceptaComunicaciones: 'Si',
     });
 
     expect(sync).toEqual({
@@ -73,6 +74,14 @@ describe('mautic contact', () => {
   });
 
   it('returns null without an email', () => {
-    expect(buildMauticContactSync(offerTarget, { nombre1: 'Sin correo' })).toBeNull();
+    expect(buildMauticContactSync(offerTarget, { nombre1: 'Sin correo', aceptaComunicaciones: 'Si' })).toBeNull();
+  });
+
+  it('does not register applicants who did not consent to receive communications', () => {
+    const values = { email: 'valeria@example.com', nombre1: 'Valeria' };
+
+    expect(buildMauticContactSync(offerTarget, values)).toBeNull();
+    expect(buildMauticContactSync(offerTarget, { ...values, aceptaComunicaciones: 'No' })).toBeNull();
+    expect(buildMauticContactSync(offerTarget, { ...values, aceptaComunicaciones: 'Si' })).not.toBeNull();
   });
 });

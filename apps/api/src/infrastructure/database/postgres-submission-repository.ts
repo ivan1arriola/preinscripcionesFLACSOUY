@@ -6,16 +6,21 @@ import type {
   SavedSubmissionResult,
 } from '../../ports/submission-repository.js';
 import type { KyselyDb } from './kysely.js';
-import {
-  UNIVERSAL_INPUTS,
-  SUPPORTED_SPECIFIC_INPUTS,
-} from '../../domain/form-definition.js';
 
 export class PostgresSubmissionRepository implements SubmissionRepository {
   constructor(private readonly db: KyselyDb) {}
 
   async save(record: ValidatedSubmissionRecord): Promise<SavedSubmissionResult> {
     return this.saveOrGet(record);
+  }
+
+  async findByClientSubmissionId(clientSubmissionId: string): Promise<{ id: string } | null> {
+    const existing = await this.db
+      .selectFrom('submissions')
+      .select('id')
+      .where('client_submission_id', '=', clientSubmissionId)
+      .executeTakeFirst();
+    return existing ? { id: existing.id } : null;
   }
 
   async saveOrGet(record: ValidatedSubmissionRecord): Promise<SavedSubmissionResult> {
@@ -63,11 +68,7 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
           spreadsheetColumn?: string;
         }> | undefined;
 
-        const allKnownInputs = [
-          ...UNIVERSAL_INPUTS,
-          ...Object.values(SUPPORTED_SPECIFIC_INPUTS),
-          ...(profileInputs ?? []),
-        ];
+        const allKnownInputs = profileInputs ?? [];
 
         for (const key of Object.keys(record.values)) {
           const def = allKnownInputs.find((i) => i.key === key);

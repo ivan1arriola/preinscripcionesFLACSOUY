@@ -8,6 +8,11 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// El servidor verifica la firma real del archivo, no sólo el tipo declarado.
+const pdfBytes = (text: string) => Buffer.from(`%PDF-1.4
+${text}`);
+const pngBytes = () => Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('datos')]);
+
 describe('Upload HTTP Routes', () => {
   const openDiploma: AcademicTarget = {
     id: 'diploma-davia',
@@ -85,7 +90,7 @@ describe('Upload HTTP Routes', () => {
       const form = new FormData();
       form.append('targetId', 'diploma-davia');
       form.append('fieldKey', 'cv');
-      form.append('file', new Blob([Buffer.from('pdf data')], { type: 'application/pdf' }), 'curriculum.pdf');
+      form.append('file', new Blob([pdfBytes('pdf data')], { type: 'application/pdf' }), 'curriculum.pdf');
 
       const response = await fetch(baseUrl, {
         method: 'POST',
@@ -106,13 +111,55 @@ describe('Upload HTTP Routes', () => {
     }
   });
 
+  it('rejects a file whose content does not match the declared type', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      const form = new FormData();
+      form.append('targetId', 'diploma-davia');
+      form.append('fieldKey', 'cv');
+      // Un ejecutable de Windows declarado como PDF.
+      form.append('file', new Blob([Buffer.from('MZ\x90\x00 programa.exe')], { type: 'application/pdf' }), 'cv.pdf');
+
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-alpha' },
+        body: form,
+      });
+
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: { code: string } }).error.code).toBe('INVALID_FILE_CONTENT');
+    } finally {
+      await close();
+    }
+  });
+
+  it('rejects an upload that omits the target, which would skip the field rules', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      const form = new FormData();
+      form.append('fieldKey', 'cv');
+      form.append('file', new Blob([pdfBytes('pdf')], { type: 'application/pdf' }), 'cv.pdf');
+
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-alpha' },
+        body: form,
+      });
+
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: { code: string } }).error.code).toBe('INVALID_REQUEST');
+    } finally {
+      await close();
+    }
+  });
+
   it('rejects upload when session header is missing', async () => {
     const { baseUrl, close } = await setupApp();
     try {
       const form = new FormData();
       form.append('targetId', 'diploma-davia');
       form.append('fieldKey', 'cv');
-      form.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'cv.pdf');
+      form.append('file', new Blob([pdfBytes('pdf')], { type: 'application/pdf' }), 'cv.pdf');
 
       const response = await fetch(baseUrl, {
         method: 'POST',
@@ -134,7 +181,7 @@ describe('Upload HTTP Routes', () => {
       const formClosed = new FormData();
       formClosed.append('targetId', 'target-closed');
       formClosed.append('fieldKey', 'cv');
-      formClosed.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'cv.pdf');
+      formClosed.append('file', new Blob([pdfBytes('pdf')], { type: 'application/pdf' }), 'cv.pdf');
 
       const resClosed = await fetch(baseUrl, {
         method: 'POST',
@@ -147,7 +194,7 @@ describe('Upload HTTP Routes', () => {
       const formUnknown = new FormData();
       formUnknown.append('targetId', 'unknown-target');
       formUnknown.append('fieldKey', 'cv');
-      formUnknown.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'cv.pdf');
+      formUnknown.append('file', new Blob([pdfBytes('pdf')], { type: 'application/pdf' }), 'cv.pdf');
 
       const resUnknown = await fetch(baseUrl, {
         method: 'POST',
@@ -166,7 +213,7 @@ describe('Upload HTTP Routes', () => {
       const form = new FormData();
       form.append('targetId', 'seminar-ia');
       form.append('fieldKey', 'cartaMotivacion'); // Seminars do not accept motivation letter
-      form.append('file', new Blob([Buffer.from('pdf')], { type: 'application/pdf' }), 'carta.pdf');
+      form.append('file', new Blob([pdfBytes('pdf')], { type: 'application/pdf' }), 'carta.pdf');
 
       const response = await fetch(baseUrl, {
         method: 'POST',
@@ -188,7 +235,7 @@ describe('Upload HTTP Routes', () => {
       const form = new FormData();
       form.append('targetId', 'diploma-davia');
       form.append('fieldKey', 'cv');
-      form.append('file', new Blob([Buffer.from('image bytes')], { type: 'image/png' }), 'cv.png');
+      form.append('file', new Blob([pngBytes()], { type: 'image/png' }), 'cv.png');
 
       const response = await fetch(baseUrl, {
         method: 'POST',
@@ -211,7 +258,7 @@ describe('Upload HTTP Routes', () => {
       const form1 = new FormData();
       form1.append('targetId', 'diploma-davia');
       form1.append('fieldKey', 'cv');
-      form1.append('file', new Blob([Buffer.from('cv 1')], { type: 'application/pdf' }), 'cv1.pdf');
+      form1.append('file', new Blob([pdfBytes('cv 1')], { type: 'application/pdf' }), 'cv1.pdf');
 
       const res1 = await fetch(baseUrl, {
         method: 'POST',
@@ -224,7 +271,7 @@ describe('Upload HTTP Routes', () => {
       const form2 = new FormData();
       form2.append('targetId', 'diploma-davia');
       form2.append('fieldKey', 'cv');
-      form2.append('file', new Blob([Buffer.from('cv 2')], { type: 'application/pdf' }), 'cv2.pdf');
+      form2.append('file', new Blob([pdfBytes('cv 2')], { type: 'application/pdf' }), 'cv2.pdf');
 
       const res2 = await fetch(baseUrl, {
         method: 'POST',
@@ -246,7 +293,7 @@ describe('Upload HTTP Routes', () => {
       const form = new FormData();
       form.append('targetId', 'diploma-davia');
       form.append('fieldKey', 'cv');
-      form.append('file', new Blob([Buffer.from('cv content')], { type: 'application/pdf' }), 'cv.pdf');
+      form.append('file', new Blob([pdfBytes('cv content')], { type: 'application/pdf' }), 'cv.pdf');
 
       const uploadRes = await fetch(baseUrl, {
         method: 'POST',

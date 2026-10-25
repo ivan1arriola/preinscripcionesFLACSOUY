@@ -61,6 +61,8 @@ export function buildMauticContactSync(
 ): MauticContactSync | null {
   const email = values.email?.trim().toLowerCase();
   if (!email) return null;
+  // Sin consentimiento explícito para recibir comunicaciones el postulante no se registra en Mautic.
+  if (values.aceptaComunicaciones?.trim() !== 'Si') return null;
 
   const fields: Record<string, string> = {
     firstname: joinNames(values.nombre1, values.nombre2),

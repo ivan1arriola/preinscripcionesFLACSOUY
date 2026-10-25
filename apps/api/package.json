@@ -7,7 +7,7 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc",
     "start": "node dist/main.js",
-    "test": "vitest run",
+    "test": "vitest run src",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "db:migrate": "tsx src/infrastructure/database/migrate.ts",

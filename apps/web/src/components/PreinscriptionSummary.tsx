@@ -125,7 +125,7 @@ export function buildSummarySections(
             ].includes(i.key);
           }
           if (step.id === 'declaracion') {
-            return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion'].includes(i.key);
+            return ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion', 'aceptaComunicaciones'].includes(i.key);
           }
           return stepIndex === 0;
         })

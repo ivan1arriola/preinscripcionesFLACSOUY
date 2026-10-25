@@ -111,7 +111,7 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     const token = await this.tokenProvider();
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
       spreadsheetId
-    )}/values/${encodeURIComponent(range)}`;
+    )}/values/${encodeURIComponent(range)}?valueRenderOption=FORMULA`;
 
     const res = await this.executeFetch(
       url,
@@ -132,8 +132,9 @@ export class HttpGoogleSheetsClient implements SheetsClient {
       );
     }
 
-    const data = (await res.json()) as { values?: string[][] };
-    return data.values ?? [];
+    // Con FORMULA, Sheets devuelve las fórmulas (=HYPERLINK…) y los números como número JSON.
+    const data = (await res.json()) as { values?: unknown[][] };
+    return (data.values ?? []).map((row) => row.map((cell) => (cell === null || cell === undefined ? '' : String(cell))));
   }
 
   async appendValues(

@@ -1,5 +1,5 @@
 import type { AcademicTarget, AgreementOption } from '@flacso/contracts';
-import { isSupportedOfferType } from '../domain/form-profiles.js';
+import { isSupportedOfferType } from '../domain/offer-types.js';
 import { getCanonicalFormDefinition } from '../domain/canonical-forms.js';
 import { buildSpreadsheetSchema } from '../domain/spreadsheet-schema.js';
 import type {

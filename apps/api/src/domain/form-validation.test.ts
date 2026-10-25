@@ -82,6 +82,7 @@ describe('validateSubmission', () => {
     convenioWordpressId: '',
     fuente: 'Web',
     aceptaDifusion: 'No',
+    aceptaComunicaciones: 'Si',
     estudios: 'Licenciatura',
     posgradoFlacso: 'No',
     posgradoCual: '',

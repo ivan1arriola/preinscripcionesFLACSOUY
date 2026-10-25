@@ -59,6 +59,17 @@ export interface MigrateOptions {
   }) => void;
 }
 
+function sheetColumnLetter(columnNumber: number): string {
+  let current = columnNumber;
+  let result = '';
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    current = Math.floor((current - 1) / 26);
+  }
+  return result || 'A';
+}
+
 function toSheetRange(sheetName: string): string {
   if (sheetName.startsWith("'") && sheetName.endsWith("'")) return sheetName;
   if (/^[A-Za-z0-9_]+$/.test(sheetName)) return sheetName;
@@ -235,15 +246,8 @@ async function migrateSingleSpreadsheet(
   const newSpreadsheetData = [targetHeaders, ...migratedDataRows];
 
   if (!dryRun) {
-    if (dependencies.sheetsClient.clearValues && existingRows.length > 0) {
-      const clearRange = `${sheetRange}!A1:ZZ${Math.max(existingRows.length, newSpreadsheetData.length) + 10}`;
-      try {
-        await dependencies.sheetsClient.clearValues(spreadsheetId, clearRange);
-      } catch {
-        // Safe ignore if clear fails on empty or non-existent range
-      }
-    }
-
+    // Primero se escribe y recién después se limpia el sobrante: si la escritura falla (red, cuota),
+    // la planilla conserva sus datos en lugar de quedar vacía.
     const updateRange = `${sheetRange}!A1`;
     await dependencies.sheetsClient.updateValues(
       spreadsheetId,
@@ -251,6 +255,26 @@ async function migrateSingleSpreadsheet(
       newSpreadsheetData,
       'USER_ENTERED'
     );
+
+    if (dependencies.sheetsClient.clearValues && existingRows.length > 0) {
+      const newRowCount = newSpreadsheetData.length;
+      const newColumnCount = targetHeaders.length;
+      const oldColumnCount = Math.max(0, ...existingRows.map((row) => row.length));
+      const leftovers: string[] = [];
+      if (existingRows.length > newRowCount) {
+        leftovers.push(`${sheetRange}!A${newRowCount + 1}:ZZ${existingRows.length}`);
+      }
+      if (oldColumnCount > newColumnCount) {
+        leftovers.push(`${sheetRange}!${sheetColumnLetter(newColumnCount + 1)}1:ZZ${Math.max(existingRows.length, newRowCount)}`);
+      }
+      for (const range of leftovers) {
+        try {
+          await dependencies.sheetsClient.clearValues(spreadsheetId, range);
+        } catch {
+          // El sobrante vacío no compromete los datos ya escritos.
+        }
+      }
+    }
 
     if (actualSheetName !== sheetName) {
       try {

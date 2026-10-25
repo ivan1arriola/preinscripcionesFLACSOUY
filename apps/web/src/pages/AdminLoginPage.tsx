@@ -20,7 +20,7 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLoginSuccess }
       setError(null);
       const redirectUri = `${window.location.origin}${GOOGLE_CALLBACK_PATH}`;
       apiClient
-        .adminLogin(code, redirectUri)
+        .adminLogin(code, redirectUri, params.get('state') ?? '')
         .then((res) => {
           // Clean URL params
           window.history.replaceState({}, document.title, window.location.pathname);

@@ -155,6 +155,7 @@ describe('Document Flow Integration', () => {
         tieneConvenio: 'No',
         fuente: 'Web',
         aceptaDifusion: 'Si',
+        aceptaComunicaciones: 'Si',
       },
       files: [
         { fieldKey: 'identidad', token: 'tok_fl1_id', originalName: 'cedula.pdf', mimeType: 'application/pdf', size: 1024 },
@@ -226,6 +227,7 @@ describe('Document Flow Integration', () => {
         tieneConvenio: 'No',
         fuente: 'Web',
         aceptaDifusion: 'Si',
+        aceptaComunicaciones: 'Si',
       },
       files: [
         { fieldKey: 'identidad', token: 'tok_fl2_id', originalName: 'cedula.pdf', mimeType: 'application/pdf', size: 1024 },
@@ -304,6 +306,7 @@ describe('Document Flow Integration', () => {
         tieneConvenio: 'No',
         fuente: 'Web',
         aceptaDifusion: 'Si',
+        aceptaComunicaciones: 'Si',
       },
       files: [
         { fieldKey: 'identidad', token: 'tok_fl3_id', originalName: 'cedula.pdf', mimeType: 'application/pdf', size: 1024 },
@@ -374,6 +377,7 @@ describe('Document Flow Integration', () => {
         tieneConvenio: 'No',
         fuente: 'Web',
         aceptaDifusion: 'Si',
+        aceptaComunicaciones: 'Si',
       },
       files: [
         { fieldKey: 'identidad', token: 'tok_fl4_id', originalName: 'cedula.pdf', mimeType: 'application/pdf', size: 1024 },

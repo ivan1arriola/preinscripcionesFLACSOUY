@@ -93,4 +93,23 @@ describe('EncryptedSettingsService', () => {
     const result = await service.getEncryptedSetting('non_existent_key');
     expect(result).toBeNull();
   });
+
+  describe('master key strength', () => {
+    it('refuses the public placeholder from .env.example', () => {
+      const service = new EncryptedSettingsService(
+        new MemorySystemSettingsRepository(),
+        'REEMPLAZAR_CON_CLAVE_LOCAL_HEX_64_CHARS',
+      );
+      expect(() => service.encrypt('secreto')).toThrow(/no es segura/);
+    });
+
+    it('refuses short passphrases but still accepts a long one for backwards compatibility', () => {
+      const repo = new MemorySystemSettingsRepository();
+      expect(() => new EncryptedSettingsService(repo, 'corta').encrypt('x')).toThrow(/no es segura/);
+
+      const longPassphrase = 'una-frase-larga-y-aleatoria-de-mas-de-32-caracteres';
+      const service = new EncryptedSettingsService(repo, longPassphrase);
+      expect(service.decrypt(service.encrypt('secreto'))).toBe('secreto');
+    });
+  });
 });

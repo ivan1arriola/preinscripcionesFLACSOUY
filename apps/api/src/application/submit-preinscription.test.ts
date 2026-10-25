@@ -43,6 +43,7 @@ describe('submitPreinscription Use Case', () => {
     tieneConvenio: 'No',
     fuente: 'Web',
     aceptaDifusion: 'No',
+    aceptaComunicaciones: 'Si',
     estudios: 'Licenciatura',
     posgradoFlacso: 'No',
     posgradoCual: '',
@@ -78,7 +79,7 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions).toHaveLength(1);
     expect(repo.submissions[0]?.targetId).toBe('davia-c11');
     expect(repo.submissions[0]?.configRevision).toBe(rev);
-    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
+    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v2');
     expect(repo.submissions[0]?.profileSnapshot).toBeDefined();
     expect(repo.submissions[0]?.values.nombre1).toBe('Valeria');
     expect(repo.submissions[0]?.values.documento).toBe('3.456.789-4');
@@ -86,6 +87,91 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions[0]?.values.orientacion).toBe('Educación');
     expect(repo.submissions[0]?.values.mencion).toBe('Tecnología Educativa');
     expect(result.catalogValidation).toBe('live');
+  });
+
+  describe('server-side hardening', () => {
+    it('requires the mandatory documents even when `files` is omitted', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const result = await submitPreinscription(catalog, repo, {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: validValues,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.code).toBe('VALIDATION_ERROR');
+      expect(Object.keys(result.fieldErrors ?? {})).toEqual(expect.arrayContaining(['identidad', 'cv']));
+      expect(repo.submissions).toHaveLength(0);
+    });
+
+    it('drops keys that the form does not define', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const result = await submitPreinscription(catalog, repo, {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: { ...validValues, claveInventada: 'x', __proto_extra: 'y' },
+        files: baseFiles,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(repo.submissions[0]?.values.claveInventada).toBeUndefined();
+      expect(repo.submissions[0]?.values.__proto_extra).toBeUndefined();
+    });
+
+    it('rejects impossible birth dates and oversized texts', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const result = await submitPreinscription(catalog, repo, {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: { ...validValues, fechaNacimiento: '1990-02-31', estudios: 'x'.repeat(5001) },
+        files: baseFiles,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(Object.keys(result.fieldErrors ?? {})).toEqual(expect.arrayContaining(['fechaNacimiento', 'estudios']));
+    });
+
+    it('requires the communications consent question and only syncs Mautic when it is accepted', async () => {
+      const missing = await submitPreinscription(catalog, new InMemorySubmissionRepository(), {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: { ...validValues, aceptaComunicaciones: '' },
+        files: baseFiles,
+      }, { isMauticContactSyncEnabled: async () => true });
+      expect(missing.ok).toBe(false);
+      if (!missing.ok) expect(Object.keys(missing.fieldErrors ?? {})).toContain('aceptaComunicaciones');
+
+      const declined = new InMemorySubmissionRepository();
+      const declinedResult = await submitPreinscription(catalog, declined, {
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: { ...validValues, aceptaComunicaciones: 'No' },
+        files: baseFiles,
+      }, { isMauticContactSyncEnabled: async () => true });
+      expect(declinedResult.ok).toBe(true);
+      expect(declined.submissions[0]?.mauticContact).toBeNull();
+    });
+
+    it('reports when the submission already existed for the same client id', async () => {
+      const repo = new InMemorySubmissionRepository();
+      const command = {
+        clientSubmissionId: 'client-1',
+        targetId: 'davia-c11',
+        configRevision: await currentRevision(),
+        values: validValues,
+        files: baseFiles,
+      };
+      const first = await submitPreinscription(catalog, repo, command);
+      const second = await submitPreinscription(catalog, repo, command);
+
+      expect(first.ok && second.ok).toBe(true);
+      if (!first.ok || !second.ok) return;
+      expect(first.existing).toBe(false);
+      expect(second.existing).toBe(true);
+      expect(second.submissionId).toBe(first.submissionId);
+    });
   });
 
   describe('Mautic contact sync', () => {
@@ -177,12 +263,12 @@ describe('submitPreinscription Use Case', () => {
       files: baseFiles,
     });
     expect(firstResult.ok).toBe(true);
-    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
+    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v2');
 
     // Second submission using outdated revision must be rejected
     const secondResult = await submitPreinscription(catalog, repo, {
       targetId: 'davia-c11',
-      configRevision: 'outdated-wp-rev:canonical-v1',
+      configRevision: 'outdated-wp-rev:canonical-v2',
       values: validValues,
       files: baseFiles,
     });
@@ -192,7 +278,7 @@ describe('submitPreinscription Use Case', () => {
 
     // Prior submission remains intact with its original snapshot
     expect(repo.submissions).toHaveLength(1);
-    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
+    expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v2');
   });
 
   it('rejects a closed target and does not persist', async () => {
@@ -219,6 +305,7 @@ describe('submitPreinscription Use Case', () => {
         tieneConvenio: 'No',
         fuente: 'Web',
         aceptaDifusion: 'No',
+        aceptaComunicaciones: 'Si',
         estudios: 'Licenciatura',
         posgradoFlacso: 'No',
         posgradoCual: '',
@@ -467,7 +554,7 @@ describe('submitPreinscription Use Case', () => {
 
       expect(result.ok).toBe(true);
       expect(repo.submissions).toHaveLength(1);
-      expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v1');
+      expect(repo.submissions[0]?.profileVersionId).toBe('canonical-v2');
     });
   });
 });

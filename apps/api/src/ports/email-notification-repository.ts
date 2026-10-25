@@ -57,5 +57,10 @@ export interface EmailNotificationRepository {
   findById?(id: string): Promise<EmailNotificationRecord | null>;
   resetForManualRetry?(id: string, now: Date, updatedEmail?: string): Promise<void>;
   getCounts?(): Promise<EmailNotificationCounts>;
+  /**
+   * Retención: vacía los datos personales de las notificaciones ya enviadas antes de `sentBefore`.
+   * Devuelve cuántas se redactaron (procesa como máximo `limit` por llamada).
+   */
+  redactSentBefore?(sentBefore: Date, limit?: number): Promise<number>;
 }
 

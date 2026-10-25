@@ -7,6 +7,27 @@ import { getCanonicalFormDefinition } from '../../domain/canonical-forms.js';
 const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024; // 10 MiB per file
 const MAX_TOTAL_SESSION_BYTES = 25 * 1024 * 1024; // 25 MiB total per preinscription
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/** Verifica los primeros bytes del archivo contra el tipo que declaró el cliente. */
+export function matchesDeclaredType(buffer: Buffer, mimeType: string): boolean {
+  switch (mimeType) {
+    case 'application/pdf':
+      // La especificación admite basura previa: el marcador debe aparecer en el primer KiB.
+      return buffer.subarray(0, 1024).includes('%PDF-', 0, 'latin1');
+    case 'image/jpeg':
+      return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    case 'image/png':
+      return buffer.length >= 8 && buffer.subarray(0, 8).equals(PNG_SIGNATURE);
+    case 'image/webp':
+      return buffer.length >= 12
+        && buffer.subarray(0, 4).toString('latin1') === 'RIFF'
+        && buffer.subarray(8, 12).toString('latin1') === 'WEBP';
+    default:
+      return false;
+  }
+}
+
 export function createUploadRoutes(
   storage: TemporaryFileStoragePort,
   catalog?: AcademicCatalog
@@ -79,8 +100,30 @@ export function createUploadRoutes(
 
         const buffer = Buffer.concat(chunks);
 
+        // Sin destino no se pueden aplicar las reglas del campo (tipo, tamaño, cantidad): no se acepta el archivo.
+        if (catalog && !targetId) {
+          res.status(400).json({
+            error: {
+              code: 'INVALID_REQUEST',
+              message: 'El destino académico (targetId) es obligatorio para cargar un archivo.',
+            },
+          });
+          return;
+        }
+
+        // El tipo declarado por el navegador no es de fiar: se comprueba la firma real del contenido.
+        if (!matchesDeclaredType(buffer, mimeType)) {
+          res.status(400).json({
+            error: {
+              code: 'INVALID_FILE_CONTENT',
+              message: 'El contenido del archivo no coincide con su tipo. Subí un PDF, JPG, PNG o WebP válido.',
+            },
+          });
+          return;
+        }
+
         if (catalog && targetId) {
-          const target = await catalog.revalidateTarget(targetId);
+          const target = (await catalog.getTarget(targetId)) ?? (await catalog.revalidateTarget(targetId));
           if (!target) {
             res.status(404).json({
               error: {

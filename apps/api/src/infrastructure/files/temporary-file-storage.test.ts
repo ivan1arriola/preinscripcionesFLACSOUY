@@ -21,6 +21,19 @@ describe('TemporaryFileStorage', () => {
     if (process.platform !== 'win32') expect(fileInfo.mode & 0o077).toBe(0);
   });
 
+  it('opens a file without a session for administrative recovery', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'flacso-upload-'));
+    const storage = new TemporaryFileStorage({ rootDir: root, maxBytes: 1024, allowedMimeTypes: ['application/pdf'], ttlMs: 60_000 });
+
+    const saved = await storage.save('session-a', 'cv', {
+      originalName: 'cv.pdf', mimeType: 'application/pdf', data: Buffer.from('contenido'),
+    });
+
+    // El reintento administrativo no conoce la sesión del postulante.
+    expect((await storage.open(saved.token)).data.toString()).toBe('contenido');
+    await expect(storage.open(saved.token, 'session-b')).rejects.toThrow('no autorizado');
+  });
+
   it('rejects disallowed type or size and removes expired files', async () => {
     const root = await mkdtemp(join(tmpdir(), 'flacso-upload-'));
     const storage = new TemporaryFileStorage({ rootDir: root, maxBytes: 4, allowedMimeTypes: ['application/pdf'], ttlMs: 0 });

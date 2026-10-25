@@ -8,7 +8,10 @@ export const normalizePath = (path: string): string => {
   if (!normalized.startsWith('/')) {
     normalized = `/${normalized}`;
   }
-  return normalized.endsWith('/') ? normalized : `${normalized}/`;
+  normalized = normalized.endsWith('/') ? normalized : `${normalized}/`;
+  return normalized
+    .replace(/^\/ofertas\/([^/]+)\/$/i, '/oferta/$1/')
+    .replace(/^\/seminarios\/([^/]+)\/$/i, '/seminario/$1/');
 };
 
 export const legacyPathForTarget = (target: DiagnosticTarget): string | null => {

@@ -52,6 +52,32 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
     requiredColumns: string[],
     sheetName = 'Sheet1'
   ): Promise<AppendResult> {
+    // Insertar la fila 2 y escribirla son dos llamadas: sin serializar, dos envíos simultáneos a la misma
+    // planilla escribirían ambos en la fila 2 y uno pisaría al otro.
+    return this.serializePerSpreadsheet(spreadsheetId, () =>
+      this.appendByHeadersUnlocked(spreadsheetId, valuesByColumnName, requiredColumns, sheetName),
+    );
+  }
+
+  private readonly writeQueues = new Map<string, Promise<unknown>>();
+
+  private serializePerSpreadsheet<T>(spreadsheetId: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.writeQueues.get(spreadsheetId) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(task);
+    const tail = run.catch(() => undefined);
+    this.writeQueues.set(spreadsheetId, tail);
+    void tail.then(() => {
+      if (this.writeQueues.get(spreadsheetId) === tail) this.writeQueues.delete(spreadsheetId);
+    });
+    return run;
+  }
+
+  private async appendByHeadersUnlocked(
+    spreadsheetId: string,
+    valuesByColumnName: Record<string, string>,
+    requiredColumns: string[],
+    sheetName: string,
+  ): Promise<AppendResult> {
     const actualSheetName = await this.resolveSheetName(spreadsheetId, sheetName);
     let headers = await this.readHeadersFromSheet(spreadsheetId, actualSheetName);
     let buildResult = buildSpreadsheetRow(headers, valuesByColumnName, requiredColumns);

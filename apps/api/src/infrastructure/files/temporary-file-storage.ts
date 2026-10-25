@@ -108,7 +108,9 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
       mimeType: string;
       createdAt: string;
     };
-    if (metadata.sessionId !== sessionId) {
+    // Sin sessionId la apertura es administrativa (reintento de recuperación), igual que en la
+    // variante con repositorio: sólo se exige coincidencia cuando el postulante presenta su sesión.
+    if (sessionId !== undefined && metadata.sessionId !== sessionId) {
       throw new Error('Acceso no autorizado al archivo temporal');
     }
     return {

@@ -17,6 +17,11 @@ export class InMemorySubmissionRepository implements SubmissionRepository {
     return this.saveOrGet(record);
   }
 
+  async findByClientSubmissionId(clientSubmissionId: string): Promise<{ id: string } | null> {
+    const existing = this.submissions.find((s) => s.clientSubmissionId === clientSubmissionId);
+    return existing ? { id: existing.id } : null;
+  }
+
   async saveOrGet(record: ValidatedSubmissionRecord): Promise<SavedSubmissionResult> {
     if (record.clientSubmissionId) {
       const existing = this.submissions.find((s) => s.clientSubmissionId === record.clientSubmissionId);

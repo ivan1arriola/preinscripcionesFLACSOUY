@@ -162,7 +162,28 @@ export function buildSpreadsheetValues(
     }
   }
 
+  // Las planillas se escriben con USER_ENTERED: todo texto del postulante que Sheets pudiera evaluar como
+  // fórmula o reinterpretar como número se guarda como texto literal. Sólo se respetan los hipervínculos
+  // que genera el propio sistema en las columnas de documentos.
+  const hyperlinkColumns = new Set([
+    SPREADSHEET_DOCUMENTS_FOLDER_COLUMN,
+    ...(form.documents ?? []).map((doc) => doc.label),
+  ]);
+  for (const [column, value] of Object.entries(values)) {
+    if (hyperlinkColumns.has(column) && value.startsWith('=HYPERLINK(')) continue;
+    values[column] = escapeSheetText(value);
+  }
+
   return values;
+}
+
+const SHEET_FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+const SHEET_LEADING_ZERO_NUMBER = /^0\d+$/;
+
+/** Evita la inyección de fórmulas y la pérdida del `+` o de ceros a la izquierda al usar USER_ENTERED. */
+export function escapeSheetText(value: string): string {
+  if (!value) return value;
+  return SHEET_FORMULA_TRIGGER.test(value) || SHEET_LEADING_ZERO_NUMBER.test(value) ? `'${value}` : value;
 }
 
 export function collapseLegacySpreadsheetRow(
@@ -174,11 +195,14 @@ export function collapseLegacySpreadsheetRow(
   const legacy = new Map(headers.map((header, index) => [header.trim(), row[index] ?? '']));
   return targetHeaders.map((header) => {
     if (header === SPREADSHEET_POSTGRADUATE_COLUMN) {
+      // Una hoja que ya tiene la columna consolidada y no la pregunta legacy no debe perder sus valores.
+      if (!legacy.has('¿Cursó posgrado en FLACSO?')) return legacy.get(header) ?? '';
       return legacy.get('¿Cursó posgrado en FLACSO?') === 'Si'
         ? legacy.get('Cuál posgrado') ?? ''
         : 'No';
     }
     if (header === SPREADSHEET_AGREEMENT_COLUMN) {
+      if (!legacy.has('¿Te corresponde algún convenio?')) return legacy.get(header) ?? '';
       return legacy.get('¿Te corresponde algún convenio?') === 'Si'
         ? agreementLabel(legacy.get('Convenio'), agreements)
         : 'No';

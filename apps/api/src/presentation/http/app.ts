@@ -36,6 +36,45 @@ import type { EmailProvider } from '../../infrastructure/email/email-provider.js
 import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
 import type { TelegramProvider } from '../../ports/telegram-provider.js';
 import { loadTelegramConfig } from '../../infrastructure/telegram/telegram-config.js';
+import {
+  RECAPTCHA_ACTION,
+  isRecaptchaActive,
+  loadRecaptchaConfig,
+  verifyRecaptchaToken,
+  type RecaptchaVerifier,
+} from '../../infrastructure/recaptcha/recaptcha.js';
+import { createRecaptchaGuard } from './recaptcha-guard.js';
+import { createAdminRecaptchaRoutes } from './admin-recaptcha-routes.js';
+import { createIpRateLimit, type RateLimitOptions } from './rate-limit.js';
+
+const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
+
+export interface RateLimitSettings {
+  submissions: RateLimitOptions;
+  uploads: RateLimitOptions;
+  adminAuth: RateLimitOptions;
+  /** Envíos por correo del postulante: evita usar el formulario para escribirle a un tercero. */
+  submissionsPerEmail: RateLimitOptions;
+}
+
+const DEFAULT_RATE_LIMITS: RateLimitSettings = {
+  submissions: { windowMs: FIFTEEN_MINUTES_MS, max: 30 },
+  uploads: { windowMs: FIFTEEN_MINUTES_MS, max: 120 },
+  adminAuth: { windowMs: FIFTEEN_MINUTES_MS, max: 30 },
+  submissionsPerEmail: { windowMs: 60 * 60 * 1000, max: 5 },
+};
+
+/**
+ * Cantidad de proxies de confianza delante de la API. En producción son dos (Apache del servidor → nginx del
+ * contenedor web); sin esto `req.ip` sería siempre el del proxy y el límite por IP bloquearía a todos a la vez.
+ */
+export function resolveTrustProxyHops(): number {
+  const configured = Number(process.env.TRUST_PROXY_HOPS);
+  if (process.env.TRUST_PROXY_HOPS !== undefined && Number.isInteger(configured) && configured >= 0) {
+    return configured;
+  }
+  return process.env.NODE_ENV === 'production' ? 2 : 0;
+}
 
 export interface AppDependencies {
   catalog: AcademicCatalog;
@@ -61,10 +100,21 @@ export interface AppDependencies {
   getTelegramPreinscriptionChatIds?: () => Promise<string[]> | string[];
   telegramProviderFactory?: (botToken: string) => TelegramProvider;
   mauticClientFactory?: (config: MauticConfig) => Pick<MauticClient, 'verify'>;
+  /** Proxies de confianza (por defecto 2 en producción, 0 en desarrollo y tests). */
+  trustProxyHops?: number;
+  /** `false` desactiva los límites de frecuencia; un objeto parcial reemplaza los valores por defecto. */
+  rateLimits?: false | Partial<RateLimitSettings>;
+  /** Verificador de reCAPTCHA (se inyecta en los tests; en producción consulta a Google). */
+  recaptchaVerifier?: RecaptchaVerifier;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
+  app.set('trust proxy', dependencies.trustProxyHops ?? resolveTrustProxyHops());
+
+  const rateLimits: RateLimitSettings | false = dependencies.rateLimits === false
+    ? false
+    : { ...DEFAULT_RATE_LIMITS, ...dependencies.rateLimits };
 
   if (dependencies.submissionRecoveryRepository && dependencies.repository && 'recoveryRepository' in dependencies.repository) {
     if (!(dependencies.repository as any).recoveryRepository) {
@@ -74,6 +124,10 @@ export function createApp(dependencies: AppDependencies): Express {
 
   app.use(express.json());
   app.use(cookieParser());
+
+  if (rateLimits) {
+    app.post('/api/uploads', createIpRateLimit(rateLimits.uploads));
+  }
 
   if (dependencies.temporaryFileStorage) {
     app.use('/api/uploads', createUploadRoutes(dependencies.temporaryFileStorage, dependencies.catalog));
@@ -100,6 +154,33 @@ export function createApp(dependencies: AppDependencies): Express {
   const encryptedSettingsService =
     dependencies.encryptedSettingsService ??
     new EncryptedSettingsService(settingsRepo, process.env.APP_SETTINGS_ENCRYPTION_KEY);
+
+  // Configuración pública que necesita el navegador: sólo la clave del sitio de reCAPTCHA (no es secreta).
+  app.get('/api/config', async (_req, res) => {
+    let recaptcha: { enabled: boolean; siteKey?: string; action?: string } = { enabled: false };
+    try {
+      const config = await loadRecaptchaConfig(encryptedSettingsService);
+      if (isRecaptchaActive(config)) {
+        recaptcha = { enabled: true, siteKey: config.siteKey, action: RECAPTCHA_ACTION };
+      }
+    } catch {
+      // Sin configuración legible el formulario sigue funcionando sin reCAPTCHA.
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ recaptcha });
+  });
+
+  // Antes de las rutas de destinos: primero el límite de frecuencia, después el reCAPTCHA.
+  if (rateLimits) {
+    app.post('/api/targets/:id/submissions', createIpRateLimit(rateLimits.submissions));
+  }
+  app.post(
+    '/api/targets/:id/submissions',
+    createRecaptchaGuard({
+      getConfig: () => loadRecaptchaConfig(encryptedSettingsService),
+      verify: dependencies.recaptchaVerifier ?? verifyRecaptchaToken,
+    }),
+  );
 
   const targetRoutes = createTargetRoutes(dependencies.catalog);
   const submissionRoutes = createSubmissionRoutes(
@@ -200,6 +281,7 @@ export function createApp(dependencies: AppDependencies): Express {
     encryptedSettingsService
       ? { isContactSyncEnabled: async () => (await loadMauticConfig(encryptedSettingsService)).contactsEnabled }
       : undefined,
+    rateLimits ? { perEmail: rateLimits.submissionsPerEmail } : undefined,
   );
 
   targetRoutes.use('/:id/submissions', submissionRoutes);
@@ -208,9 +290,15 @@ export function createApp(dependencies: AppDependencies): Express {
   // Admin session and routes
   const sessionStore = dependencies.adminSessionStore ?? new MemoryAdminSessionStore();
   if (dependencies.googleIdentityVerifier) {
+    if (rateLimits) {
+      app.use('/api/admin/auth', createIpRateLimit(rateLimits.adminAuth));
+    }
     app.use('/api/admin/auth', createAdminAuthRoutes(dependencies.googleIdentityVerifier, sessionStore));
   }
   app.use('/api/admin', createAdminMeRoute(sessionStore));
+
+  // Debe montarse antes de /api/admin/settings, cuyo router exige sesión para todo su subárbol.
+  app.use('/api/admin/settings/recaptcha', createAdminRecaptchaRoutes(sessionStore, encryptedSettingsService));
 
   app.use('/api/admin/settings', createAdminSettingsRoutes(
     settingsRepo,

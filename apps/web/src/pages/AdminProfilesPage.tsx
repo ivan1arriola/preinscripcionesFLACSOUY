@@ -4,6 +4,7 @@ import { AdminDriveSettingsCard } from '../components/AdminDriveSettingsCard.js'
 import { AdminSpreadsheetSettingsCard } from '../components/AdminSpreadsheetSettingsCard.js';
 import { AdminNotificationsSettingsCard } from '../components/AdminNotificationsSettingsCard.js';
 import { AdminMauticSettingsCard } from '../components/AdminMauticSettingsCard.js';
+import { AdminRecaptchaSettingsCard } from '../components/AdminRecaptchaSettingsCard.js';
 import { AdminRecoverySettingsCard } from '../components/AdminRecoverySettingsCard.js';
 import { AdminFailedSubmissionsCard } from '../components/AdminFailedSubmissionsCard.js';
 import './admin-responsive.css';
@@ -17,7 +18,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
   onRequireLogin,
   onLogout,
 }) => {
-  const [activeSection, setActiveSection] = useState<'profiles' | 'drive' | 'spreadsheets' | 'notifications' | 'recovery'>('profiles');
+  const [activeSection, setActiveSection] = useState<'profiles' | 'drive' | 'spreadsheets' | 'notifications' | 'recovery' | 'security'>('profiles');
   const [adminUser, setAdminUser] = useState<any>(null);
   const [csrfToken, setCsrfToken] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -160,6 +161,19 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
         >
           🛡️ Recuperación y Alertas
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'security'}
+          onClick={() => setActiveSection('security')}
+          className={`admin-section-tab px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            activeSection === 'security'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          🔒 Seguridad
+        </button>
       </div>
 
       <div className="admin-section-content">
@@ -172,6 +186,10 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
           <AdminNotificationsSettingsCard csrfToken={csrfToken} />
           <AdminMauticSettingsCard csrfToken={csrfToken} />
         </div>
+      ) : activeSection === 'security' ? (
+        <div className="space-y-8">
+          <AdminRecaptchaSettingsCard csrfToken={csrfToken} />
+        </div>
       ) : activeSection === 'recovery' ? (
         <div className="space-y-8">
           <AdminFailedSubmissionsCard csrfToken={csrfToken} />
@@ -181,7 +199,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
         <div className="space-y-6">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 shadow-sm">
             <h2 className="text-lg font-bold text-blue-900 mb-2">
-              Formularios Canónicos Activos (canonical-v1)
+              Formularios Canónicos Activos (canonical-v2)
             </h2>
             <p className="text-sm text-blue-800 mb-4 leading-relaxed">
               La plataforma utiliza una definición canónica unificada y declarativa en código TypeScript. Los perfiles dinámicos y editables han sido reemplazados para garantizar estabilidad, consistencia y trazabilidad. Los cambios de formulario se realizan mediante revisiones de código y despliegues controlados.
