@@ -10,7 +10,6 @@ import {
   UNIVERSAL_INPUTS,
   SUPPORTED_SPECIFIC_INPUTS,
 } from '../../domain/form-definition.js';
-import { buildRegistrationStatusChangedEvent } from '../../application/registration-event.js';
 import type { RegistrationLookup } from '../../ports/registration-lookup.js';
 
 export class PostgresSubmissionRepository implements SubmissionRepository, RegistrationLookup {
@@ -120,30 +119,6 @@ export class PostgresSubmissionRepository implements SubmissionRepository, Regis
             updated_at: new Date(),
           })
           .execute();
-
-        const email = record.values.email?.trim().toLowerCase();
-        if (!email) throw new Error('An effective registration requires an email address.');
-        const event = buildRegistrationStatusChangedEvent({
-          submissionId,
-          targetId: record.targetId,
-          email,
-          occurredAt: new Date(),
-        });
-        await trx.insertInto('registration_event_outbox').values({
-          id: 'reg_evt_' + crypto.randomUUID().replace(/-/g, ''),
-          submission_id: submissionId,
-          idempotency_key: event.idempotency_key,
-          payload_json: JSON.stringify(event),
-          status: 'pending',
-          attempt_count: 0,
-          available_at: new Date(),
-          locked_until: null,
-          locked_by: null,
-          last_error: null,
-          delivered_at: null,
-          created_at: new Date(),
-          updated_at: new Date(),
-        }).execute();
 
         // 4. Insert submission values
         for (const [key, value] of Object.entries(record.values)) {

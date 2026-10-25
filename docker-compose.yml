@@ -67,8 +67,6 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://flacso:flacso_password@postgres:5432/flacso_preinscripciones
-      FLACSO_MAILING_REGISTRATIONS_URL: ${FLACSO_MAILING_REGISTRATIONS_URL:-}
-      PREINSCRIPCIONES_HMAC_SECRET: ${PREINSCRIPCIONES_HMAC_SECRET:-}
     volumes:
       - ./.secrets:/app/.secrets:ro
     depends_on:

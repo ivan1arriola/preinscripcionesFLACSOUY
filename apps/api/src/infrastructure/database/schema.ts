@@ -232,22 +232,6 @@ export interface TelegramRecoveryAlertsTable {
   updated_at: Generated<Date>;
 }
 
-export interface RegistrationEventOutboxTable {
-  id: string;
-  submission_id: string;
-  idempotency_key: string;
-  payload_json: string;
-  status: 'pending' | 'processing' | 'delivered' | 'failed';
-  attempt_count: number;
-  available_at: Date;
-  locked_until: Date | null;
-  locked_by: string | null;
-  last_error: string | null;
-  delivered_at: Date | null;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-}
-
 export interface DatabaseSchema {
   targets: TargetsTable;
   input_definitions: InputDefinitionsTable;
@@ -271,5 +255,4 @@ export interface DatabaseSchema {
   email_notifications: EmailNotificationsTable;
   submission_recoveries: SubmissionRecoveriesTable;
   telegram_recovery_alerts: TelegramRecoveryAlertsTable;
-  registration_event_outbox: RegistrationEventOutboxTable;
 }
