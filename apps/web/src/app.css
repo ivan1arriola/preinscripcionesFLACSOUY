@@ -275,6 +275,8 @@ textarea { min-height: 6.75rem; resize: vertical; }
 .wizard-secondary-action { border-radius: .625rem; font-weight: 600; }
 input, select, textarea { border-color: #cfd9e6; border-radius: .65rem; padding: .78rem .85rem; }
 input:hover, select:hover, textarea:hover { border-color: #aebfd5; }
+/* Las reglas de campo de texto no aplican a casillas: sin esto ocupan todo el ancho con borde y relleno. */
+input:where([type="checkbox"], [type="radio"]) { display: inline-block; flex: none; width: 1rem; height: 1rem; margin-top: .2rem; padding: 0; border: 0; border-radius: 0; box-shadow: none; accent-color: #175cd3; }
 
 /* Institutional login */
 .admin-login-page { max-width: 31rem; margin: 2.5rem auto; }
