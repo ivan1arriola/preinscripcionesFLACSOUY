@@ -370,7 +370,7 @@ describe('Submission HTTP Routes', () => {
         expect(enqueued.length).toBeGreaterThanOrEqual(2); // applicant + target and/or master
         expect(enqueued.some((n) => n.audience === 'applicant')).toBe(true);
         expect(enqueued[0]?.payload.spreadsheetRowUrl).toBe(
-          'https://docs.google.com/spreadsheets/d/sheet-abc/edit#gid=12345&range=A15:Z15'
+          'https://docs.google.com/spreadsheets/d/sheet-abc/edit'
         );
         expect(enqueued[0]?.payload.documentsFolderUrl).toBe(
           'https://drive.google.com/drive/folders/folder-target-123'
@@ -378,6 +378,97 @@ describe('Submission HTTP Routes', () => {
       } finally {
         await new Promise<void>((resolve) => tempServer.close(() => resolve()));
       }
+    });
+
+    it('records a recoverable notification failure after the submission is stored', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const testRepo = new InMemorySubmissionRepository();
+      const notifRepo = new InMemoryEmailNotificationRepository();
+      const recoveryRepo = new InMemorySubmissionRecoveryRepository();
+      vi.spyOn(notifRepo, 'ensureForSubmission').mockRejectedValue(new Error('database unavailable'));
+      const storage: TemporaryFileStoragePort = {
+        save: async () => ({ token: 'unused', sessionId: 'sess-1', fieldKey: 'identidad', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }),
+        remove: async () => undefined, cleanup: async () => 0,
+      };
+      const drive: GoogleDriveRepositoryPort = { storeSubmissionFiles: async ({ files }) => ({ files: files.map((f) => ({ token: f.token, driveFileId: `drive-${f.token}` })), documentsFolderId: 'folder-1', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-1' }) };
+      const app = createApp({ catalog, repository: testRepo, temporaryFileStorage: storage, googleDriveRepository: drive,
+        emailNotificationRepository: notifRepo, submissionRecoveryRepository: recoveryRepo });
+      const tempServer = app.listen(0);
+      const port = (tempServer.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 'sess-1' }, body: JSON.stringify(validPayload),
+        });
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        const recovery = await recoveryRepo.findById(data.submissionId);
+        expect(recovery?.stage).toBe('notifications');
+        expect(recovery?.status).toBe('pending');
+      } finally { await new Promise<void>((resolve) => tempServer.close(() => resolve())); }
+    });
+
+    it('leaves no pending recovery when notifications are enqueued', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const notifRepo = new InMemoryEmailNotificationRepository();
+      const recoveryRepo = new InMemorySubmissionRecoveryRepository();
+      for (const t of (catalog as unknown as { targets: Array<{ notificationEmails?: string[] }> }).targets) t.notificationEmails = ['coordinacion@example.org'];
+      const storage: TemporaryFileStoragePort = { save: async () => ({ token: 'unused', sessionId: 's', fieldKey: 'x', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }), remove: async () => undefined, cleanup: async () => 0 };
+      const drive: GoogleDriveRepositoryPort = { storeSubmissionFiles: async ({ files }) => ({ files: files.map((f) => ({ token: f.token, driveFileId: `drive-${f.token}` })), documentsFolderId: 'folder', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder' }) };
+      const app = createApp({ catalog, repository: new InMemorySubmissionRepository(), temporaryFileStorage: storage, googleDriveRepository: drive, emailNotificationRepository: notifRepo, submissionRecoveryRepository: recoveryRepo });
+      const server = app.listen(0); const port = (server.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 's' }, body: JSON.stringify(validPayload) });
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        expect((await recoveryRepo.findById(data.submissionId))?.status).toBe('resolved');
+      } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
+    });
+
+    it('keeps the reserved recovery pending when the failure cannot be recorded afterwards', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      const notifRepo = new InMemoryEmailNotificationRepository();
+      const recoveryRepo = new InMemorySubmissionRecoveryRepository();
+      vi.spyOn(notifRepo, 'ensureForSubmission').mockRejectedValue(new Error('database unavailable'));
+      const realRecord = recoveryRepo.recordFailure.bind(recoveryRepo);
+      let calls = 0;
+      vi.spyOn(recoveryRepo, 'recordFailure').mockImplementation(async (input) => {
+        if (++calls > 1) throw new Error('database unavailable');
+        return realRecord(input);
+      });
+      const storage: TemporaryFileStoragePort = { save: async () => ({ token: 'unused', sessionId: 's', fieldKey: 'x', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }), remove: async () => undefined, cleanup: async () => 0 };
+      const drive: GoogleDriveRepositoryPort = { storeSubmissionFiles: async ({ files }) => ({ files: files.map((f) => ({ token: f.token, driveFileId: `drive-${f.token}` })), documentsFolderId: 'folder', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder' }) };
+      const app = createApp({ catalog, repository: new InMemorySubmissionRepository(), temporaryFileStorage: storage, googleDriveRepository: drive, emailNotificationRepository: notifRepo, submissionRecoveryRepository: recoveryRepo });
+      const server = app.listen(0); const port = (server.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 's' }, body: JSON.stringify(validPayload) });
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        expect((await recoveryRepo.findById(data.submissionId))?.status).toBe('pending');
+      } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
+    });
+
+    it('records a notification issue when the authenticated target has no coordination email', async () => {
+      const catalog = new FixtureAcademicCatalog();
+      for (const t of (catalog as unknown as { targets: Array<{ notificationEmails?: string[] }> }).targets) t.notificationEmails = [];
+      const storage: TemporaryFileStoragePort = { save: async () => ({ token: 'unused', sessionId: 's', fieldKey: 'x', originalName: '', mimeType: '', size: 0, createdAt: new Date() }),
+        open: async (token) => ({ originalName: `${token}.pdf`, mimeType: 'application/pdf', data: Buffer.from('pdf'), createdAt: new Date() }), remove: async () => undefined, cleanup: async () => 0 };
+      const drive: GoogleDriveRepositoryPort = { storeSubmissionFiles: async ({ files }) => ({ files: files.map((f) => ({ token: f.token, driveFileId: `drive-${f.token}` })), documentsFolderId: 'folder', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder' }) };
+      const recoveryRepo = new InMemorySubmissionRecoveryRepository();
+      const notifRepo = new InMemoryEmailNotificationRepository();
+      const app = createApp({ catalog, repository: new InMemorySubmissionRepository(), temporaryFileStorage: storage, googleDriveRepository: drive, emailNotificationRepository: notifRepo, submissionRecoveryRepository: recoveryRepo });
+      const server = app.listen(0); const port = (server.address() as { port: number }).port;
+      try {
+        const res = await fetch(`http://localhost:${port}/api/targets/davia-c11/submissions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 's' }, body: JSON.stringify(validPayload) });
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        const recovery = await recoveryRepo.findById(data.submissionId);
+        expect(recovery?.stage).toBe('notifications');
+        expect(recovery?.safeError).toContain('correos de coordinación');
+        expect((await notifRepo.listNotifications({ submissionId: data.submissionId })).some(n => n.audience === 'applicant')).toBe(true);
+      } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
     });
 
     it('captures Drive failure, returns tracking ID, creates recovery case and does not enqueue notifications', async () => {

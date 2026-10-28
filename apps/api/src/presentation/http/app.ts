@@ -1,5 +1,5 @@
 import type { MauticClient } from '../../infrastructure/mautic/mautic-client.js';
-import { isEnrollmentNotifyReady, loadMauticConfig, type MauticConfig } from '../../infrastructure/mautic/mautic-config.js';
+import { shouldQueueEnrollmentNotice, loadMauticConfig, type MauticConfig } from '../../infrastructure/mautic/mautic-config.js';
 import express, { type Express } from 'express';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../../ports/submission-repository.js';
@@ -292,7 +292,7 @@ export function createApp(dependencies: AppDependencies): Express {
     encryptedSettingsService
       ? {
           isContactSyncEnabled: async () => (await loadMauticConfig(encryptedSettingsService)).contactsEnabled,
-          isEnrollmentNotifyEnabled: async () => isEnrollmentNotifyReady(await loadMauticConfig(encryptedSettingsService)),
+          isEnrollmentNotifyEnabled: async () => shouldQueueEnrollmentNotice(await loadMauticConfig(encryptedSettingsService)),
         }
       : undefined,
     rateLimits ? { perEmail: rateLimits.submissionsPerEmail } : undefined,

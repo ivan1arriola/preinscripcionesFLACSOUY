@@ -25,6 +25,8 @@ function mapRow(
     stage: row.stage,
     status: row.status,
     safeError: row.safe_error,
+    spreadsheetUrl: row.spreadsheet_url,
+    documentsFolderUrl: row.documents_folder_url,
     attemptCount: row.attempt_count,
     firstFailedAt: row.first_failed_at,
     lastAttemptAt: row.last_attempt_at,
@@ -69,6 +71,8 @@ export class PostgresSubmissionRecoveryRepository implements SubmissionRecoveryR
         stage: input.stage,
         status: 'pending',
         safe_error: input.safeError,
+        spreadsheet_url: input.spreadsheetUrl ?? null,
+        documents_folder_url: input.documentsFolderUrl ?? null,
         attempt_count: 1,
         first_failed_at: now,
         last_attempt_at: now,
@@ -86,6 +90,8 @@ export class PostgresSubmissionRecoveryRepository implements SubmissionRecoveryR
         oc.column('submission_id').doUpdateSet((eb) => ({
           stage: input.stage,
           safe_error: input.safeError,
+          spreadsheet_url: input.spreadsheetUrl ?? eb.ref('submission_recoveries.spreadsheet_url'),
+          documents_folder_url: input.documentsFolderUrl ?? eb.ref('submission_recoveries.documents_folder_url'),
           status: 'pending',
           attempt_count: eb('submission_recoveries.attempt_count', '+', 1),
           last_attempt_at: now,
@@ -251,6 +257,8 @@ export class PostgresSubmissionRecoveryRepository implements SubmissionRecoveryR
           status: 'pending',
           stage: result.stage ?? eb.ref('stage'),
           safe_error: result.safeError ?? eb.ref('safe_error'),
+          spreadsheet_url: result.spreadsheetUrl ?? eb.ref('spreadsheet_url'),
+          documents_folder_url: result.documentsFolderUrl ?? eb.ref('documents_folder_url'),
           attempt_count: eb('submission_recoveries.attempt_count', '+', 1),
           last_attempt_at: now,
           locked_until: null,
@@ -284,6 +292,7 @@ export class PostgresSubmissionRecoveryRepository implements SubmissionRecoveryR
       .selectFrom('submission_recoveries')
       .select('submission_id')
       .where('retention_expires_at', '<', now)
+      .where((eb) => eb.or([eb('stage', '!=', 'notifications'), eb('status', 'not in', ['pending', 'retrying'])]))
       .execute();
 
     if (expiredRows.length === 0) {
@@ -295,6 +304,7 @@ export class PostgresSubmissionRecoveryRepository implements SubmissionRecoveryR
     await this.db
       .deleteFrom('submission_recoveries')
       .where('retention_expires_at', '<', now)
+      .where((eb) => eb.or([eb('stage', '!=', 'notifications'), eb('status', 'not in', ['pending', 'retrying'])]))
       .execute();
 
     return submissionIds;

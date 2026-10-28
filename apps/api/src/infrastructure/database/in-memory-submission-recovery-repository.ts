@@ -20,6 +20,8 @@ export class InMemorySubmissionRecoveryRepository implements SubmissionRecoveryR
     );
 
     if (existing) {
+      existing.spreadsheetUrl = input.spreadsheetUrl ?? existing.spreadsheetUrl;
+      existing.documentsFolderUrl = input.documentsFolderUrl ?? existing.documentsFolderUrl;
       existing.stage = input.stage;
       existing.safeError = input.safeError;
       existing.status = 'pending';
@@ -37,6 +39,8 @@ export class InMemorySubmissionRecoveryRepository implements SubmissionRecoveryR
       submissionId: input.submissionId,
       targetId: input.targetId,
       stage: input.stage,
+      spreadsheetUrl: input.spreadsheetUrl,
+      documentsFolderUrl: input.documentsFolderUrl,
       status: 'pending',
       safeError: input.safeError,
       attemptCount: 1,
@@ -189,6 +193,8 @@ export class InMemorySubmissionRecoveryRepository implements SubmissionRecoveryR
     } else {
       liveRecord.status = 'pending';
       if (result.stage) liveRecord.stage = result.stage;
+      liveRecord.spreadsheetUrl = result.spreadsheetUrl ?? liveRecord.spreadsheetUrl;
+      liveRecord.documentsFolderUrl = result.documentsFolderUrl ?? liveRecord.documentsFolderUrl;
       if (result.safeError) liveRecord.safeError = result.safeError;
       liveRecord.attemptCount += 1;
       liveRecord.lastAttemptAt = now;
@@ -217,7 +223,7 @@ export class InMemorySubmissionRecoveryRepository implements SubmissionRecoveryR
     const expired: string[] = [];
 
     for (const [id, record] of this.records.entries()) {
-      if (record.retentionExpiresAt < now) {
+      if (record.retentionExpiresAt < now && !(record.stage === 'notifications' && ['pending', 'retrying'].includes(record.status))) {
         expired.push(record.submissionId);
         this.records.delete(id);
       }

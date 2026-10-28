@@ -70,6 +70,9 @@ describe('Notification Templates', () => {
       expect(rendered.subject).toContain('Ana Silva');
       expect(rendered.subject).toContain('Diploma Superior en Educación');
 
+      expect(rendered.text).toContain('sub_xyz_789');
+      expect(rendered.html).toContain('sub_xyz_789');
+
       // MUST contain operational links
       expect(rendered.text).toContain('https://docs.google.com/spreadsheets/d/sheet-id-123/edit#gid=0&range=10:10');
       expect(rendered.text).toContain('https://drive.google.com/drive/folders/folder-id-abc');

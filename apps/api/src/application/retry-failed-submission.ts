@@ -143,11 +143,11 @@ export async function retryFailedSubmission(
     );
     await dependencies.recoveryRepository.markRetryResult(recovery.id, {
       success: false,
-      stage: 'sheets',
+      stage: recovery.stage === 'notifications' ? 'notifications' : 'sheets',
       safeError,
       now,
     });
-    await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
+    if (recovery.stage !== 'notifications') await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
     return {
       ok: false,
       code: 'CONFIGURATION_ERROR',
@@ -158,7 +158,7 @@ export async function retryFailedSubmission(
     const safeError = `No se encontró el destino académico "${recovery.targetId}" para procesar la preinscripción.`;
     await dependencies.recoveryRepository.markRetryResult(recovery.id, {
       success: false,
-      stage: 'sheets',
+      stage: recovery.stage === 'notifications' ? 'notifications' : 'sheets',
       safeError,
       now,
     });
@@ -181,11 +181,11 @@ export async function retryFailedSubmission(
     );
     await dependencies.recoveryRepository.markRetryResult(recovery.id, {
       success: false,
-      stage: 'sheets',
+      stage: recovery.stage === 'notifications' ? 'notifications' : 'sheets',
       safeError,
       now,
     });
-    await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
+    if (recovery.stage !== 'notifications') await dependencies.submissionRepository.markProcessing(submissionId, 'failed', safeError);
     return {
       ok: false,
       code: 'CONFIGURATION_ERROR',
@@ -194,6 +194,32 @@ export async function retryFailedSubmission(
   }
   const form = composition.value;
   const normalizedValues = normalizeIdentityValues(storedValues);
+  if (recovery.stage === 'notifications') {
+    try {
+      if (!dependencies.notificationDependencies) throw new Error('La cola de notificaciones no está configurada.');
+      const masters = dependencies.notificationDependencies.getMasterEmails
+        ? await dependencies.notificationDependencies.getMasterEmails() : [];
+      const spreadsheet = !recovery.spreadsheetUrl && dependencies.spreadsheetDependencies
+        ? await dependencies.spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target) : null;
+      await createPreinscriptionNotifications(dependencies.notificationDependencies.repository, {
+        submissionId, target, form, values: normalizedValues,
+        spreadsheetRowUrl: recovery.spreadsheetUrl || spreadsheet?.url || (spreadsheet?.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheet.spreadsheetId}/edit` : ''),
+        documentsFolderUrl: recovery.documentsFolderUrl || '', masterRecipients: masters,
+      });
+      if (!target.notificationEmails?.length) {
+        const safeError = 'El destino no tiene correos de coordinación configurados en el catálogo.';
+        await dependencies.recoveryRepository.markRetryResult(recovery.id, { success: false, stage: 'notifications', safeError, now });
+        return { ok: false, code: 'CONFIGURATION_ERROR', message: safeError };
+      }
+      await dependencies.submissionRepository.markProcessing(submissionId, 'success');
+      await dependencies.recoveryRepository.markRetryResult(recovery.id, { success: true, now });
+      return { ok: true, submissionId, message: 'Notificaciones encoladas para su envío.' };
+    } catch {
+      const safeError = 'No se pudo encolar las notificaciones; el caso sigue pendiente.';
+      await dependencies.recoveryRepository.markRetryResult(recovery.id, { success: false, stage: 'notifications', safeError, now });
+      return { ok: false, code: 'CONFIGURATION_ERROR', message: safeError };
+    }
+  }
   const driveTarget = driveTargetDescriptor(target);
 
   let documentsFolderUrl = '';
@@ -321,15 +347,13 @@ export async function retryFailedSubmission(
       const requiredColumns = spreadsheetSchema.requiredColumns;
 
       const spreadsheet = await dependencies.spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);
-      const appendRes = await dependencies.spreadsheetDependencies.repository.appendByHeaders(
+      await dependencies.spreadsheetDependencies.repository.appendByHeaders(
         spreadsheet.spreadsheetId,
         valuesByColumnName,
         requiredColumns,
         spreadsheet.sheetName
       );
-      if (appendRes?.rowUrl) {
-        spreadsheetRowUrl = appendRes.rowUrl;
-      }
+      spreadsheetRowUrl = `https://docs.google.com/spreadsheets/d/${spreadsheet.spreadsheetId}/edit`;
     } catch (err) {
       const safeError = sanitizeSafeError(err, 'No se pudo crear o guardar la planilla de la preinscripción.');
       await dependencies.recoveryRepository.markRetryResult(recovery.id, {
@@ -347,11 +371,11 @@ export async function retryFailedSubmission(
     }
   }
 
-  // 5. Complete Success
-  await dependencies.recoveryRepository.markRetryResult(recovery.id, {
-    success: true,
-    now,
-  });
+  // La fila ya está guardada: registrar primero la etapa de correo permite recuperarla
+  // sin volver a escribir Sheets si el proceso se interrumpe.
+  if (dependencies.notificationDependencies) {
+    await dependencies.recoveryRepository.markRetryResult(recovery.id, { success: false, stage: 'notifications', safeError: 'Notificaciones pendientes de encolado.', spreadsheetUrl: spreadsheetRowUrl, documentsFolderUrl, now });
+  }
   await dependencies.submissionRepository.markProcessing(submissionId, 'success');
 
   // 6. Enqueue notifications if configured
@@ -369,10 +393,18 @@ export async function retryFailedSubmission(
         documentsFolderUrl,
         masterRecipients,
       });
-    } catch (notifErr) {
-      console.error('[Recovery] Error al encolar notificaciones tras reintento:', notifErr);
+      if (!target.notificationEmails?.length) {
+        const safeError = 'El destino no tiene correos de coordinación configurados en el catálogo.';
+        await dependencies.recoveryRepository.markRetryResult(recovery.id, { success: false, stage: 'notifications', safeError, spreadsheetUrl: spreadsheetRowUrl, documentsFolderUrl, now });
+        return { ok: false, code: 'CONFIGURATION_ERROR', message: safeError };
+      }
+    } catch {
+      const safeError = 'No se pudieron encolar las notificaciones; el caso sigue pendiente.';
+      await dependencies.recoveryRepository.markRetryResult(recovery.id, { success: false, stage: 'notifications', safeError, spreadsheetUrl: spreadsheetRowUrl, documentsFolderUrl, now });
+      return { ok: false, code: 'CONFIGURATION_ERROR', message: safeError };
     }
   }
+  await dependencies.recoveryRepository.markRetryResult(recovery.id, { success: true, now });
 
   // 6b. Enqueue Telegram preinscription notifications if configured
   if (dependencies.telegramDependencies?.repository && dependencies.telegramDependencies.getPreinscriptionChatIds) {

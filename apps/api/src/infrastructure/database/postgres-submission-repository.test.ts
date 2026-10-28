@@ -18,6 +18,15 @@ integrationDescribe('PostgresSubmissionRepository (Integration with PostgreSQL)'
     await db.destroy();
   });
 
+  it('atomically marks completion and leaves a recoverable notification intent with the original links', async () => {
+    const saved = await repository.save({ targetId: 'davia-c11', configRevision: 'v1', targetTitle: 'DAVIA', targetKind: 'academic_offer', values: { email: 'test@example.com' } });
+    await repository.markSuccessWithNotificationIntent(saved.id, { targetId: 'davia-c11', spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/test/edit', documentsFolderUrl: 'https://drive.google.com/drive/folders/test' });
+    const processing = await db.selectFrom('submission_processing').selectAll().where('submission_id', '=', saved.id).executeTakeFirst();
+    const recovery = await db.selectFrom('submission_recoveries').selectAll().where('submission_id', '=', saved.id).executeTakeFirst();
+    expect(processing?.status).toBe('success');
+    expect(recovery).toMatchObject({ stage: 'notifications', status: 'pending', spreadsheet_url: 'https://docs.google.com/spreadsheets/d/test/edit', documents_folder_url: 'https://drive.google.com/drive/folders/test' });
+  });
+
   it('persists submission and values in normalized 3NF tables', async () => {
     const submissionData = {
       targetId: 'davia-c11',

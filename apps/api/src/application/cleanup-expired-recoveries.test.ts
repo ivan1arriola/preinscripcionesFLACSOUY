@@ -3,6 +3,13 @@ import { InMemorySubmissionRecoveryRepository } from '../infrastructure/database
 import { cleanupExpiredRecoveries } from './cleanup-expired-recoveries.js';
 
 describe('cleanupExpiredRecoveries', () => {
+  it('keeps unresolved notification failures visible after temporary-file retention expires', async () => {
+    const repo = new InMemorySubmissionRecoveryRepository();
+    const record = await repo.recordFailure({ submissionId: 'sub-notify', targetId: 'target', stage: 'notifications', safeError: 'Sin destinatarios', now: new Date('2026-10-01T00:00:00Z'), retentionDays: 7 });
+    await cleanupExpiredRecoveries({ recoveryRepository: repo }, new Date('2026-10-10T00:00:00Z'));
+    expect((await repo.findById(record.id))?.status).toBe('pending');
+  });
+
   it('cleans expired recoveries and calls file storage cleanup idempotently', async () => {
     const recoveryRepo = new InMemorySubmissionRecoveryRepository();
     const mockStorage = {

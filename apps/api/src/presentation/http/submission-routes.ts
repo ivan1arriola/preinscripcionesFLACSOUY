@@ -363,15 +363,13 @@ export function createSubmissionRoutes(
             }
           );
 
-          const appendRes = await spreadsheetDependencies.repository.appendByHeaders(
+          await spreadsheetDependencies.repository.appendByHeaders(
             spreadsheet.spreadsheetId,
             valuesByColumnName,
             result.spreadsheet.requiredColumns,
             spreadsheet.sheetName,
           );
-          if (appendRes?.rowUrl) {
-            spreadsheetRowUrl = appendRes.rowUrl;
-          }
+          spreadsheetRowUrl = `https://docs.google.com/spreadsheets/d/${spreadsheet.spreadsheetId}/edit`;
         } catch (error) {
           const safeError = sanitizeSafeError(error, 'No se pudo crear o guardar la planilla de la preinscripción.');
           let recoveryRecord;
@@ -410,9 +408,24 @@ export function createSubmissionRoutes(
         }
       }
 
-      await repository.markProcessing(result.submissionId, 'success');
+      let reservedRecoveryId: string | undefined;
+      if (notificationDependencies && recoveryDependencies?.repository && repository.markSuccessWithNotificationIntent) {
+        reservedRecoveryId = await repository.markSuccessWithNotificationIntent(result.submissionId, { targetId, spreadsheetUrl: spreadsheetRowUrl, documentsFolderUrl });
+      } else {
+        await repository.markProcessing(result.submissionId, 'success');
+      }
 
       if (notificationDependencies) {
+        let missingCoordinationEmail = false;
+        // Fallback para repositorios sin soporte de transacción conjunta.
+        if (!reservedRecoveryId && recoveryDependencies?.repository) {
+          try {
+            const reserved = await recoveryDependencies.repository.recordFailure({ submissionId: result.submissionId, targetId, stage: 'notifications', safeError: 'Encolado de notificaciones en curso.', retentionDays: 7, spreadsheetUrl: spreadsheetRowUrl, documentsFolderUrl });
+            reservedRecoveryId = reserved.id;
+          } catch {
+            console.error('[Notifications] No se pudo reservar el caso de recuperación previo al encolado.');
+          }
+        }
         try {
           const masterRecipients = notificationDependencies.getMasterEmails
             ? await notificationDependencies.getMasterEmails()
@@ -426,8 +439,27 @@ export function createSubmissionRoutes(
             documentsFolderUrl,
             masterRecipients,
           });
-        } catch (notificationError) {
-          console.error('[Notifications] Error al encolar notificaciones de preinscripción:', notificationError);
+          if (!result.target.notificationEmails?.length) {
+            missingCoordinationEmail = true;
+            throw new Error('missing_coordination_email');
+          }
+          if (reservedRecoveryId) await recoveryDependencies!.repository.markRetryResult(reservedRecoveryId, { success: true });
+        } catch {
+          const safeError = missingCoordinationEmail
+            ? 'El destino no tiene correos de coordinación configurados en el catálogo.'
+            : 'No se pudieron encolar las notificaciones de la preinscripción.';
+          console.error('[Notifications]', safeError);
+          try {
+            const recovery = recoveryDependencies?.repository
+              ? await recoveryDependencies.repository.recordFailure({ submissionId: result.submissionId, targetId, stage: 'notifications', safeError, retentionDays: 7, spreadsheetUrl: spreadsheetRowUrl, documentsFolderUrl })
+              : undefined;
+            if (!recovery && repository.recordProcessingFailure) {
+              await repository.recordProcessingFailure(result.submissionId, 'notifications', safeError, 7);
+            }
+            await tryEnqueueTelegramAlert(recoveryDependencies, recovery?.id, result.submissionId, targetId, 'notifications', safeError);
+          } catch {
+            console.error('[Notifications] No se pudo registrar el caso para recuperación.');
+          }
         }
       }
 

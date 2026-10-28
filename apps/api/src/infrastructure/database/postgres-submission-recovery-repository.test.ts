@@ -87,6 +87,20 @@ integrationDescribe('PostgresSubmissionRecoveryRepository (Integration with Post
     expect(updated.retentionExpiresAt.toISOString()).toBe(expectedExpiry.toISOString());
   });
 
+  it('retains links and unresolved notification recovery past file expiry', async () => {
+    const submissionId = `sub_notify_${crypto.randomUUID().slice(0, 8)}`;
+    await createTestSubmission(submissionId);
+    const record = await repository.recordFailure({
+      submissionId, targetId: 'diplomado-edutec', stage: 'notifications', safeError: 'Sin destinatarios',
+      spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet/edit',
+      documentsFolderUrl: 'https://drive.google.com/drive/folders/folder',
+      now: new Date('2026-10-01T00:00:00Z'), retentionDays: 7,
+    });
+    await repository.deleteExpired(new Date('2026-10-10T00:00:00Z'));
+    const retained = await repository.findById(record.id);
+    expect(retained).toMatchObject({ status: 'pending', spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/sheet/edit', documentsFolderUrl: 'https://drive.google.com/drive/folders/folder' });
+  });
+
   it('lists failed recoveries with filtering and includes file summaries', async () => {
     const submissionId = `sub_rec_${crypto.randomUUID().slice(0, 8)}`;
     await createTestSubmission(submissionId);

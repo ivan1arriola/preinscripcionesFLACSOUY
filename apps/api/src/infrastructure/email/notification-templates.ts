@@ -133,6 +133,7 @@ export function renderOperationalNotification(
     '',
     `Postulante: ${snapshot.applicantName || snapshot.applicantEmail}`,
     `Email: ${snapshot.applicantEmail}`,
+    `ID de seguimiento: ${snapshot.submissionId}`,
     '',
     'ACCESOS OPERATIVOS DIRECTOS:',
     `Planilla Google Sheets: ${snapshot.spreadsheetRowUrl}`,
@@ -184,12 +185,13 @@ export function renderOperationalNotification(
         snapshot.targetTitle
       )}</h1>
       <p style="color: #475467; margin: 0;">Nueva postulación recibida</p>
+      <p style="color: #475467; margin: 4px 0 0;">ID de seguimiento: ${escapeHtml(snapshot.submissionId)}</p>
     </div>
 
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
       <h3 style="margin: 0 0 12px 0; font-size: 14px; text-transform: uppercase; color: #475467;">Enlaces directos de gestión</h3>
       <div style="margin-bottom: 8px;">
-        📊 <strong>Planilla (fila):</strong> <a href="${escapeHtml(
+        📊 <strong>Planilla:</strong> <a href="${escapeHtml(
           snapshot.spreadsheetRowUrl
         )}" target="_blank" style="color: #175cd3; text-decoration: underline;">${escapeHtml(
     snapshot.spreadsheetRowUrl

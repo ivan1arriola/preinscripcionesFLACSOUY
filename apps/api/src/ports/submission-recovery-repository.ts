@@ -33,6 +33,8 @@ export interface SubmissionRecoveryRecord {
   updatedAt: Date;
   files?: RecoveryFileSummary[];
   values?: Record<string, string>;
+  spreadsheetUrl?: string | null;
+  documentsFolderUrl?: string | null;
   targetTitle?: string;
   targetKind?: string;
 }
@@ -44,6 +46,8 @@ export interface CreateRecoveryInput {
   safeError: string;
   now?: Date;
   retentionDays?: number;
+  spreadsheetUrl?: string;
+  documentsFolderUrl?: string;
 }
 
 export interface SubmissionRecoveryFilter {
@@ -58,6 +62,8 @@ export interface SubmissionRecoveryFilter {
 export interface RetryResultInput {
   success: boolean;
   stage?: RecoveryStage;
+  spreadsheetUrl?: string;
+  documentsFolderUrl?: string;
   safeError?: string;
   now?: Date;
 }

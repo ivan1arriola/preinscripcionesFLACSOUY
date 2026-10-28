@@ -60,6 +60,16 @@ describe('createPreinscriptionNotifications & buildNotificationRecipients', () =
       documents: [],
     } as unknown as FormDefinition;
 
+    it.each(['academic_offer', 'seminar'] as const)('enqueues a coordination notice for a %s', async (kind) => {
+      const repository = new InMemoryEmailNotificationRepository();
+      const target = { ...mockTarget, kind, notificationEmails: ['coord@example.com'] };
+      const jobs = await createPreinscriptionNotifications(repository, {
+        submissionId: `sub-${kind}`, target, form: mockForm,
+        values: { email: 'postulante@example.com' }, spreadsheetRowUrl: '', documentsFolderUrl: '', masterRecipients: [],
+      });
+      expect(jobs.filter(job => job.audience === 'target').map(job => job.recipientEmail)).toEqual(['coord@example.com']);
+    });
+
     it('creates snapshot and enqueues jobs in the notification repository', async () => {
       const repository = new InMemoryEmailNotificationRepository();
 

@@ -30,6 +30,8 @@ export interface SubmissionRepository {
   saveOrGet(submission: ValidatedSubmissionRecord): Promise<SavedSubmissionResult>;
   /** Permite reconocer un reintento (mismo clientSubmissionId) antes de repetir validaciones y efectos. */
   findByClientSubmissionId?(clientSubmissionId: string): Promise<{ id: string } | null>;
+  /** Registra conjuntamente la finalización y la tarea recuperable de correo. */
+  markSuccessWithNotificationIntent?(id: string, links: { targetId: string; spreadsheetUrl: string; documentsFolderUrl: string }): Promise<string>;
   markProcessing(id: string, status: 'pending' | 'success' | 'failed' | 'unknown', errorMessage?: string): Promise<void>;
   markFileStored(token: string, driveFileId: string): Promise<void>;
   markFileFailed(token: string, errorMessage: string): Promise<void>;

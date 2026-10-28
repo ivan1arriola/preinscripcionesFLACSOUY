@@ -54,9 +54,9 @@ export function enrollmentWebhook(config: MauticConfig): { url: string; secret: 
   return { url: `${config.baseUrl}/flacso/enrollments`, secret: config.enrollmentSecret };
 }
 
-/** Se encolan avisos sólo con el interruptor encendido y un destino utilizable. */
-export function isEnrollmentNotifyReady(config: MauticConfig): boolean {
-  return config.enrollmentNotifyEnabled && enrollmentWebhook(config) !== null;
+/** Encolar si está activado; el worker espera hasta que el destino esté configurado. */
+export function shouldQueueEnrollmentNotice(config: MauticConfig): boolean {
+  return config.enrollmentNotifyEnabled;
 }
 
 export function mauticCredentials(config: MauticConfig): MauticCredentials {

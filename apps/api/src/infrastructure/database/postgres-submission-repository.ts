@@ -196,6 +196,28 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
     }
   }
 
+  async markSuccessWithNotificationIntent(id: string, links: { targetId: string; spreadsheetUrl: string; documentsFolderUrl: string }): Promise<string> {
+    const now = new Date();
+    return this.db.transaction().execute(async (trx) => {
+      const processing = await trx.updateTable('submission_processing')
+        .set({ status: 'success', error_message: null, updated_at: now })
+        .where('submission_id', '=', id).returning('submission_id').executeTakeFirstOrThrow();
+      const row = await trx.insertInto('submission_recoveries').values({
+        id: `rec_${crypto.randomUUID().replace(/-/g, '')}`, submission_id: processing.submission_id,
+        target_id: links.targetId, stage: 'notifications', status: 'pending',
+        safe_error: 'Notificaciones pendientes de encolado.', spreadsheet_url: links.spreadsheetUrl,
+        documents_folder_url: links.documentsFolderUrl, attempt_count: 0, first_failed_at: now,
+        last_attempt_at: now, retention_expires_at: new Date(now.getTime() + 7 * 86400000),
+        created_at: now, updated_at: now,
+      }).onConflict((oc) => oc.column('submission_id').doUpdateSet({
+        stage: 'notifications', status: 'pending', safe_error: 'Notificaciones pendientes de encolado.',
+        spreadsheet_url: links.spreadsheetUrl, documents_folder_url: links.documentsFolderUrl,
+        locked_until: null, locked_by: null, updated_at: now,
+      })).returning('id').executeTakeFirstOrThrow();
+      return row.id;
+    });
+  }
+
   async markProcessing(
     id: string,
     status: 'pending' | 'success' | 'failed' | 'unknown',

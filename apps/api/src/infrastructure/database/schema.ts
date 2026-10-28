@@ -197,6 +197,8 @@ export interface SubmissionRecoveriesTable {
   stage: 'drive' | 'sheets' | 'notifications' | 'unknown';
   status: 'pending' | 'retrying' | 'resolved' | 'discarded';
   safe_error: string;
+  spreadsheet_url: Generated<string | null>;
+  documents_folder_url: Generated<string | null>;
   attempt_count: number;
   first_failed_at: Generated<Date>;
   last_attempt_at: Generated<Date>;

@@ -30,6 +30,7 @@ describe('notifyEnrollment', () => {
     ['network failure', new Error('ECONNRESET'), 'mautic_unavailable'],
     ['5xx', 502, 'mautic_http_502'],
     ['401 (signature or clock skew)', 401, 'mautic_http_401'],
+    ['409 (contact not yet available)', 409, 'mautic_http_409'],
     ['503 (secret not configured in Mautic yet)', 503, 'mautic_http_503'],
   ])('retries on %s', async (_label, result, safeCode) => {
     await expect(notifyEnrollment('evt-1', payload, webhook, sender(result), 1, NOW)).resolves.toEqual({ status: 'retry', safeCode });

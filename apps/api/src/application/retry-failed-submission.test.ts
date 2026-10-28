@@ -30,6 +30,11 @@ describe('retryFailedSubmission', () => {
     recoveryRepo = new InMemorySubmissionRecoveryRepository();
     submissionRepo = new InMemorySubmissionRepository();
     catalog = new FixtureAcademicCatalog();
+    const revalidate = catalog.revalidateTarget.bind(catalog);
+    vi.spyOn(catalog, 'revalidateTarget').mockImplementation(async (id) => {
+      const target = await revalidate(id);
+      return target ? { ...target, notificationEmails: ['coordinacion@example.com'] } : null;
+    });
 
     mockFileStorage = {
       open: vi.fn(async (token: string) => ({
@@ -67,6 +72,52 @@ describe('retryFailedSubmission', () => {
       ensureForSubmission: vi.fn(async () => undefined),
       enqueue: vi.fn(async () => ({ id: 'notif-1' })),
     };
+  });
+
+  it('retries only notification creation without writing another spreadsheet row', async () => {
+    const record = await recoveryRepo.recordFailure({ submissionId: 'sub_notify', targetId: 'diplomado-salud-c2', stage: 'notifications', safeError: 'No se pudo encolar', retentionDays: 7, spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/original/edit', documentsFolderUrl: 'https://drive.google.com/drive/folders/original' });
+    recoveryRepo.setDetails(record.id, { values: { email: 'maria@example.com' }, files: [] });
+    const result = await retryFailedSubmission({ recoveryIdOrSubmissionId: record.id, adminEmail: 'admin@flacso.edu.uy' }, {
+      recoveryRepository: recoveryRepo, submissionRepository: submissionRepo, catalog,
+      spreadsheetDependencies: { targetSpreadsheetService: mockTargetSpreadsheetService as any, repository: mockSpreadsheetRepo as any },
+      notificationDependencies: { repository: mockNotificationRepo },
+    });
+    expect(result.ok).toBe(true);
+    expect(mockSpreadsheetRepo.appendByHeaders).not.toHaveBeenCalled();
+    expect(mockNotificationRepo.ensureForSubmission).toHaveBeenCalledOnce();
+    expect(mockNotificationRepo.ensureForSubmission.mock.calls[0][0].snapshot).toMatchObject({ spreadsheetRowUrl: 'https://docs.google.com/spreadsheets/d/original/edit', documentsFolderUrl: 'https://drive.google.com/drive/folders/original' });
+    expect((await recoveryRepo.findById(record.id))?.status).toBe('resolved');
+  });
+
+  it('keeps notification recovery pending when enqueuing fails again', async () => {
+    const record = await recoveryRepo.recordFailure({ submissionId: 'sub_notify_fail', targetId: 'diplomado-salud-c2', stage: 'notifications', safeError: 'No se pudo encolar', retentionDays: 7 });
+    recoveryRepo.setDetails(record.id, { values: { email: 'maria@example.com' }, files: [] });
+    mockNotificationRepo.ensureForSubmission.mockRejectedValue(new Error('database unavailable'));
+    const result = await retryFailedSubmission({ recoveryIdOrSubmissionId: record.id, adminEmail: 'admin@flacso.edu.uy' }, {
+      recoveryRepository: recoveryRepo, submissionRepository: submissionRepo, catalog,
+      spreadsheetDependencies: { targetSpreadsheetService: mockTargetSpreadsheetService as any, repository: mockSpreadsheetRepo as any },
+      notificationDependencies: { repository: mockNotificationRepo },
+    });
+    expect(result.ok).toBe(false);
+    expect(mockSpreadsheetRepo.appendByHeaders).not.toHaveBeenCalled();
+    expect((await recoveryRepo.findById(record.id))?.status).toBe('pending');
+    expect((await recoveryRepo.findById(record.id))?.stage).toBe('notifications');
+  });
+
+  it('does not resolve a notification recovery if the target has no configured recipients', async () => {
+    const record = await recoveryRepo.recordFailure({ submissionId: 'sub_no_recipients', targetId: 'diplomado-salud-c2', stage: 'notifications', safeError: 'Sin destinatarios', retentionDays: 7 });
+    recoveryRepo.setDetails(record.id, { values: { email: 'maria@example.com' }, files: [] });
+    const original = catalog.revalidateTarget.bind(catalog);
+    vi.spyOn(catalog, 'revalidateTarget').mockImplementation(async (id) => {
+      const target = await original(id);
+      return target ? { ...target, notificationEmails: [] } : null;
+    });
+    const result = await retryFailedSubmission({ recoveryIdOrSubmissionId: record.id, adminEmail: 'admin@flacso.edu.uy' }, {
+      recoveryRepository: recoveryRepo, submissionRepository: submissionRepo, catalog,
+      notificationDependencies: { repository: mockNotificationRepo },
+    });
+    expect(result.ok).toBe(false);
+    expect((await recoveryRepo.findById(record.id))?.status).toBe('pending');
   });
 
   it('successfully retries a submission failed at the sheets stage', async () => {
@@ -111,6 +162,22 @@ describe('retryFailedSubmission', () => {
     const updated = await recoveryRepo.findById(subRecord.id);
     expect(updated?.status).toBe('resolved');
     expect(updated?.resolvedAt).toBeInstanceOf(Date);
+  });
+
+  it('keeps the case at notifications when a Sheets retry succeeds without coordination emails', async () => {
+    const record = await recoveryRepo.recordFailure({ submissionId: 'sub_sheet_no_email', targetId: 'diplomado-salud-c2', stage: 'sheets', safeError: 'Sheets error', retentionDays: 7 });
+    recoveryRepo.setDetails(record.id, { values: { email: 'maria@example.com' }, files: [] });
+    const original = catalog.revalidateTarget.bind(catalog);
+    vi.spyOn(catalog, 'revalidateTarget').mockImplementation(async (id) => { const target = await original(id); return target ? { ...target, notificationEmails: [] } : null; });
+    const result = await retryFailedSubmission({ recoveryIdOrSubmissionId: record.id, adminEmail: 'admin@flacso.edu.uy' }, {
+      recoveryRepository: recoveryRepo, submissionRepository: submissionRepo, catalog,
+      spreadsheetDependencies: { targetSpreadsheetService: mockTargetSpreadsheetService as any, repository: mockSpreadsheetRepo as any },
+      notificationDependencies: { repository: mockNotificationRepo },
+    });
+    expect(result.ok).toBe(false);
+    expect(mockSpreadsheetRepo.appendByHeaders).toHaveBeenCalledOnce();
+    expect((await recoveryRepo.findById(record.id))?.stage).toBe('notifications');
+    expect((await recoveryRepo.findById(record.id))?.status).toBe('pending');
   });
 
   it('keeps the recovery pending when WordPress cannot revalidate the target', async () => {
