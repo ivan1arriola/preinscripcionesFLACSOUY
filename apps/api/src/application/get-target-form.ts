@@ -68,7 +68,7 @@ export async function getTargetForm(
       return {
         ok: false,
         code: 'CLOSED',
-        message: 'La preinscripción para este seminario presenta un conflicto en el catálogo.',
+        message: 'La preinscripción para esta propuesta presenta un conflicto en el catálogo.',
       };
     }
     if (resolution.status === 'closed' || resolution.targetId !== target.id) {

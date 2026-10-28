@@ -183,7 +183,7 @@ describe('App legacy registration routes', () => {
 
       render(<App />);
 
-      expect(await screen.findByText(/Las preinscripciones para este seminario no se encuentran abiertas/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Las preinscripciones para esta propuesta no se encuentran abiertas/i)).toBeInTheDocument();
       expect(apiClient.getTarget).not.toHaveBeenCalled();
     });
 

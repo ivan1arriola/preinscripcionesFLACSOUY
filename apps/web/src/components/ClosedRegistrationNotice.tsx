@@ -23,8 +23,8 @@ export const ClosedRegistrationNotice: React.FC<ClosedRegistrationNoticeProps> =
       {title && <h2 className="text-lg font-bold mb-2">{title}</h2>}
       <p className="font-medium">
         {isConflict
-          ? 'La preinscripción para este seminario no está disponible por conflicto o inconsistencia en la configuración del catálogo.'
-          : 'Las preinscripciones para este seminario no se encuentran abiertas en este momento.'}
+          ? 'La preinscripción para esta propuesta no está disponible por conflicto o inconsistencia en la configuración del catálogo.'
+          : 'Las preinscripciones para esta propuesta no se encuentran abiertas en este momento.'}
       </p>
       <button
         type="button"
