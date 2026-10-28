@@ -8,8 +8,19 @@ export interface BuildPreinscriptionTelegramMessageInput {
   submissionId: string;
   targetTitle: string;
   targetKind: 'offer' | 'seminar' | string;
+  /** Nombre completo del postulante; no se incluye ningún otro dato personal. */
+  applicantName?: string;
   occurredAt?: Date;
   catalogValidation?: 'live' | 'cached';
+}
+
+/** Nombres y apellidos del formulario, en el orden en que se leen. Vacío si no hay ninguno. */
+export function applicantNameFromValues(values: Record<string, string | undefined> | undefined): string {
+  if (!values) return '';
+  return [values.nombre1, values.nombre2, values.apellido1, values.apellido2]
+    .map((part) => part?.trim() ?? '')
+    .filter((part) => part !== '' && part !== '-')
+    .join(' ');
 }
 
 export function buildPreinscriptionTelegramMessage(
@@ -26,10 +37,12 @@ export function buildPreinscriptionTelegramMessage(
   const typeLabel = isSeminar ? 'Seminario' : 'Oferta académica';
   const occurredAt = input.occurredAt ?? new Date();
   const formattedDate = occurredAt.toISOString();
+  const applicantName = input.applicantName?.trim().slice(0, 120);
 
   return [
     '✅ Nueva preinscripción recibida',
     `ID: ${input.submissionId}`,
+    ...(applicantName ? [`Nombre: ${applicantName}`] : []),
     `Destino: ${truncatedTitle}`,
     `Tipo: ${typeLabel}`,
     `Fecha: ${formattedDate}`,
@@ -45,6 +58,7 @@ export interface EnqueuePreinscriptionTelegramNotificationsInput {
   submissionId: string;
   target: AcademicTarget;
   chatIds: string[];
+  applicantName?: string;
   occurredAt?: Date;
   catalogValidation?: 'live' | 'cached';
 }
@@ -52,7 +66,7 @@ export interface EnqueuePreinscriptionTelegramNotificationsInput {
 export async function enqueuePreinscriptionTelegramNotifications(
   input: EnqueuePreinscriptionTelegramNotificationsInput
 ): Promise<TelegramAlertRecord[]> {
-  const { repository, submissionId, target, chatIds, occurredAt = new Date(), catalogValidation } = input;
+  const { repository, submissionId, target, chatIds, applicantName, occurredAt = new Date(), catalogValidation } = input;
   if (!chatIds || chatIds.length === 0) {
     return [];
   }
@@ -61,6 +75,7 @@ export async function enqueuePreinscriptionTelegramNotifications(
     submissionId,
     targetTitle: target.title,
     targetKind: target.kind,
+    applicantName,
     occurredAt,
     catalogValidation,
   });

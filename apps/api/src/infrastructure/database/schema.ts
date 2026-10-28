@@ -97,6 +97,13 @@ export interface TargetSpreadsheetsTable {
   updated_at: Generated<Date>;
 }
 
+export interface OfferRegistrationLinksTable {
+  offer_wp_id: number;
+  path: string;
+  registered_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 export interface SpreadsheetOperationsTable {
   id: string;
   submission_id: string;
@@ -279,6 +286,7 @@ export interface DatabaseSchema {
   submission_values: SubmissionValuesTable;
   technical_cache: TechnicalCacheTable;
   target_spreadsheets: TargetSpreadsheetsTable;
+  offer_registration_links: OfferRegistrationLinksTable;
   spreadsheet_operations: SpreadsheetOperationsTable;
   admin_users: AdminUsersTable;
   admin_sessions: AdminSessionsTable;

@@ -12,7 +12,7 @@ import { normalizeIdentityValues } from '../domain/identity-validation.js';
 import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import { sanitizeSafeError } from '../domain/safe-error.js';
 import { createPreinscriptionNotifications } from './create-preinscription-notifications.js';
-import { enqueuePreinscriptionTelegramNotifications } from './preinscription-telegram-notification.js';
+import { applicantNameFromValues, enqueuePreinscriptionTelegramNotifications } from './preinscription-telegram-notification.js';
 import { buildSpreadsheetSchema, buildSpreadsheetValues } from '../domain/spreadsheet-schema.js';
 
 export interface RetrySubmissionDependencies {
@@ -416,6 +416,7 @@ export async function retryFailedSubmission(
           submissionId,
           target,
           chatIds,
+          applicantName: applicantNameFromValues(normalizedValues),
           occurredAt: now,
         });
       }

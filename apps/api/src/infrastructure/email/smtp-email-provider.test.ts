@@ -57,7 +57,7 @@ describe('SmtpEmailProvider', () => {
     ).resolves.toEqual({ providerMessageId: 'smtp-message-123' });
 
     expect(injectedTransport.sendMail).toHaveBeenCalledWith({
-      from: 'preinscripciones@flacso.edu.uy',
+      from: { name: 'FLACSO Uruguay - Preinscripciones', address: 'preinscripciones@flacso.edu.uy' },
       to: ['postulante@example.com'],
       subject: 'Confirmación de preinscripción',
       text: 'Recibimos su preinscripción.',

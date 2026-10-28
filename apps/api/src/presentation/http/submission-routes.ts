@@ -11,7 +11,10 @@ import type { EmailNotificationRepository } from '../../ports/email-notification
 import { createPreinscriptionNotifications } from '../../application/create-preinscription-notifications.js';
 import type { SubmissionRecoveryRepository } from '../../ports/submission-recovery-repository.js';
 import type { TelegramAlertRepository } from '../../ports/telegram-alert-repository.js';
-import { enqueuePreinscriptionTelegramNotifications } from '../../application/preinscription-telegram-notification.js';
+import {
+  applicantNameFromValues,
+  enqueuePreinscriptionTelegramNotifications,
+} from '../../application/preinscription-telegram-notification.js';
 import { buildSpreadsheetValues } from '../../domain/spreadsheet-schema.js';
 import { RateLimiter, rateLimitedResponse, type RateLimitOptions } from './rate-limit.js';
 
@@ -476,6 +479,7 @@ export function createSubmissionRoutes(
               submissionId: result.submissionId,
               target: result.target,
               chatIds,
+              applicantName: applicantNameFromValues(result.normalizedValues),
               catalogValidation: result.catalogValidation,
             });
           }

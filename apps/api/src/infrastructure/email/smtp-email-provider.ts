@@ -6,7 +6,7 @@ import type { SmtpConfig } from './email-config.js';
 export interface SmtpTransport {
   verify(): Promise<unknown>;
   sendMail(message: {
-    from: string;
+    from: string | { name: string; address: string };
     to: string[];
     subject: string;
     text: string;
@@ -15,6 +15,9 @@ export interface SmtpTransport {
     headers?: Record<string, string>;
   }): Promise<{ messageId?: string }>;
 }
+
+/** Nombre que ven los destinatarios como remitente, en lugar de la parte local del correo ("noreply"). */
+export const EMAIL_SENDER_NAME = 'FLACSO Uruguay - Preinscripciones';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -97,7 +100,7 @@ export class SmtpEmailProvider implements EmailProvider {
 
     try {
       const response = await this.transport.sendMail({
-        from: this.config.fromEmail,
+        from: { name: EMAIL_SENDER_NAME, address: this.config.fromEmail },
         to: message.to,
         subject: message.subject,
         text: message.text,

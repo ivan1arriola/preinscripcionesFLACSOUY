@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest';
 import type { AcademicTarget } from '@flacso/contracts';
 import { InMemoryTelegramAlertRepository } from '../infrastructure/database/in-memory-telegram-alert-repository.js';
 import {
+  applicantNameFromValues,
   buildPreinscriptionTelegramMessage,
   enqueuePreinscriptionTelegramNotifications,
 } from './preinscription-telegram-notification.js';
 
 describe('preinscription-telegram-notification', () => {
   describe('buildPreinscriptionTelegramMessage', () => {
-    it('formats offer preinscription message without PII and with correct label', () => {
+    it('formats offer preinscription message without contact data and with correct label', () => {
       const occurredAt = new Date('2026-10-05T14:30:00.000Z');
       const message = buildPreinscriptionTelegramMessage({
         submissionId: 'sub_test_123',
@@ -24,8 +25,30 @@ describe('preinscription-telegram-notification', () => {
       expect(message).toContain('Fecha: 2026-10-05T14:30:00.000Z');
       expect(message).toContain('Estado: Registrada');
 
-      // Zero PII
-      expect(message).not.toMatch(/@|\b(cédula|ci|telefono|celular|nombre|apellido|token|drive|sheets)\b/i);
+      // Sin nombre cuando no se informa, y nunca datos de contacto ni de acceso
+      expect(message).not.toContain('Nombre:');
+      expect(message).not.toMatch(/@|\b(cédula|ci|telefono|celular|token|drive|sheets)\b/i);
+    });
+
+    it('includes the applicant name, and only the name, when it is provided', () => {
+      const message = buildPreinscriptionTelegramMessage({
+        submissionId: 'sub_test_name',
+        targetTitle: 'Maestría en Género',
+        targetKind: 'academic_offer',
+        applicantName: 'María José Pérez Gómez',
+        occurredAt: new Date('2026-10-05T14:30:00.000Z'),
+      });
+
+      expect(message).toContain('Nombre: María José Pérez Gómez');
+      expect(message).not.toMatch(/@|\b(cédula|telefono|celular|token|drive|sheets)\b/i);
+    });
+
+    it('builds the applicant name from the form values, skipping empty parts and dashes', () => {
+      expect(
+        applicantNameFromValues({ nombre1: 'María', nombre2: '-', apellido1: ' Pérez ', apellido2: '', email: 'a@b.c' })
+      ).toBe('María Pérez');
+      expect(applicantNameFromValues({})).toBe('');
+      expect(applicantNameFromValues(undefined)).toBe('');
     });
 
     it('formats seminar preinscription message with correct label', () => {

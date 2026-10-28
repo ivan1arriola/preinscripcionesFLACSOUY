@@ -9,6 +9,8 @@ import { sql } from 'kysely';
 import { WordPressClient } from './infrastructure/wordpress/wordpress-client.js';
 import { catalogHealthResponse, type CatalogHealthResponse } from './presentation/http/health.js';
 import { WordPressAcademicCatalog } from './infrastructure/wordpress/wordpress-academic-catalog.js';
+import { RegisteredLinkAcademicCatalog } from './application/registered-link-catalog.js';
+import { PostgresOfferRegistrationLinkRepository } from './infrastructure/database/postgres-offer-registration-link-repository.js';
 import { PostgresWordPressCache } from './infrastructure/wordpress/wordpress-cache.js';
 import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
 import { GoogleDriveRepository } from './infrastructure/google/google-drive-repository.js';
@@ -53,8 +55,12 @@ const telegramAlertRepository = new PostgresTelegramAlertRepository(db);
 const wordPressClient = process.env.WORDPRESS_URL
   ? new WordPressClient({ baseUrl: process.env.WORDPRESS_URL, catalogToken: process.env.WORDPRESS_CATALOG_TOKEN })
   : undefined;
+// El enlace de preinscripción de cada oferta se registra una sola vez y solo cambia si WordPress lo cambia.
 const catalog = wordPressClient
-  ? new WordPressAcademicCatalog(wordPressClient, new PostgresWordPressCache(db))
+  ? new RegisteredLinkAcademicCatalog(
+      new WordPressAcademicCatalog(wordPressClient, new PostgresWordPressCache(db)),
+      new PostgresOfferRegistrationLinkRepository(db)
+    )
   : new FixtureAcademicCatalog();
 
 // Consulta WordPress directo (sin la caché del catálogo) y recuerda el resultado 30 s,
