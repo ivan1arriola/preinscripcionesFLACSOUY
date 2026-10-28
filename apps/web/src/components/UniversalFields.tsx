@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as Flags from 'country-flag-icons/react/3x2';
 import { getCountries, getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
 import type { AgreementOption, InputDefinition } from '@flacso/contracts';
+import { CountrySelect } from './CountrySelect.js';
+import { COUNTRY_KEYS } from '../domain/countries.js';
 
 interface UniversalFieldsProps {
   inputs: InputDefinition[];
@@ -9,6 +11,8 @@ interface UniversalFieldsProps {
   errors: Record<string, string | undefined>;
   disabled: boolean;
   onChange: (key: string, value: string) => void;
+  /** Se llama al salir de un campo, para validarlo en el momento. */
+  onBlurField?: (key: string) => void;
   agreements?: AgreementOption[];
 }
 
@@ -48,7 +52,30 @@ const yesNoKeys = new Set(['tieneConvenio', 'aceptaDifusion', 'aceptaComunicacio
 // Campos que ocupan todo el ancho de la grilla; el resto se acomoda de a dos (nombres con apellidos, por ejemplo).
 const wideKeys = new Set(['celular', 'domicilio', 'estudios', 'generoOtra', 'posgradoCual', 'convenioWordpressId', 'fuente', 'tituloDenominacion', ...yesNoKeys]);
 
-export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values, errors, disabled, onChange, agreements = [] }) => {
+// Atributos autocomplete para que el navegador (y sobre todo el celular) complete los datos conocidos.
+const autocompleteByKey: Record<string, string> = {
+  nombre1: 'given-name',
+  nombre2: 'additional-name',
+  apellido1: 'family-name',
+  fechaNacimiento: 'bday',
+  email: 'email',
+  emailConfirmacion: 'email',
+  celular: 'tel-national',
+  ciudadResidencia: 'address-level2',
+  domicilio: 'street-address',
+  paisResidencia: 'country-name',
+  ocupacion: 'organization-title',
+  documento: 'off',
+};
+
+const documentHint = (type: string | undefined) => {
+  if (type === 'pasaporte') return 'Número tal como figura en el pasaporte.';
+  if (type === 'documento_extranjero') return 'Número tal como figura en el documento.';
+  if (!type) return 'Elegí primero el tipo de documento.';
+  return '';
+};
+
+export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values, errors, disabled, onChange, onBlurField, agreements = [] }) => {
   const [phoneCountry, setPhoneCountry] = useState<CountryCode>('UY');
   const [phoneStatus, setPhoneStatus] = useState('');
   const [cedulaStatus, setCedulaStatus] = useState('');
@@ -58,8 +85,21 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
     if (input.key === 'generoOtra') return values.genero === 'Otra';
     if (input.key === 'convenioWordpressId') return values.tieneConvenio === 'Si';
     if (input.key === 'posgradoCual') return values.posgradoFlacso === 'Si';
-    if (input.key === 'paisEmisorDocumento') return !isUruguayanCedula;
     return true;
+  };
+
+  // Con cédula uruguaya el país emisor es Uruguay: el campo queda en su lugar, fijo, para que el formulario no se mueva.
+  const hasIssuerInput = inputs.some((input) => input.key === 'paisEmisorDocumento');
+  useEffect(() => {
+    if (hasIssuerInput && isUruguayanCedula && values.paisEmisorDocumento !== 'Uruguay') onChange('paisEmisorDocumento', 'Uruguay');
+  }, [hasIssuerInput, isUruguayanCedula, values.paisEmisorDocumento]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleChange = (key: string, value: string) => {
+    onChange(key, value);
+    if (key === 'tipoDocumento') {
+      if (value === 'cedula_uruguaya') onChange('paisEmisorDocumento', 'Uruguay');
+      else if (isUruguayanCedula && values.paisEmisorDocumento === 'Uruguay') onChange('paisEmisorDocumento', '');
+    }
   };
 
   const updatePhone = (raw: string) => {
@@ -74,7 +114,8 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
   };
 
   return <div className="fields-grid">{inputs.filter(visible).map((input) => {
-    const value = values[input.key] || ''; const error = errors[input.key]; const options = choices[input.key];
+    const issuerLocked = input.key === 'paisEmisorDocumento' && isUruguayanCedula;
+    const value = issuerLocked ? 'Uruguay' : values[input.key] || ''; const error = errors[input.key]; const options = choices[input.key];
     const label = input.key === 'documento' && isUruguayanCedula ? 'Cédula de identidad uruguaya' : input.label;
     const phoneInputValue = input.key === 'celular' && value.startsWith('+')
       ? parsePhoneNumberFromString(value)?.formatNational() ?? value
@@ -83,6 +124,10 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
     const describedBy = (...ids: Array<string | false | undefined>) => ids.filter(Boolean).join(' ') || undefined;
     const invalid = error ? true : undefined;
     const isWide = wideKeys.has(input.key) || input.type === 'textarea';
+    const blur = () => onBlurField?.(input.key);
+    const autoComplete = autocompleteByKey[input.key];
+    const isCountry = COUNTRY_KEYS.has(input.key);
+    const cedulaOk = isValidCedula(value);
     return <div key={input.key} className={`field-group${isWide ? ' field-group--wide' : ''}${error ? ' has-error' : ''}`}>
       <label htmlFor={`input-${input.key}`} className="field-label">{label} {input.required && <span className="field-required">*</span>}</label>
       {input.key === 'celular' ? <>
@@ -114,8 +159,10 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
             type="tel"
             value={phoneInputValue}
             onChange={(event) => updatePhone(event.target.value)}
+            onBlur={blur}
             disabled={disabled}
             placeholder={phonePlaceholderFor(phoneCountry)}
+            autoComplete={autoComplete}
             aria-invalid={invalid}
             aria-describedby={describedBy('celular-ayuda', phoneStatus && 'celular-estado', error && errorId)}
           />
@@ -125,18 +172,33 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
       </> : yesNoKeys.has(input.key) ? <fieldset className="choice-group" aria-describedby={error ? errorId : undefined}>
         <legend className="sr-only">{label}</legend>
         {(choices[input.key] ?? []).map(([optionValue, optionLabel]) => <label className="choice-card" key={optionValue}>
-          <input type="radio" name={input.key} value={optionValue} checked={value === optionValue} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} />
+          <input type="radio" name={input.key} value={optionValue} checked={value === optionValue} onChange={(event) => handleChange(input.key, event.target.value)} onBlur={blur} disabled={disabled} />
           <span>{optionLabel}</span>
         </label>)}
       </fieldset>
-      : input.key === 'convenioWordpressId' ? <select id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)}><option value="">Seleccioná un convenio</option>{agreements.map((agreement) => <option key={agreement.id} value={agreement.id}>{agreement.label}</option>)}</select>
-      : options ? <select id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)}><option value="">Seleccioná una opción</option>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select>
+      : isCountry ? <CountrySelect
+          id={`input-${input.key}`}
+          name={input.key}
+          value={value}
+          onChange={(name) => handleChange(input.key, name)}
+          onBlur={blur}
+          disabled={disabled || issuerLocked}
+          invalid={Boolean(error)}
+          describedBy={describedBy(input.key === 'paisEmisorDocumento' && 'pais-emisor-ayuda', error && errorId)}
+          autoComplete={autoComplete}
+        />
+      : input.key === 'convenioWordpressId' ? <select id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => handleChange(input.key, event.target.value)} onBlur={blur} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)}><option value="">Seleccioná un convenio</option>{agreements.map((agreement) => <option key={agreement.id} value={agreement.id}>{agreement.label}</option>)}</select>
+      : options ? <select id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => handleChange(input.key, event.target.value)} onBlur={blur} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)}><option value="">Seleccioná una opción</option>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select>
       : input.key === 'documento' && isUruguayanCedula ? <>
-        <input id={`input-${input.key}`} name={input.key} type="text" inputMode="numeric" value={value} onChange={(event) => { const formatted = formatCedula(event.target.value); onChange(input.key, formatted); setCedulaStatus(formatted.length ? (isValidCedula(formatted) ? 'Cédula válida.' : 'La cédula o su dígito verificador no son válidos.') : 'Ingresá los 8 dígitos de la cédula.'); }} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy('cedula-ayuda', cedulaStatus && 'cedula-estado', error && errorId)} />
-        <p id="cedula-ayuda" className="field-hint">Se valida automáticamente, incluido el dígito verificador.</p>
-        {cedulaStatus && <p id="cedula-estado" className="field-status" aria-live="polite">{cedulaStatus}</p>}
-      </> : input.type === 'textarea' ? <textarea id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} rows={3} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)} />
-      : <input id={`input-${input.key}`} name={input.key} type={input.type === 'date' ? 'date' : input.type === 'email' ? 'email' : input.type === 'tel' ? 'tel' : 'text'} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)} />}
+        <input id={`input-${input.key}`} name={input.key} type="text" inputMode="numeric" autoComplete="off" value={value} onChange={(event) => { const formatted = formatCedula(event.target.value); handleChange(input.key, formatted); setCedulaStatus(formatted.length ? (isValidCedula(formatted) ? 'Cédula válida.' : 'Cédula o dígito verificador no válidos.') : 'Ingresá los 8 dígitos de la cédula.'); }} onBlur={blur} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy('documento-ayuda', error && errorId)} />
+      </> : input.type === 'textarea' ? <textarea id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => handleChange(input.key, event.target.value)} onBlur={blur} disabled={disabled} rows={3} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)} />
+      : <input id={`input-${input.key}`} name={input.key} type={input.type === 'date' ? 'date' : input.type === 'email' ? 'email' : input.type === 'tel' ? 'tel' : 'text'} autoComplete={autoComplete} value={value} onChange={(event) => handleChange(input.key, event.target.value)} onBlur={blur} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(input.key === 'documento' && 'documento-ayuda', error && errorId)} />}
+      {input.key === 'documento' && (
+        <p id="documento-ayuda" className={`field-hint field-hint--slot${isUruguayanCedula && value && cedulaOk ? ' field-hint--ok' : ''}${isUruguayanCedula && value && !cedulaOk ? ' field-hint--bad' : ''}`} aria-live="polite">
+          {isUruguayanCedula ? (cedulaStatus || 'Se valida con el dígito verificador.') : documentHint(values.tipoDocumento)}
+        </p>
+      )}
+      {input.key === 'paisEmisorDocumento' && <p id="pais-emisor-ayuda" className="field-hint field-hint--slot">{issuerLocked ? 'El país emisor es Uruguay.' : 'País que emitió el documento.'}</p>}
       {input.key === 'convenioWordpressId' && agreements.length === 0 && <p className="field-hint">No hay convenios disponibles en este momento.</p>}
       {error && <p id={errorId} className="field-error">{error}</p>}
     </div>;

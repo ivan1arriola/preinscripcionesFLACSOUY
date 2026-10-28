@@ -7,6 +7,7 @@ import { PreinscriptionLoadingOverlay } from './PreinscriptionLoadingOverlay.js'
 import { PreinscriptionStartCard } from './PreinscriptionStartCard.js';
 import { MobileWizardNavigation } from './MobileWizardNavigation.js';
 import { FormErrorSummary } from './FormErrorSummary.js';
+import { FormHelp } from './FormHelp.js';
 import { apiClient } from '../api/client.js';
 
 interface PreinscriptionWizardProps {
@@ -31,6 +32,9 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<SubmissionFileToken[]>([]);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  // El recuadro con la lista de errores aparece solo al intentar avanzar; al salir de un campo
+  // se avisa junto al campo, sin mover el resto del formulario.
+  const [summaryVisible, setSummaryVisible] = useState(false);
 
   const steps: FormStepDefinition[] = form.steps && form.steps.length > 0
     ? [...form.steps].sort((a, b) => a.order - b.order)
@@ -201,10 +205,24 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
     const errs = validateStep(currentStep);
     if (Object.keys(errs).length > 0) {
       setClientErrors(errs);
+      setSummaryVisible(true);
       return false;
     }
     setClientErrors({});
+    setSummaryVisible(false);
     return true;
+  };
+
+  // Al salir de un campo se valida solo ese campo, para avisar en el momento y no al final del paso.
+  const handleBlurField = (key: string) => {
+    const message = validateStep(currentStep)[key];
+    setClientErrors((prev) => {
+      if (message) return prev[key] === message ? prev : { ...prev, [key]: message };
+      if (!(key in prev)) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   const validateAllSteps = (): boolean => {
@@ -223,6 +241,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
     if (firstErrorIndex !== -1) {
       setClientErrors(allErrors);
+      setSummaryVisible(true);
       setCurrentStepIndex(firstErrorIndex);
       setIsReviewing(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -237,6 +256,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
     if (!validateCurrentStep()) return;
     const nextIdx = currentStepIndex + 1;
     if (nextIdx < steps.length) {
+      setSummaryVisible(false);
       setCurrentStepIndex(nextIdx);
       setHighestStepReached((prev) => Math.max(prev, nextIdx));
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -245,6 +265,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   const handleBack = () => {
     if (currentStepIndex > 0) {
+      setSummaryVisible(false);
       setCurrentStepIndex(currentStepIndex - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -252,6 +273,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   const handleStepClick = (index: number) => {
     if (index <= highestStepReached) {
+      setSummaryVisible(false);
       setIsReviewing(false);
       setCurrentStepIndex(index);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -326,6 +348,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
           onStart={() => setHasStarted(true)}
           disabled={isSubmitting || !form.registrationOpen}
         />
+        <FormHelp />
       </div>
     );
   }
@@ -358,7 +381,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       ) : (
         <form onSubmit={isFinalStep ? handleReview : (e) => { e.preventDefault(); handleNext(); }}>
           <FormErrorSummary
-            errors={errors}
+            errors={summaryVisible ? errors : {}}
             orderedKeys={[...new Set([
               ...currentStepInputs.map((input) => input.key),
               ...currentStepDocs.map((document) => document.key),
@@ -381,6 +404,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
               errors={errors}
               disabled={isSubmitting || !form.registrationOpen}
               onChange={handleInputChange}
+              onBlurField={handleBlurField}
               files={files}
               onUpload={onUpload}
               onFileToken={handleFileToken}
@@ -408,6 +432,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
           />
         </form>
       )}
+      <FormHelp />
     </div>
   );
 };

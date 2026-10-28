@@ -13,12 +13,15 @@ const inputs: InputDefinition[] = [
 ];
 
 describe('UniversalFields identity and contact controls', () => {
-  it('uses the Uruguayan identity card flow and hides the issuer country', () => {
+  it('uses the Uruguayan identity card flow and keeps the issuer country in place, fixed to Uruguay', () => {
     const onChange = vi.fn();
     render(<UniversalFields inputs={inputs} values={{ tipoDocumento: 'cedula_uruguaya' }} errors={{}} disabled={false} onChange={onChange} />);
 
     expect(screen.getByLabelText(/Cédula de identidad uruguaya/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/País emisor del documento/i)).not.toBeInTheDocument();
+    // El campo no aparece ni desaparece según el documento: así el formulario no se mueve.
+    expect(screen.getByLabelText(/País emisor del documento/i)).toBeDisabled();
+    expect(screen.getByLabelText(/País emisor del documento/i)).toHaveValue('Uruguay');
+    expect(onChange).toHaveBeenCalledWith('paisEmisorDocumento', 'Uruguay');
 
     fireEvent.change(screen.getByLabelText(/Cédula de identidad uruguaya/i), { target: { value: '34567894' } });
     expect(onChange).toHaveBeenLastCalledWith('documento', '3.456.789-4');
@@ -85,5 +88,66 @@ describe('UniversalFields identity and contact controls', () => {
     const { container } = render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={vi.fn()} />);
 
     expect(container.querySelector('.phone-prefix')).not.toBeInTheDocument();
+  });
+});
+
+describe('UniversalFields stable layout, autocomplete and blur', () => {
+  const identityInputs: InputDefinition[] = [
+    { key: 'nombre1', label: 'Primer nombre', type: 'text', required: true, position: 1 },
+    { key: 'email', label: 'Correo electrónico', type: 'email', required: true, position: 2 },
+    { key: 'tipoDocumento', label: 'Tipo de documento', type: 'select', required: true, position: 3 },
+    { key: 'paisEmisorDocumento', label: 'País emisor del documento', type: 'text', required: true, position: 4 },
+    { key: 'documento', label: 'Número de documento', type: 'text', required: true, position: 5 },
+  ];
+
+  it('sets the issuer country to Uruguay when choosing the Uruguayan ID, and clears it when leaving it', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<UniversalFields inputs={identityInputs} values={{}} errors={{}} disabled={false} onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText(/Tipo de documento/i), { target: { value: 'cedula_uruguaya' } });
+    expect(onChange).toHaveBeenCalledWith('tipoDocumento', 'cedula_uruguaya');
+    expect(onChange).toHaveBeenCalledWith('paisEmisorDocumento', 'Uruguay');
+
+    onChange.mockClear();
+    rerender(<UniversalFields inputs={identityInputs} values={{ tipoDocumento: 'cedula_uruguaya', paisEmisorDocumento: 'Uruguay' }} errors={{}} disabled={false} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText(/Tipo de documento/i), { target: { value: 'pasaporte' } });
+    expect(onChange).toHaveBeenCalledWith('paisEmisorDocumento', '');
+  });
+
+  it('keeps the same fields on screen for every document type and always shows a help line', () => {
+    const labelsFor = (tipoDocumento?: string) => {
+      const { unmount } = render(<UniversalFields inputs={identityInputs} values={tipoDocumento ? { tipoDocumento } : {}} errors={{}} disabled={false} onChange={vi.fn()} />);
+      const count = screen.getAllByRole('textbox').length + screen.getAllByRole('combobox').length;
+      const hint = document.getElementById('documento-ayuda')?.textContent ?? '';
+      unmount();
+      return { count, hint };
+    };
+
+    const none = labelsFor(undefined);
+    const cedula = labelsFor('cedula_uruguaya');
+    const passport = labelsFor('pasaporte');
+    const foreign = labelsFor('documento_extranjero');
+
+    expect(new Set([none.count, cedula.count, passport.count, foreign.count]).size).toBe(1);
+    for (const { hint } of [none, cedula, passport, foreign]) expect(hint.length).toBeGreaterThan(10);
+    expect(passport.hint).toMatch(/pasaporte/i);
+  });
+
+  it('adds autocomplete hints and reports when a field loses focus', () => {
+    const onBlurField = vi.fn();
+    render(<UniversalFields inputs={identityInputs} values={{}} errors={{}} disabled={false} onChange={vi.fn()} onBlurField={onBlurField} />);
+
+    expect(screen.getByLabelText(/Primer nombre/i)).toHaveAttribute('autocomplete', 'given-name');
+    expect(screen.getByLabelText(/Correo electrónico/i)).toHaveAttribute('autocomplete', 'email');
+
+    fireEvent.blur(screen.getByLabelText(/Primer nombre/i));
+    expect(onBlurField).toHaveBeenCalledWith('nombre1');
+  });
+
+  it('marks the field as invalid for assistive technology when it has an error', () => {
+    render(<UniversalFields inputs={identityInputs} values={{}} errors={{ nombre1: 'El campo Primer nombre es obligatorio.' }} disabled={false} onChange={vi.fn()} />);
+    const field = screen.getByLabelText(/Primer nombre/i);
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field.getAttribute('aria-describedby')).toContain('error-nombre1');
   });
 });

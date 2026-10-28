@@ -62,6 +62,30 @@ describe('PreinscriptionWizard Component', () => {
     mentions: [],
   });
 
+  it('validates a field as soon as it loses focus, and clears the error once it is filled', () => {
+    render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} />);
+    startWizard();
+
+    const firstName = screen.getByLabelText(/Primer nombre/i);
+    fireEvent.blur(firstName);
+    expect(screen.getByText('El campo Primer nombre es obligatorio.')).toBeInTheDocument();
+    expect(firstName).toHaveAttribute('aria-invalid', 'true');
+    // Solo se marca el campo que se dejó: el resto del paso no se llena de errores.
+    expect(screen.queryByText('El campo Primer apellido es obligatorio.')).not.toBeInTheDocument();
+
+    fireEvent.change(firstName, { target: { value: 'María' } });
+    fireEvent.blur(firstName);
+    expect(screen.queryByText('El campo Primer nombre es obligatorio.')).not.toBeInTheDocument();
+  });
+
+  it('offers help contact and a personal data note', () => {
+    render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} />);
+    expect(screen.getByText(/Ley 18\.331/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'inscripciones@flacso.edu.uy' })).toHaveAttribute('href', 'mailto:inscripciones@flacso.edu.uy');
+    startWizard();
+    expect(screen.getByRole('link', { name: 'inscripciones@flacso.edu.uy' })).toBeInTheDocument();
+  });
+
   it('renders progress bar with the separate orientation step and starts at step 1', () => {
     render(<PreinscriptionWizard form={diplomaForm} onSubmit={vi.fn()} />);
     startWizard();

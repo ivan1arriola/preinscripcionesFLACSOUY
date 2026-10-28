@@ -3,6 +3,8 @@ import type { DocumentDefinition, SubmissionFileToken } from '@flacso/contracts'
 import { TitleDocumentFields } from './TitleDocumentFields.js';
 import { DocumentUploadCard } from './DocumentUploadCard.js';
 import { apiClient } from '../api/client.js';
+import { rememberPreview } from '../domain/file-previews.js';
+import { UploadedFileChip } from './UploadedFileChip.js';
 import { getDocumentProgress } from './preinscription-form-view-model.js';
 
 export interface DocumentUploadFieldsProps {
@@ -134,6 +136,7 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                       setUploading((current) => ({ ...current, [document.key]: true }));
                       try {
                         const token = await onUpload(document.key, file);
+                        rememberPreview(token.token, file);
                         onFileToken(token);
                         setUploadErrors((current) => ({ ...current, [document.key]: undefined }));
                       } catch (uploadError) {
@@ -156,21 +159,13 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                       ? `${uploaded.length} archivo cargado`
                       : 'Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB)'}
                   </p>
-                  {uploaded.map((file) => (
-                    <div
-                      key={file.token}
-                      className="file-chip"
-                    >
-                      <span>{file.originalName}</span>
-                      <button
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => handleRemoveFile(file)}
-                      >
-                        Quitar
-                      </button>
-                    </div>
-                  ))}
+                  {uploaded.length > 0 && (
+                    <ul className="file-list">
+                      {uploaded.map((file) => (
+                        <UploadedFileChip key={file.token} file={file} disabled={disabled} onRemove={handleRemoveFile} />
+                      ))}
+                    </ul>
+                  )}
                   {uploadErrors[document.key] && (
                     <p className="field-error">{uploadErrors[document.key]}</p>
                   )}

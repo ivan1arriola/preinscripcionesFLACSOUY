@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { DocumentDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { apiClient } from '../api/client.js';
+import { rememberPreview } from '../domain/file-previews.js';
+import { UploadedFileChip } from './UploadedFileChip.js';
 
 export interface TitleDocumentFieldsProps {
   document: DocumentDefinition;
@@ -59,6 +61,7 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
     setUploading(true);
     try {
       const token = await onUpload(document.key, file);
+      rememberPreview(token.token, file);
       onFileToken(token);
       setUploadError(undefined);
     } catch (err: any) {
@@ -153,21 +156,13 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
                 ? `${uploadedFiles.length} archivo cargado`
                 : 'Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB)'}
             </p>
-            {uploadedFiles.map((file) => (
-              <div
-                key={file.token}
-                className="file-chip"
-              >
-                <span>{file.originalName}</span>
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => handleRemoveFile(file)}
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
+            {uploadedFiles.length > 0 && (
+              <ul className="file-list">
+                {uploadedFiles.map((file) => (
+                  <UploadedFileChip key={file.token} file={file} disabled={disabled} onRemove={handleRemoveFile} />
+                ))}
+              </ul>
+            )}
             {uploadError && <p className="field-error">{uploadError}</p>}
             {fileError && <p className="field-error">{fileError}</p>}
           </div>

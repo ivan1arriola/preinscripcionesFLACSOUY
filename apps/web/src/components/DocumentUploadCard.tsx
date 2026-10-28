@@ -1,5 +1,7 @@
 import React from 'react';
 import type { DocumentDefinition, SubmissionFileToken } from '@flacso/contracts';
+import { rememberPreview } from '../domain/file-previews.js';
+import { UploadedFileChip } from './UploadedFileChip.js';
 
 export interface DocumentUploadCardProps {
   document: DocumentDefinition;
@@ -53,7 +55,9 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
             const file = event.target.files?.[0];
             if (!file) return;
             try {
-              onFileToken(await onUpload(document.key, file));
+              const token = await onUpload(document.key, file);
+              rememberPreview(token.token, file);
+              onFileToken(token);
     } catch (uploadError) {
               onError?.(uploadError instanceof Error ? uploadError.message : 'No se pudo cargar el archivo.');
             } finally {
@@ -67,12 +71,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
       {files.length > 0 ? (
         <ul className="file-list">
           {files.map((file) => (
-            <li key={file.token} className="file-chip">
-              <span>{file.originalName}</span>
-              <button type="button" aria-label={`Quitar ${file.originalName}`} disabled={disabled} onClick={() => onRemove(file)}>
-                Quitar
-              </button>
-            </li>
+            <UploadedFileChip key={file.token} file={file} disabled={disabled} onRemove={onRemove} removeLabel={`Quitar ${file.originalName}`} />
           ))}
         </ul>
       ) : (

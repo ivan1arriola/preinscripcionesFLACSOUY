@@ -14,6 +14,7 @@ export interface FormStepProps {
   errors: Record<string, string | undefined>;
   disabled: boolean;
   onChange: (key: string, value: string) => void;
+  onBlurField?: (key: string) => void;
   files: SubmissionFileToken[];
   onUpload: (fieldKey: string, file: File) => Promise<SubmissionFileToken>;
   onFileToken: (file: SubmissionFileToken) => void;
@@ -33,6 +34,7 @@ export const FormStep: React.FC<FormStepProps> = ({
   errors,
   disabled,
   onChange,
+  onBlurField,
   files,
   onUpload,
   onFileToken,
@@ -133,6 +135,7 @@ export const FormStep: React.FC<FormStepProps> = ({
           errors={errors}
           disabled={disabled}
           onChange={onChange}
+          onBlurField={onBlurField}
           agreements={agreements}
         />
       )}

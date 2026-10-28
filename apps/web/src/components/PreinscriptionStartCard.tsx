@@ -1,4 +1,5 @@
 import React from 'react';
+import { PRIVACY_NOTE } from '../content/form-copy.js';
 
 export interface PreinscriptionDocumentSummaryItem {
   label: string;
@@ -62,6 +63,8 @@ export const PreinscriptionStartCard: React.FC<PreinscriptionStartCardProps> = (
         <p className="start-card__empty">Esta propuesta no requiere documentos adjuntos.</p>
       )}
     </div>
+
+    <p className="start-card__privacy">{PRIVACY_NOTE}</p>
 
     <button
       type="button"
