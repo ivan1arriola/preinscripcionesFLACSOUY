@@ -78,27 +78,21 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-4">
+    <div className="document-upload-card">
       <div>
-        <h4 className="text-base font-semibold text-gray-900">
-          {document.label} <span className="text-red-600">*</span>
+        <h4 className="document-upload-card__title">
+          {document.label} <span className="field-required">*</span>
         </h4>
-        <p className="text-xs text-gray-500 mt-0.5">
+        <p className="document-upload-card__formats">
           Ingrese la denominación de su título y adjunte el archivo correspondiente, o declare no poseer título actualmente.
         </p>
       </div>
 
       {/* Decision card for title possession */}
-      <div
-        className={`p-3.5 rounded-lg border transition-colors ${
-          isAbsent
-            ? 'bg-amber-50/70 border-amber-300'
-            : 'bg-white border-gray-200 hover:border-gray-300'
-        }`}
-      >
+      <div className={`panel-soft${isAbsent ? ' is-active' : ''}`} style={{ marginTop: '1rem' }}>
         <label
           htmlFor="toggle-sin-titulo"
-          className="flex items-start gap-3 cursor-pointer select-none"
+          className="checkbox-row"
         >
           <input
             id="toggle-sin-titulo"
@@ -106,26 +100,25 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
             checked={isAbsent}
             disabled={disabled}
             onChange={handleToggleAbsence}
-            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
           />
-          <div className="space-y-0.5">
-            <span className="block text-sm font-semibold text-gray-900">
+          <div>
+            <strong>
               No poseo actualmente título
-            </span>
-            <p className="text-xs text-gray-600">
+            </strong>
+            <span>
               {isAbsent
                 ? 'Ha declarado no poseer título. Se omitirá la denominación y la carga del comprobante.'
                 : 'Marque esta opción únicamente si no cuenta con un título de grado o terciario finalizado.'}
-            </p>
+            </span>
           </div>
         </label>
       </div>
 
       {!isAbsent && (
-        <div className="space-y-4 pt-2 border-t border-gray-200">
-          <div>
-            <label htmlFor="titulo-denominacion" className="block text-sm font-medium text-gray-700">
-              Denominación del título <span className="text-red-600">*</span>
+        <div className="fields-grid" style={{ marginTop: '1rem' }}>
+          <div className={`field-group field-group--wide${denominationError ? ' has-error' : ''}`}>
+            <label htmlFor="titulo-denominacion" className="field-label">
+              Denominación del título <span className="field-required">*</span>
             </label>
             <input
               id="titulo-denominacion"
@@ -134,16 +127,16 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
               disabled={disabled}
               placeholder="Ej. Licenciatura en Sociología"
               onChange={(e) => onChange('tituloDenominacion', e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+              aria-invalid={denominationError ? true : undefined}
             />
             {denominationError && (
-              <p className="text-sm text-red-600 mt-1">{denominationError}</p>
+              <p className="field-error">{denominationError}</p>
             )}
           </div>
 
-          <div>
-            <label htmlFor={`file-${document.key}`} className="block text-sm font-medium text-gray-700">
-              Archivo del título <span className="text-red-600">*</span>
+          <div className={`field-group field-group--wide${fileError ? ' has-error' : ''}`}>
+            <label htmlFor={`file-${document.key}`} className="field-label">
+              Archivo del título <span className="field-required">*</span>
             </label>
             <input
               id={`file-${document.key}`}
@@ -151,24 +144,23 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
               accept={document.acceptedMimeTypes?.join(',')}
               disabled={disabled || uploading}
               onChange={handleFileChange}
-              className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              className="file-input"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="field-hint">
               {uploading
                 ? 'Guardando archivo temporalmente…'
                 : uploadedFiles.length > 0
                 ? `${uploadedFiles.length} archivo cargado`
-                : 'Formatos admitidos: PDF, JPEG, PNG, WebP (máx. 10 MiB)'}
+                : 'Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB)'}
             </p>
             {uploadedFiles.map((file) => (
               <div
                 key={file.token}
-                className="flex items-center justify-between gap-2 text-sm text-gray-700 mt-2 p-2 bg-white rounded border border-gray-200"
+                className="file-chip"
               >
                 <span>{file.originalName}</span>
                 <button
                   type="button"
-                  className="text-red-600 hover:underline text-xs"
                   disabled={disabled}
                   onClick={() => handleRemoveFile(file)}
                 >
@@ -176,8 +168,8 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
                 </button>
               </div>
             ))}
-            {uploadError && <p className="text-sm text-red-600 mt-1">{uploadError}</p>}
-            {fileError && <p className="text-sm text-red-600 mt-1">{fileError}</p>}
+            {uploadError && <p className="field-error">{uploadError}</p>}
+            {fileError && <p className="field-error">{fileError}</p>}
           </div>
         </div>
       )}

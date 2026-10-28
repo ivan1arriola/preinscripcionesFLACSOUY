@@ -144,13 +144,9 @@ export function App() {
               if (event.key === 'Enter' || event.key === ' ') handleGoHome();
             }}
           >
-            <div className="app-brand-mark w-8 h-8 rounded bg-blue-600 text-white flex items-center justify-center font-bold text-sm">
-              F
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900 leading-tight">FLACSO Uruguay</h1>
-              <p className="text-xs text-gray-500">Sistema de Preinscripciones</p>
-            </div>
+            <img className="app-brand-logo" src="/logo-flacso-claro.png" alt="FLACSO Uruguay" width="104" height="42" />
+            <span className="app-brand-divider" aria-hidden="true" />
+            <p className="app-brand-title">Preinscripciones</p>
           </div>
 
           <div>
@@ -206,11 +202,13 @@ export function App() {
             onBack={handleGoHome}
           />
         ) : routeError ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-900" role="alert">
-            <p className="font-medium">{routeError}</p>
-            <button type="button" onClick={handleGoHome} className="mt-3 text-sm font-medium text-blue-700 hover:underline">
-              Ver todas las preinscripciones
-            </button>
+          <div className="page-notice" role="alert">
+            <div>
+              <p>{routeError}</p>
+              <button type="button" onClick={handleGoHome} className="btn btn-secondary">
+                Ver todas las preinscripciones
+              </button>
+            </div>
           </div>
         ) : (
           <HomePage onSelectTarget={handleSelectTarget} />

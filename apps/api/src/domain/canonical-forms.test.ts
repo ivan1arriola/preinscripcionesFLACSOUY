@@ -98,6 +98,19 @@ describe('Canonical Forms Specification', () => {
     expect(inputKeys).not.toContain('cartaRecomendacion2Pendiente');
   });
 
+  it('every document of every form accepts PDF and images (JPG, PNG, WebP)', () => {
+    const expected = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    for (const offerType of ['diploma', 'maestria', 'especializacion']) {
+      const result = getCanonicalFormDefinition({ ...baseTarget, id: `t-${offerType}`, offerType });
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.value.documents.length).toBeGreaterThan(0);
+      for (const document of result.value.documents) {
+        expect(document.acceptedMimeTypes, `${offerType}/${document.key}`).toEqual(expected);
+      }
+    }
+  });
+
   it('canonicalDocumentsForSeminarExcludeLetters: seminar form excludes motivation and recommendations', () => {
     const seminarTarget: AcademicTarget = {
       id: 'seminar-test',

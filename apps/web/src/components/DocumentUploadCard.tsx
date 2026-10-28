@@ -25,23 +25,23 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
   onError,
 }) => {
   const inputId = `file-${document.key}`;
-  const formatLabel = document.acceptedMimeTypes?.map((mime) => mime.split('/')[1]?.toUpperCase()).join(', ') || 'PDF';
+  const formatLabel = document.acceptedMimeTypes?.map((mime) => (mime === 'image/jpeg' ? 'JPG' : mime.split('/')[1]?.toUpperCase())).join(', ') || 'PDF';
 
   return (
-    <article className="document-upload-card rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <article className={`document-upload-card${files.length > 0 ? ' is-done' : ''}`}>
+      <div className="document-upload-card__head">
         <div>
-          <h4 className="text-base font-semibold text-gray-900">
-            {document.label} {document.required && <span className="text-red-600" aria-label="obligatorio">*</span>}
+          <h4 className="document-upload-card__title">
+            {document.label} {document.required && <span className="field-required" aria-label="obligatorio">*</span>}
           </h4>
-          <p className="mt-1 text-xs text-gray-600">Formatos: {formatLabel}. Máx. 10 MiB.</p>
+          <p className="document-upload-card__formats">Formatos: {formatLabel}. Máx. 10 MiB.</p>
         </div>
-        <span className={`rounded-full px-2 py-1 text-xs font-medium ${files.length > 0 ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
+        <span className={`pill ${files.length > 0 ? 'pill--done' : 'pill--pending'}`}>
           {files.length > 0 ? 'Listo' : 'Pendiente'}
         </span>
       </div>
 
-      <label htmlFor={inputId} className="mt-4 flex min-h-11 cursor-pointer items-center justify-center rounded-lg border border-dashed border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-800 hover:bg-blue-100">
+      <label htmlFor={inputId} className="dropzone">
         {uploading ? 'Guardando archivo…' : 'Agregar archivo'}
         <span className="sr-only"> para {document.label}</span>
         <input
@@ -65,21 +65,21 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
       </label>
 
       {files.length > 0 ? (
-        <ul className="mt-3 space-y-2">
+        <ul className="file-list">
           {files.map((file) => (
-            <li key={file.token} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-800">
-              <span className="min-w-0 break-words">{file.originalName}</span>
-              <button type="button" aria-label={`Quitar ${file.originalName}`} className="min-h-11 shrink-0 px-2 text-sm font-semibold text-red-700 hover:underline" disabled={disabled} onClick={() => onRemove(file)}>
+            <li key={file.token} className="file-chip">
+              <span>{file.originalName}</span>
+              <button type="button" aria-label={`Quitar ${file.originalName}`} disabled={disabled} onClick={() => onRemove(file)}>
                 Quitar
               </button>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-gray-600">Pendiente de carga</p>
+        <p className="document-upload-card__empty">Pendiente de carga</p>
       )}
-      {uploading && <p className="mt-2 text-sm text-blue-800" role="status">Guardando archivo temporalmente…</p>}
-      {error && <p className="mt-2 text-sm text-red-700" role="alert">{error}</p>}
+      {uploading && <p className="document-upload-card__status" role="status">Guardando archivo temporalmente…</p>}
+      {error && <p className="document-upload-card__error" role="alert">{error}</p>}
     </article>
   );
 };

@@ -45,6 +45,8 @@ const phonePlaceholders: Partial<Record<CountryCode, string>> = {
 };
 const phonePlaceholderFor = (country: CountryCode) => phonePlaceholders[country] ?? 'Número local';
 const yesNoKeys = new Set(['tieneConvenio', 'aceptaDifusion', 'aceptaComunicaciones', 'posgradoFlacso']);
+// Campos que ocupan todo el ancho de la grilla; el resto se acomoda de a dos (nombres con apellidos, por ejemplo).
+const wideKeys = new Set(['celular', 'domicilio', 'estudios', 'generoOtra', 'posgradoCual', 'convenioWordpressId', 'fuente', 'tituloDenominacion', ...yesNoKeys]);
 
 export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values, errors, disabled, onChange, agreements = [] }) => {
   const [phoneCountry, setPhoneCountry] = useState<CountryCode>('UY');
@@ -71,14 +73,18 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
     onChange('celular', phone.number);
   };
 
-  return <div className="space-y-4">{inputs.filter(visible).map((input) => {
+  return <div className="fields-grid">{inputs.filter(visible).map((input) => {
     const value = values[input.key] || ''; const error = errors[input.key]; const options = choices[input.key];
     const label = input.key === 'documento' && isUruguayanCedula ? 'Cédula de identidad uruguaya' : input.label;
     const phoneInputValue = input.key === 'celular' && value.startsWith('+')
       ? parsePhoneNumberFromString(value)?.formatNational() ?? value
       : value;
-    return <div key={input.key} className="field-group">
-      <label htmlFor={`input-${input.key}`} className="block text-sm font-medium text-gray-700">{label} {input.required && <span className="text-red-600">*</span>}</label>
+    const errorId = `error-${input.key}`;
+    const describedBy = (...ids: Array<string | false | undefined>) => ids.filter(Boolean).join(' ') || undefined;
+    const invalid = error ? true : undefined;
+    const isWide = wideKeys.has(input.key) || input.type === 'textarea';
+    return <div key={input.key} className={`field-group${isWide ? ' field-group--wide' : ''}${error ? ' has-error' : ''}`}>
+      <label htmlFor={`input-${input.key}`} className="field-label">{label} {input.required && <span className="field-required">*</span>}</label>
       {input.key === 'celular' ? <>
         <label htmlFor="phone-country" className="sr-only">País del teléfono</label>
         <div className="phone-input">
@@ -110,28 +116,29 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
             onChange={(event) => updatePhone(event.target.value)}
             disabled={disabled}
             placeholder={phonePlaceholderFor(phoneCountry)}
-            aria-describedby="celular-ayuda celular-estado"
+            aria-invalid={invalid}
+            aria-describedby={describedBy('celular-ayuda', phoneStatus && 'celular-estado', error && errorId)}
           />
         </div>
-        <p id="celular-ayuda" className="mt-1 text-xs text-gray-500">Elegí el país e ingresá el número. Se guardará con el código internacional.</p>
-        {phoneStatus && <p id="celular-estado" className="mt-1 text-xs text-gray-600" aria-live="polite">{phoneStatus}</p>}
-      </> : yesNoKeys.has(input.key) ? <fieldset className="choice-group" aria-describedby={error ? `error-${input.key}` : undefined}>
+        <p id="celular-ayuda" className="field-hint">Elegí el país e ingresá el número. Se guardará con el código internacional.</p>
+        {phoneStatus && <p id="celular-estado" className="field-status" aria-live="polite">{phoneStatus}</p>}
+      </> : yesNoKeys.has(input.key) ? <fieldset className="choice-group" aria-describedby={error ? errorId : undefined}>
         <legend className="sr-only">{label}</legend>
         {(choices[input.key] ?? []).map(([optionValue, optionLabel]) => <label className="choice-card" key={optionValue}>
           <input type="radio" name={input.key} value={optionValue} checked={value === optionValue} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} />
           <span>{optionLabel}</span>
         </label>)}
       </fieldset>
-      : input.key === 'convenioWordpressId' ? <select id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled}><option value="">Seleccioná un convenio</option>{agreements.map((agreement) => <option key={agreement.id} value={agreement.id}>{agreement.label}</option>)}</select>
-      : options ? <select id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled}><option value="">-- Seleccione una opción --</option>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select>
+      : input.key === 'convenioWordpressId' ? <select id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)}><option value="">Seleccioná un convenio</option>{agreements.map((agreement) => <option key={agreement.id} value={agreement.id}>{agreement.label}</option>)}</select>
+      : options ? <select id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)}><option value="">Seleccioná una opción</option>{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select>
       : input.key === 'documento' && isUruguayanCedula ? <>
-        <input id={`input-${input.key}`} name={input.key} type="text" value={value} onChange={(event) => { const formatted = formatCedula(event.target.value); onChange(input.key, formatted); setCedulaStatus(formatted.length ? (isValidCedula(formatted) ? 'Cédula válida.' : 'La cédula o su dígito verificador no son válidos.') : 'Ingresá los 8 dígitos de la cédula.'); }} disabled={disabled} aria-describedby="cedula-ayuda cedula-estado" />
-        <p id="cedula-ayuda" className="mt-1 text-xs text-gray-500">Se valida automáticamente, incluido el dígito verificador.</p>
-        {cedulaStatus && <p id="cedula-estado" className="mt-1 text-xs text-gray-600" aria-live="polite">{cedulaStatus}</p>}
-      </> : input.type === 'textarea' ? <textarea id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} rows={3} />
-      : <input id={`input-${input.key}`} name={input.key} type={input.type === 'date' ? 'date' : input.type === 'email' ? 'email' : input.type === 'tel' ? 'tel' : 'text'} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} />}
-      {input.key === 'convenioWordpressId' && agreements.length === 0 && <p className="mt-1 text-xs text-gray-500">No hay convenios disponibles en este momento.</p>}
-      {error && <p id={`error-${input.key}`} className="mt-1 text-sm text-red-600">{error}</p>}
+        <input id={`input-${input.key}`} name={input.key} type="text" inputMode="numeric" value={value} onChange={(event) => { const formatted = formatCedula(event.target.value); onChange(input.key, formatted); setCedulaStatus(formatted.length ? (isValidCedula(formatted) ? 'Cédula válida.' : 'La cédula o su dígito verificador no son válidos.') : 'Ingresá los 8 dígitos de la cédula.'); }} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy('cedula-ayuda', cedulaStatus && 'cedula-estado', error && errorId)} />
+        <p id="cedula-ayuda" className="field-hint">Se valida automáticamente, incluido el dígito verificador.</p>
+        {cedulaStatus && <p id="cedula-estado" className="field-status" aria-live="polite">{cedulaStatus}</p>}
+      </> : input.type === 'textarea' ? <textarea id={`input-${input.key}`} name={input.key} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} rows={3} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)} />
+      : <input id={`input-${input.key}`} name={input.key} type={input.type === 'date' ? 'date' : input.type === 'email' ? 'email' : input.type === 'tel' ? 'tel' : 'text'} value={value} onChange={(event) => onChange(input.key, event.target.value)} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy(error && errorId)} />}
+      {input.key === 'convenioWordpressId' && agreements.length === 0 && <p className="field-hint">No hay convenios disponibles en este momento.</p>}
+      {error && <p id={errorId} className="field-error">{error}</p>}
     </div>;
   })}</div>;
 };

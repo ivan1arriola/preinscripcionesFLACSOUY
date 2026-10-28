@@ -229,7 +229,7 @@ describe('Upload HTTP Routes', () => {
     }
   });
 
-  it('rejects unaccepted MIME type for field (e.g. image for CV which only accepts PDF)', async () => {
+  it('accepts an image (photo or scan) in a field that used to accept only PDF, such as the CV', async () => {
     const { baseUrl, close } = await setupApp();
     try {
       const form = new FormData();
@@ -243,9 +243,29 @@ describe('Upload HTTP Routes', () => {
         body: form,
       });
 
+      expect(response.status).toBe(201);
+    } finally {
+      await close();
+    }
+  });
+
+  it('rejects an unaccepted MIME type for any field (e.g. GIF)', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      const form = new FormData();
+      form.append('targetId', 'diploma-davia');
+      form.append('fieldKey', 'cv');
+      form.append('file', new Blob([Buffer.from('GIF89a')], { type: 'image/gif' }), 'cv.gif');
+
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: { 'x-preinscription-session': 'session-alpha' },
+        body: form,
+      });
+
       expect(response.status).toBe(400);
       const data = await response.json();
-      expect(data.error.message).toMatch(/no permitido/i);
+      expect(data.error.message).toMatch(/no permitido|no coincide/i);
     } finally {
       await close();
     }

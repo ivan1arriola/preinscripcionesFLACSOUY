@@ -45,51 +45,51 @@ export const FormStep: React.FC<FormStepProps> = ({
   if (step.id === 'confirmacion') {
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">{step.title}</h2>
-          {step.description && <p className="text-sm text-gray-600 mt-1">{step.description}</p>}
+        <div className="step-heading">
+          <h2>{step.title}</h2>
+          {step.description && <p>{step.description}</p>}
         </div>
 
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <h3 className="text-md font-semibold text-gray-800 mb-3">Resumen de tus datos</h3>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        <div className="summary-section-card">
+          <h3 className="summary-section-card__head">Resumen de tus datos</h3>
+          <dl className="summary-fields">
             {allInputs
               .filter((input) => input.key !== 'orientacion' && input.key !== 'mencion')
               .map((input) => {
                 const val = values[input.key];
                 if (!val) return null;
                 return (
-                  <div key={input.key} className="py-1">
-                    <dt className="text-xs text-gray-500 font-medium">{input.label}</dt>
-                    <dd className="text-gray-900 font-medium">{val}</dd>
+                  <div key={input.key} className="summary-field">
+                    <dt>{input.label}</dt>
+                    <dd>{val}</dd>
                   </div>
                 );
               })}
             {values.orientacion && (
-              <div className="py-1">
-                <dt className="text-xs text-gray-500 font-medium">Orientación</dt>
-                <dd className="text-gray-900 font-medium">{values.orientacion}</dd>
+              <div className="summary-field">
+                <dt>Orientación</dt>
+                <dd>{values.orientacion}</dd>
               </div>
             )}
             {values.mencion && (
-              <div className="py-1">
-                <dt className="text-xs text-gray-500 font-medium">Mención</dt>
-                <dd className="text-gray-900 font-medium">{values.mencion}</dd>
+              <div className="summary-field">
+                <dt>Mención</dt>
+                <dd>{values.mencion}</dd>
               </div>
             )}
           </dl>
         </div>
 
         {allDocuments.length > 0 && (
-          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-            <h3 className="text-md font-semibold text-gray-800 mb-3">Documentos adjuntos</h3>
-            <ul className="text-sm space-y-1">
+          <div className="summary-section-card">
+            <h3 className="summary-section-card__head">Documentos adjuntos</h3>
+            <ul className="summary-documents">
               {allDocuments.map((doc) => {
                 const uploaded = files.filter((f) => f.fieldKey === doc.key);
                 return (
-                  <li key={doc.key} className="flex justify-between py-1 border-b border-gray-200 last:border-b-0">
-                    <span className="text-gray-600">{doc.label}:</span>
-                    <span className="font-medium text-gray-900">
+                  <li key={doc.key} className="summary-document">
+                    <span>{doc.label}:</span>
+                    <span className="summary-document__name">
                       {uploaded.length > 0
                         ? uploaded.map((u) => u.originalName).join(', ')
                         : doc.required
@@ -121,9 +121,9 @@ export const FormStep: React.FC<FormStepProps> = ({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">{step.title}</h2>
-        {step.description && <p className="text-sm text-gray-600 mt-1">{step.description}</p>}
+      <div className="step-heading">
+        <h2>{step.title}</h2>
+        {step.description && <p>{step.description}</p>}
       </div>
 
       {regularInputs.length > 0 && (

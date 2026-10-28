@@ -87,87 +87,90 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
 
   if (loading) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Cargando formulario de preinscripción...</p>
+      <div className="loading-screen" role="status">
+        <div className="loading-card">
+          <div className="loading-spinner" aria-hidden="true" />
+          <p>Cargando formulario de preinscripción...</p>
+        </div>
       </div>
     );
   }
 
   if (submissionId) {
     return (
-      <div className="bg-white p-6 sm:p-8 rounded-xl shadow max-w-xl mx-auto text-center space-y-4">
-        <div className="w-12 h-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto text-2xl font-bold">
+      <div className="success-card">
+        <div className="success-card__icon" aria-hidden="true">
           ✓
         </div>
-        <h2 className="text-2xl font-bold text-gray-900">¡Preinscripción enviada con éxito!</h2>
-        <p className="text-gray-600">
+        <h2>¡Preinscripción enviada con éxito!</h2>
+        <p className="success-card__lead">
           Tu solicitud fue registrada correctamente. Guardá el código para consultar el estado de tu preinscripción.
         </p>
-        <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-left">
-          <span className="block text-xs font-semibold uppercase tracking-wide text-blue-800">Código de seguimiento</span>
-          <div className="mt-2 flex items-center gap-2">
-            <code className="min-w-0 flex-1 break-all text-sm font-semibold text-blue-950">{submissionId}</code>
+        <div className="tracking-box">
+          <span className="tracking-box__label">Código de seguimiento</span>
+          <div className="tracking-box__row">
+            <code>{submissionId}</code>
             <button
               type="button"
               onClick={copyTrackingCode}
-              className="min-h-11 shrink-0 rounded-md border border-blue-300 bg-white px-3 text-sm font-semibold text-blue-800 hover:bg-blue-50"
+              className="btn btn-secondary"
             >
               {copied ? 'Copiado' : 'Copiar'}
             </button>
           </div>
         </div>
         {pendingProcessing && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-left text-sm text-amber-900" role="status">
+          <p className="success-card__note" role="status">
             Recibimos tu preinscripción, pero su procesamiento técnico quedó pendiente. El equipo de FLACSO la
             completará: no hace falta que la vuelvas a enviar. Guardá el código de seguimiento.
           </p>
         )}
-        <p className="text-sm text-gray-600">El equipo de FLACSO revisará la información y se comunicará contigo si necesita algo más.</p>
-        <div className="pt-4">
-          <button
-            type="button"
-            onClick={onBack}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
-          >
-            Volver a la lista de destinos
-          </button>
-        </div>
+        <ul className="success-next">
+          <li>El equipo de FLACSO revisará la información y se comunicará contigo si necesita algo más.</li>
+        </ul>
+        <button
+          type="button"
+          onClick={onBack}
+          className="btn btn-primary"
+        >
+          Volver a la lista de destinos
+        </button>
       </div>
     );
   }
 
   if (error || !form) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow space-y-4">
-        <div className="p-4 bg-red-50 text-red-700 rounded border border-red-200">
-          <p className="font-bold">No se puede acceder a este formulario</p>
-          <p className="mt-1">{error}</p>
+      <div className="page-notice page-notice--error" role="alert">
+        <div>
+          <h2>No se puede acceder a este formulario</h2>
+          <p>{error}</p>
           {issues.length > 0 && (
-            <ul className="list-disc list-inside mt-2 text-sm">
+            <ul>
               {issues.map((issue, idx) => (
                 <li key={idx}>{issue}</li>
               ))}
             </ul>
           )}
+          <button
+            type="button"
+            onClick={onBack}
+            className="btn btn-secondary"
+          >
+            &larr; Volver al listado de destinos
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-sm text-blue-600 hover:underline"
-        >
-          &larr; Volver al listado de destinos
-        </button>
       </div>
     );
   }
 
   return (
-    <div className="target-page space-y-6 max-w-2xl mx-auto">
-      <div className="flex items-center">
+    <div className="target-page">
+      <div>
         <button
           type="button"
           onClick={onBack}
-          className="target-back-link text-sm text-blue-600 hover:underline flex items-center gap-1"
+          className="target-back-link btn btn-text"
         >
           &larr; Volver al listado
         </button>
@@ -175,9 +178,9 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
 
       <div className="target-page-heading">
         <span className="target-page-eyebrow">Preinscripción</span>
-        <h2 className="text-2xl font-bold text-gray-900">{form.title}</h2>
-        <p className="text-gray-600 text-sm mt-1">
-          Complete los campos solicitados a continuación para registrar su preinscripción.
+        <h2>{form.title}</h2>
+        <p>
+          Completá los campos solicitados a continuación para registrar tu preinscripción.
         </p>
       </div>
 

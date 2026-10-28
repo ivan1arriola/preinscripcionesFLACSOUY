@@ -315,7 +315,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
 
   if (!hasStarted) {
     return (
-      <div className="preinscription-wizard mx-auto py-4 relative">
+      <div className="preinscription-wizard">
         <PreinscriptionStartCard
           title={form.title}
           documentSummary={(form.documents ?? []).map((document) => ({
@@ -331,7 +331,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   }
 
   return (
-    <div className="preinscription-wizard mx-auto py-4 relative">
+    <div className="preinscription-wizard">
       <WizardProgress
         steps={steps}
         currentStepIndex={currentStepIndex}
@@ -340,7 +340,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
       />
 
       {isReviewing ? (
-        <div className="form-step-card bg-white shadow rounded-lg p-6 mb-6">
+        <div className="form-step-card">
           <PreinscriptionSummary
             form={form}
             values={values}
@@ -350,7 +350,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
             disabled={isSubmitting || !form.registrationOpen}
           />
           {serverErrors._form && (
-            <div className="mt-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
+            <div className="form-alert" style={{ marginTop: '1rem', marginBottom: 0 }} role="alert">
               {serverErrors._form.join(', ')}
             </div>
           )}
@@ -370,7 +370,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
               element?.focus();
             }}
           />
-          <div className="form-step-card bg-white shadow rounded-lg p-6 mb-6">
+          <div className="form-step-card">
             <FormStep
               step={currentStep}
               inputs={currentStepInputs}
@@ -392,7 +392,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
           </div>
 
           {serverErrors._form && (
-            <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
+            <div className="form-alert" style={{ marginTop: '1rem' }} role="alert">
               {serverErrors._form.join(', ')}
             </div>
           )}

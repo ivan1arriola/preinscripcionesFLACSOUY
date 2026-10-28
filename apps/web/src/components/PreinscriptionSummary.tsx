@@ -41,6 +41,15 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const DISPLAY_LABELS: Record<string, Record<string, string>> = {
+  tipoDocumento: {
+    cedula_uruguaya: 'Cédula de identidad uruguaya',
+    pasaporte: 'Pasaporte',
+    documento_extranjero: 'Documento extranjero',
+  },
+  genero: { Varon: 'Varón', 'Varon trans': 'Varón trans' },
+};
+
 export function formatFieldValue(
   key: string,
   rawVal: string | undefined,
@@ -56,7 +65,7 @@ export function formatFieldValue(
   }
   if (val === 'Si') return 'Sí';
   if (val === 'No') return 'No';
-  return val;
+  return DISPLAY_LABELS[key]?.[val] ?? val;
 }
 
 export function isInputVisible(input: InputDefinition, values: Record<string, string>): boolean {
@@ -209,67 +218,67 @@ export const PreinscriptionSummary: React.FC<PreinscriptionSummaryProps> = ({
   const sections = buildSummarySections(form, values, files);
 
   return (
-    <div className="preinscription-summary space-y-6">
+    <div className="preinscription-summary">
       <div className="summary-header">
-        <h2 className="text-xl font-bold text-gray-900">Revisión de datos antes de enviar</h2>
-        <p className="text-sm text-gray-600 mt-1">
+        <h2>Revisión de datos antes de enviar</h2>
+        <p>
           Por favor verificá que todos los datos y documentos ingresados sean correctos. Podés volver a modificar cualquier sección antes de confirmar.
         </p>
       </div>
 
-      <div className="summary-sections space-y-4">
+      <div className="summary-sections">
         {sections.map((section) => (
           <section
             key={section.stepId}
-            className="summary-section-card bg-white border border-gray-200 rounded-lg p-5 shadow-sm"
+            className="summary-section-card"
           >
-            <div className="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
-              <h3 className="text-base font-semibold text-gray-900">{section.title}</h3>
+            <div className="summary-section-card__head">
+              <h3>{section.title}</h3>
               <button
                 type="button"
                 onClick={() => onEditStep(section.stepIndex)}
                 disabled={disabled}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                className="btn btn-text"
               >
                 Modificar
               </button>
             </div>
 
             {section.fields.length > 0 && (
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3 text-sm">
+              <dl className="summary-fields">
                 {section.fields.map((f) => (
                   <div key={f.key} className="summary-field">
-                    <dt className="text-gray-500 font-medium">{f.label}</dt>
-                    <dd className="text-gray-900 font-medium mt-0.5">{f.value}</dd>
+                    <dt>{f.label}</dt>
+                    <dd>{f.value}</dd>
                   </div>
                 ))}
               </dl>
             )}
 
             {section.documents.length > 0 && (
-              <div className="summary-documents mt-4 pt-3 border-t border-gray-50 space-y-2">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Documentación</h4>
-                <ul className="space-y-2 text-sm">
+              <div className="summary-documents">
+                <h4>Documentación</h4>
+                <ul>
                   {section.documents.map((d) => (
-                    <li key={d.key} className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-1">
-                      <span className="text-gray-700 font-medium">{d.label}:</span>
+                    <li key={d.key} className="summary-document">
+                      <span className="summary-document__name">{d.label}:</span>
                       {d.isDeferred ? (
-                        <span className="text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded text-xs">
+                        <span className="chip chip--warn">
                           Se entregará posteriormente
                         </span>
                       ) : d.files.length > 0 ? (
-                        <span className="text-gray-900">
+                        <span>
                           {d.files.map((file, idx) => (
                             <span
                               key={idx}
-                              className="inline-block bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded ml-1"
+                              className="chip"
                             >
                               {file.name} ({file.sizeFormatted})
                             </span>
                           ))}
                         </span>
                       ) : (
-                        <span className="text-gray-400 italic">No informado</span>
+                        <span className="summary-missing">No informado</span>
                       )}
                     </li>
                   ))}
@@ -280,12 +289,12 @@ export const PreinscriptionSummary: React.FC<PreinscriptionSummaryProps> = ({
         ))}
       </div>
 
-      <div className="summary-actions flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-200">
+      <div className="summary-actions">
         <button
           type="button"
           onClick={() => onEditStep(0)}
           disabled={disabled}
-          className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="btn btn-secondary"
         >
           Volver a modificar datos
         </button>
@@ -293,7 +302,7 @@ export const PreinscriptionSummary: React.FC<PreinscriptionSummaryProps> = ({
           type="button"
           onClick={onConfirm}
           disabled={disabled}
-          className="wizard-submit-action w-full sm:w-auto px-6 py-2.5 text-sm font-semibold rounded-md shadow-sm transition-colors"
+          className="wizard-submit-action btn btn-accent btn-large"
         >
           Confirmar y enviar preinscripción
         </button>

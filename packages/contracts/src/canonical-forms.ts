@@ -57,6 +57,9 @@ export const CANONICAL_BASE_INPUTS: Array<Omit<InputDefinition, 'position'>> = [
   { key: 'aceptaComunicaciones', label: '¿Querés recibir novedades y propuestas académicas de FLACSO Uruguay por correo?', type: 'select', required: true, stepId: 'declaracion', spreadsheetColumn: 'Acepta comunicaciones' },
 ];
 
+/** Todo documento admite PDF o una imagen (foto o escaneo): JPG, PNG o WebP. */
+export const DOCUMENT_MIME_TYPES: string[] = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
 export const CANONICAL_CORE_DOCUMENTS: DocumentDefinition[] = [
   {
     key: 'identidad',
@@ -65,7 +68,7 @@ export const CANONICAL_CORE_DOCUMENTS: DocumentDefinition[] = [
     canDefer: false,
     maxFiles: 2,
     maxBytes: 10 * 1024 * 1024,
-    acceptedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+    acceptedMimeTypes: DOCUMENT_MIME_TYPES,
     stepId: 'documentos',
     position: 1,
   },
@@ -76,7 +79,7 @@ export const CANONICAL_CORE_DOCUMENTS: DocumentDefinition[] = [
     canDefer: false,
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
-    acceptedMimeTypes: ['application/pdf'],
+    acceptedMimeTypes: DOCUMENT_MIME_TYPES,
     stepId: 'documentos',
     position: 2,
   },
@@ -87,7 +90,7 @@ export const CANONICAL_CORE_DOCUMENTS: DocumentDefinition[] = [
     canDefer: false,
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
-    acceptedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
+    acceptedMimeTypes: DOCUMENT_MIME_TYPES,
     stepId: 'academico',
     position: 3,
     companionInputKey: 'tituloDenominacion',
@@ -107,7 +110,7 @@ export const MOTIVATION_DOCUMENT: DocumentDefinition = {
   canDefer: false,
   maxFiles: 1,
   maxBytes: 10 * 1024 * 1024,
-  acceptedMimeTypes: ['application/pdf'],
+  acceptedMimeTypes: DOCUMENT_MIME_TYPES,
   stepId: 'documentos',
   position: 4,
 };
@@ -125,7 +128,7 @@ export const MAESTRIA_EXTRA_DOCUMENTS: DocumentDefinition[] = [
     canDefer: false,
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
-    acceptedMimeTypes: ['application/pdf'],
+    acceptedMimeTypes: DOCUMENT_MIME_TYPES,
     stepId: 'documentos',
     position: 5,
   },
@@ -136,7 +139,7 @@ export const MAESTRIA_EXTRA_DOCUMENTS: DocumentDefinition[] = [
     canDefer: false,
     maxFiles: 1,
     maxBytes: 10 * 1024 * 1024,
-    acceptedMimeTypes: ['application/pdf'],
+    acceptedMimeTypes: DOCUMENT_MIME_TYPES,
     stepId: 'documentos',
     position: 6,
   },

@@ -52,10 +52,10 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
   }
 
   return (
-    <div className="space-y-4">
-      {normalizedOrientations.length > 0 && <div className="field-group">
-        <label htmlFor="input-orientacion" className="block text-sm font-medium text-gray-700">
-          Orientación {orientationRequired && <span className="text-red-600">*</span>}
+    <div className="fields-grid">
+      {normalizedOrientations.length > 0 && <div className={`field-group field-group--wide${orientationError ? ' has-error' : ''}`}>
+        <label htmlFor="input-orientacion" className="field-label">
+          Orientación {orientationRequired && <span className="field-required">*</span>}
         </label>
         <select
           id="input-orientacion"
@@ -63,22 +63,22 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
           value={selectedOrientation}
           onChange={handleOrientationSelect}
           disabled={disabled}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+          aria-invalid={orientationError ? true : undefined}
         >
-          <option value="">-- Seleccione una orientación --</option>
+          <option value="">Seleccioná una orientación</option>
           {normalizedOrientations.map((o) => (
             <option key={o.id} value={o.id}>
               {o.name}
             </option>
           ))}
         </select>
-        {orientationError && <p className="mt-1 text-sm text-red-600">{orientationError}</p>}
+        {orientationError && <p className="field-error">{orientationError}</p>}
       </div>}
 
       {normalizedMentions.length > 0 && (
-        <div className="field-group">
-          <label htmlFor="input-mencion" className="block text-sm font-medium text-gray-700">
-            Mención {mentionRequired && <span className="text-red-600">*</span>}
+        <div className={`field-group field-group--wide${mentionError ? ' has-error' : ''}`}>
+          <label htmlFor="input-mencion" className="field-label">
+            Mención {mentionRequired && <span className="field-required">*</span>}
           </label>
           <select
             id="input-mencion"
@@ -86,16 +86,16 @@ export const OrientationMentionFields: React.FC<OrientationMentionFieldsProps> =
             value={selectedMention}
             onChange={(e) => onMentionChange(e.target.value)}
             disabled={disabled}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            aria-invalid={mentionError ? true : undefined}
           >
-            <option value="">-- Seleccione una mención (opcional) --</option>
+            <option value="">Seleccioná una mención (opcional)</option>
             {normalizedMentions.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
               </option>
             ))}
           </select>
-          {mentionError && <p className="mt-1 text-sm text-red-600">{mentionError}</p>}
+          {mentionError && <p className="field-error">{mentionError}</p>}
         </div>
       )}
     </div>
