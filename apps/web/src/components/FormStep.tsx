@@ -16,7 +16,7 @@ export interface FormStepProps {
   onChange: (key: string, value: string) => void;
   onBlurField?: (key: string) => void;
   files: SubmissionFileToken[];
-  onUpload: (fieldKey: string, file: File) => Promise<SubmissionFileToken>;
+  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number) => void) => Promise<SubmissionFileToken>;
   onFileToken: (file: SubmissionFileToken) => void;
   onRemoveToken: (file: SubmissionFileToken) => void;
   orientations?: string[];

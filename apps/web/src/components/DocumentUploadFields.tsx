@@ -4,6 +4,8 @@ import { TitleDocumentFields } from './TitleDocumentFields.js';
 import { DocumentUploadCard } from './DocumentUploadCard.js';
 import { apiClient } from '../api/client.js';
 import { rememberPreview } from '../domain/file-previews.js';
+import { usePendingUploads } from '../domain/pending-upload.js';
+import { UploadingFileRow } from './UploadingFileRow.js';
 import { UploadedFileChip } from './UploadedFileChip.js';
 import { getDocumentProgress } from './preinscription-form-view-model.js';
 
@@ -14,7 +16,7 @@ export interface DocumentUploadFieldsProps {
   disabled: boolean;
   errors: Record<string, string | undefined>;
   onChange: (key: string, value: string) => void;
-  onUpload: (fieldKey: string, file: File) => Promise<SubmissionFileToken>;
+  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number) => void) => Promise<SubmissionFileToken>;
   onFileToken: (file: SubmissionFileToken) => void;
   onRemoveToken: (file: SubmissionFileToken) => void;
 }
@@ -32,6 +34,7 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
 }) => {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [uploadErrors, setUploadErrors] = useState<Record<string, string | undefined>>({});
+  const pendingUploads = usePendingUploads();
 
   if (documents.length === 0) return null;
 
@@ -134,8 +137,9 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                       const file = input.files?.[0];
                       if (!file) return;
                       setUploading((current) => ({ ...current, [document.key]: true }));
+                      const report = pendingUploads.begin(document.key, file);
                       try {
-                        const token = await onUpload(document.key, file);
+                        const token = await onUpload(document.key, file, report);
                         rememberPreview(token.token, file);
                         onFileToken(token);
                         setUploadErrors((current) => ({ ...current, [document.key]: undefined }));
@@ -145,6 +149,7 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                           [document.key]: uploadError instanceof Error ? uploadError.message : 'No se pudo cargar el archivo.',
                         }));
                       } finally {
+                        pendingUploads.finish(document.key);
                         setUploading((current) => ({ ...current, [document.key]: false }));
                         // Permite volver a elegir el mismo archivo después de quitarlo o de un error.
                         input.value = '';
@@ -153,12 +158,11 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                     className="file-input"
                   />
                   <p className="field-hint">
-                    {uploading[document.key]
-                      ? 'Guardando archivo temporalmente…'
-                      : uploaded.length > 0
+                    {uploaded.length > 0
                       ? `${uploaded.length} archivo cargado`
                       : 'Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB)'}
                   </p>
+                  {pendingUploads.pending[document.key] && <UploadingFileRow upload={pendingUploads.pending[document.key]} />}
                   {uploaded.length > 0 && (
                     <ul className="file-list">
                       {uploaded.map((file) => (
@@ -192,10 +196,10 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
             uploading={Boolean(uploading[document.key])}
             error={uploadErrors[document.key] ?? error}
             disabled={disabled}
-            onUpload={async (fieldKey, file) => {
+            onUpload={async (fieldKey, file, onProgress) => {
               setUploading((current) => ({ ...current, [fieldKey]: true }));
               try {
-                const token = await onUpload(fieldKey, file);
+                const token = await onUpload(fieldKey, file, onProgress);
                 setUploadErrors((current) => ({ ...current, [fieldKey]: undefined }));
                 return token;
               } finally {

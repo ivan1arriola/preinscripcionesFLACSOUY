@@ -1,4 +1,5 @@
 import React from 'react';
+import { UploadedFileChip } from './UploadedFileChip.js';
 import type {
   FormDefinition,
   InputDefinition,
@@ -23,7 +24,7 @@ export interface SummaryFieldItem {
 export interface SummaryDocumentItem {
   key: string;
   label: string;
-  files: Array<{ name: string; sizeFormatted: string }>;
+  files: Array<{ name: string; sizeFormatted: string; file: SubmissionFileToken }>;
   isDeferred?: boolean;
 }
 
@@ -166,6 +167,7 @@ export function buildSummarySections(
           .map((f) => ({
             name: f.originalName,
             sizeFormatted: formatFileSize(f.size),
+            file: f,
           }));
 
         documents.push({
@@ -267,16 +269,11 @@ export const PreinscriptionSummary: React.FC<PreinscriptionSummaryProps> = ({
                           Se entregará posteriormente
                         </span>
                       ) : d.files.length > 0 ? (
-                        <span>
-                          {d.files.map((file, idx) => (
-                            <span
-                              key={idx}
-                              className="chip"
-                            >
-                              {file.name} ({file.sizeFormatted})
-                            </span>
+                        <ul className="file-list file-list--summary">
+                          {d.files.map((item) => (
+                            <UploadedFileChip key={item.file.token} file={item.file} disabled readOnly />
                           ))}
-                        </span>
+                        </ul>
                       ) : (
                         <span className="summary-missing">No informado</span>
                       )}

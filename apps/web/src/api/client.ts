@@ -28,11 +28,45 @@ export const apiClient = {
     return generated;
   },
 
-  async upload(targetId: string, fieldKey: string, file: File): Promise<SubmissionFileToken> {
+  async upload(
+    targetId: string,
+    fieldKey: string,
+    file: File,
+    onProgress?: (percent: number) => void
+  ): Promise<SubmissionFileToken> {
     const body = new FormData();
     body.append('targetId', targetId);
     body.append('fieldKey', fieldKey);
     body.append('file', file);
+    // Con un callback de avance se usa XMLHttpRequest, que informa los bytes enviados; fetch no lo hace.
+    if (onProgress && typeof XMLHttpRequest !== 'undefined') {
+      return new Promise<SubmissionFileToken>((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open('POST', '/api/uploads');
+        request.setRequestHeader('x-preinscription-session', apiClient.sessionId());
+        request.upload.onprogress = (event) => {
+          if (event.lengthComputable && event.total > 0) onProgress((event.loaded / event.total) * 100);
+        };
+        request.onload = () => {
+          let data: any = {};
+          try {
+            data = JSON.parse(request.responseText || '{}');
+          } catch {
+            // respuesta sin cuerpo JSON
+          }
+          if (request.status >= 200 && request.status < 300) {
+            onProgress(100);
+            resolve(data as SubmissionFileToken);
+          } else {
+            reject(new ApiError(request.status, data.error?.code || 'UPLOAD_ERROR', data.error?.message || 'No se pudo cargar el archivo.'));
+          }
+        };
+        request.onerror = () =>
+          reject(new ApiError(0, 'UPLOAD_ERROR', 'No se pudo cargar el archivo. Revisá tu conexión e intentá de nuevo.'));
+        request.onabort = () => reject(new ApiError(0, 'UPLOAD_ABORTED', 'La carga del archivo se canceló.'));
+        request.send(body);
+      });
+    }
     const res = await fetch('/api/uploads', {
       method: 'POST',
       headers: { 'x-preinscription-session': apiClient.sessionId() },

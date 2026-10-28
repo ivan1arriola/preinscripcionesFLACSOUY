@@ -71,6 +71,13 @@ describe('UploadedFileChip', () => {
     expect(screen.getByRole('button', { name: 'Quitar' })).toBeEnabled();
   });
 
+  it('in read-only mode it lets you see the file but not remove it', () => {
+    rememberPreview(image.token, new File(['x'], 'cedula.jpg', { type: 'image/jpeg' }));
+    render(<ul><UploadedFileChip file={image} disabled readOnly /></ul>);
+    expect(screen.getByRole('button', { name: 'Ver cedula.jpg' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /Quitar/ })).not.toBeInTheDocument();
+  });
+
   it('does not allow removing while the form is disabled', () => {
     render(<ul><UploadedFileChip file={pdf} disabled onRemove={vi.fn()} /></ul>);
     expect(screen.getByRole('button', { name: 'Quitar' })).toBeDisabled();

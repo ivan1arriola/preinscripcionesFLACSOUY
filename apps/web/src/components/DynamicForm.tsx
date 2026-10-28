@@ -101,7 +101,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({ form, onSubmit, isSubm
       disabled={!form.registrationOpen || isSubmitting}
       errors={errors}
       onChange={handleInputChange}
-      onUpload={(fieldKey, file) => apiClient.upload(form.targetId, fieldKey, file)}
+      onUpload={(fieldKey, file, onProgress) => apiClient.upload(form.targetId, fieldKey, file, onProgress)}
       onFileToken={(file) => setFiles((current) => {
         const definition = (form.documents ?? []).find((document) => document.key === file.fieldKey);
         if (definition?.maxFiles === 1) return [...current.filter((item) => item.fieldKey !== file.fieldKey), file];

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import type { DocumentDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { apiClient } from '../api/client.js';
 import { rememberPreview } from '../domain/file-previews.js';
+import { usePendingUploads } from '../domain/pending-upload.js';
+import { UploadingFileRow } from './UploadingFileRow.js';
 import { UploadedFileChip } from './UploadedFileChip.js';
 
 export interface TitleDocumentFieldsProps {
@@ -11,7 +13,7 @@ export interface TitleDocumentFieldsProps {
   files: SubmissionFileToken[];
   disabled: boolean;
   onChange: (key: string, value: string) => void;
-  onUpload: (fieldKey: string, file: File) => Promise<SubmissionFileToken>;
+  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number) => void) => Promise<SubmissionFileToken>;
   onFileToken: (file: SubmissionFileToken) => void;
   onRemoveToken: (file: SubmissionFileToken) => void;
 }
@@ -29,6 +31,7 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
 }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | undefined>();
+  const pendingUploads = usePendingUploads();
 
   const isAbsent = values.sinTituloActual === 'Si';
   const denomination = values.tituloDenominacion ?? '';
@@ -59,14 +62,16 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
     const file = input.files?.[0];
     if (!file) return;
     setUploading(true);
+    const report = pendingUploads.begin(document.key, file);
     try {
-      const token = await onUpload(document.key, file);
+      const token = await onUpload(document.key, file, report);
       rememberPreview(token.token, file);
       onFileToken(token);
       setUploadError(undefined);
     } catch (err: any) {
       setUploadError(err instanceof Error ? err.message : 'No se pudo cargar el archivo.');
     } finally {
+      pendingUploads.finish(document.key);
       setUploading(false);
       // Sin esto el navegador no vuelve a disparar `change` si se elige de nuevo el mismo archivo.
       input.value = '';
@@ -150,12 +155,11 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
               className="file-input"
             />
             <p className="field-hint">
-              {uploading
-                ? 'Guardando archivo temporalmente…'
-                : uploadedFiles.length > 0
+              {uploadedFiles.length > 0
                 ? `${uploadedFiles.length} archivo cargado`
                 : 'Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB)'}
             </p>
+            {pendingUploads.pending[document.key] && <UploadingFileRow upload={pendingUploads.pending[document.key]} />}
             {uploadedFiles.length > 0 && (
               <ul className="file-list">
                 {uploadedFiles.map((file) => (

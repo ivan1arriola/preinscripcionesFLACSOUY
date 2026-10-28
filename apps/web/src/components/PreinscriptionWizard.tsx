@@ -15,7 +15,7 @@ interface PreinscriptionWizardProps {
   onSubmit: (values: Record<string, string>, files: SubmissionFileToken[]) => Promise<void>;
   isSubmitting?: boolean;
   serverErrors?: Record<string, string[]>;
-  onUpload?: (fieldKey: string, file: File) => Promise<SubmissionFileToken>;
+  onUpload?: (fieldKey: string, file: File, onProgress?: (percent: number) => void) => Promise<SubmissionFileToken>;
 }
 
 export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
@@ -23,7 +23,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   onSubmit,
   isSubmitting = false,
   serverErrors = {},
-  onUpload = (fieldKey, file) => apiClient.upload(form.targetId, fieldKey, file),
+  onUpload = (fieldKey, file, onProgress) => apiClient.upload(form.targetId, fieldKey, file, onProgress),
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [highestStepReached, setHighestStepReached] = useState(0);

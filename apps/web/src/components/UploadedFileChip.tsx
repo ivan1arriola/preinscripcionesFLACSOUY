@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import type { SubmissionFileToken } from '@flacso/contracts';
 import { forgetPreview, getPreview, previewKind, type FilePreviewEntry } from '../domain/file-previews.js';
 
-const THUMB_WIDTH = 72;
+// Se dibuja la primera página a este ancho; el marco A4 la recorta si la página tiene otra proporción.
+const THUMB_RENDER_WIDTH = 168;
 
-function formatSize(bytes: number): string {
+export function formatSize(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -31,8 +32,7 @@ const PdfThumb: React.FC<{ url: string }> = ({ url }) => {
         const doc = await task.promise;
         const page = await doc.getPage(1);
         const base = page.getViewport({ scale: 1 });
-        const ratio = (window.devicePixelRatio || 1) * (THUMB_WIDTH / base.width);
-        const viewport = page.getViewport({ scale: ratio });
+        const viewport = page.getViewport({ scale: THUMB_RENDER_WIDTH / base.width });
         const canvas = canvasRef.current;
         if (!canvas || cancelled) return;
         canvas.width = Math.floor(viewport.width);
@@ -104,18 +104,20 @@ const PreviewDialog: React.FC<{ preview: FilePreviewEntry; name: string; onClose
 export interface UploadedFileChipProps {
   file: SubmissionFileToken;
   disabled: boolean;
-  onRemove: (file: SubmissionFileToken) => void;
+  onRemove?: (file: SubmissionFileToken) => void;
+  /** Solo para mirar (pantalla de revisión): sin botón para quitar. */
+  readOnly?: boolean;
   /** Texto accesible del botón «Quitar» (por ejemplo, con el nombre del archivo). */
   removeLabel?: string;
 }
 
-export const UploadedFileChip: React.FC<UploadedFileChipProps> = ({ file, disabled, onRemove, removeLabel }) => {
+export const UploadedFileChip: React.FC<UploadedFileChipProps> = ({ file, disabled, onRemove, readOnly = false, removeLabel }) => {
   const preview = getPreview(file.token);
   const [open, setOpen] = useState(false);
   const size = formatSize(file.size);
 
   return (
-    <li className="file-chip file-chip--preview">
+    <li className={`file-chip file-chip--preview${readOnly ? ' file-chip--readonly' : ''}`}>
       <button
         type="button"
         className="file-chip__thumb"
@@ -136,9 +138,11 @@ export const UploadedFileChip: React.FC<UploadedFileChipProps> = ({ file, disabl
             Ver
           </button>
         )}
-        <button type="button" className="file-chip__remove" aria-label={removeLabel} disabled={disabled} onClick={() => { forgetPreview(file.token); onRemove(file); }}>
-          Quitar
-        </button>
+        {!readOnly && (
+          <button type="button" className="file-chip__remove" aria-label={removeLabel} disabled={disabled} onClick={() => { forgetPreview(file.token); onRemove?.(file); }}>
+            Quitar
+          </button>
+        )}
       </div>
       {open && preview && <PreviewDialog preview={preview} name={file.originalName} onClose={() => setOpen(false)} />}
     </li>
