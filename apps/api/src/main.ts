@@ -7,6 +7,7 @@ import { runMigrations } from './infrastructure/database/migrate.js';
 import { sql } from 'kysely';
 
 import { WordPressClient } from './infrastructure/wordpress/wordpress-client.js';
+import { catalogHealthResponse, type CatalogHealthResponse } from './presentation/http/health.js';
 import { WordPressAcademicCatalog } from './infrastructure/wordpress/wordpress-academic-catalog.js';
 import { PostgresWordPressCache } from './infrastructure/wordpress/wordpress-cache.js';
 import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
@@ -49,12 +50,32 @@ const emailNotificationRepository = new PostgresEmailNotificationRepository(db);
 const submissionRecoveryRepository = new PostgresSubmissionRecoveryRepository(db);
 const telegramAlertRepository = new PostgresTelegramAlertRepository(db);
 
-const catalog = process.env.WORDPRESS_URL
-  ? new WordPressAcademicCatalog(
-      new WordPressClient({ baseUrl: process.env.WORDPRESS_URL, catalogToken: process.env.WORDPRESS_CATALOG_TOKEN }),
-      new PostgresWordPressCache(db)
-    )
+const wordPressClient = process.env.WORDPRESS_URL
+  ? new WordPressClient({ baseUrl: process.env.WORDPRESS_URL, catalogToken: process.env.WORDPRESS_CATALOG_TOKEN })
+  : undefined;
+const catalog = wordPressClient
+  ? new WordPressAcademicCatalog(wordPressClient, new PostgresWordPressCache(db))
   : new FixtureAcademicCatalog();
+
+// Consulta WordPress directo (sin la caché del catálogo) y recuerda el resultado 30 s,
+// porque el endpoint es público y no debe poder usarse para castigar a WordPress.
+const CATALOG_HEALTH_TTL_MS = 30_000;
+let catalogHealthMemo: { at: number; value: CatalogHealthResponse } | undefined;
+const checkCatalog = wordPressClient
+  ? async (): Promise<CatalogHealthResponse> => {
+      if (catalogHealthMemo && Date.now() - catalogHealthMemo.at < CATALOG_HEALTH_TTL_MS) return catalogHealthMemo.value;
+      const tokenConfigured = Boolean(process.env.WORDPRESS_CATALOG_TOKEN?.trim());
+      let value: CatalogHealthResponse;
+      try {
+        const response = await wordPressClient.getPreinscriptions();
+        value = catalogHealthResponse({ tokenConfigured, result: { rejectedTargets: response.rejectedTargets?.length ?? 0 } });
+      } catch (error) {
+        value = catalogHealthResponse({ tokenConfigured, result: { error } });
+      }
+      catalogHealthMemo = { at: Date.now(), value };
+      return value;
+    }
+  : undefined;
 
 if (process.env.WORDPRESS_URL && !process.env.WORDPRESS_CATALOG_TOKEN?.trim()) {
   console.warn('[Catalog] WORDPRESS_CATALOG_TOKEN no configurado: no se notificará a los correos de las ofertas académicas.');
@@ -277,6 +298,7 @@ const app = createApp({
   telegramAlertRepository,
   serviceAccountEmail: googleCreds.clientEmail,
   checkDatabase: checkDb,
+  checkCatalog,
 });
 
 const cleanupInterval = setInterval(async () => {

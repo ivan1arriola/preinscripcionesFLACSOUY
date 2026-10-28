@@ -135,6 +135,18 @@ for attempt in \$(seq 1 30); do
   sleep 2
 done
 
+CATALOG_HEALTH=\$(docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T api wget -qO- http://localhost:3000/api/health/catalog < /dev/null || true)
+case "\$CATALOG_HEALTH" in
+  *'"code":"token_missing"'*|*'"code":"unauthorized"'*|*'"code":"incompatible"'*)
+    echo "El catálogo de WordPress no es utilizable: \$CATALOG_HEALTH" >&2
+    echo "Revisar FLACSO_PREINSCRIPCIONES_CATALOG_TOKEN (WordPress) y WORDPRESS_CATALOG_TOKEN. Apache no fue modificado." >&2
+    exit 1
+    ;;
+  *'"code":"unavailable"'*|'')
+    echo "Aviso: no se pudo verificar el catálogo de WordPress (\${CATALOG_HEALTH:-sin respuesta}); falla transitoria, se continúa." >&2
+    ;;
+esac
+
 curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:\$(grep '^WEB_PORT=' "\$ENV_FILE" | cut -d= -f2-)/" >/dev/null
 printf 'SHA=%s\\nBACKUP=%s\\nWEB_PORT=%s\\n' "\$SHA" "\$BACKUP_DIR" "\$(grep '^WEB_PORT=' "\$ENV_FILE" | cut -d= -f2-)" > "\$ROOT/last-deploy"
 chmod 600 "\$ROOT/last-deploy"

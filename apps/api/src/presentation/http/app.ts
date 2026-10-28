@@ -3,7 +3,7 @@ import { isEnrollmentNotifyReady, loadMauticConfig, type MauticConfig } from '..
 import express, { type Express } from 'express';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../../ports/submission-repository.js';
-import { healthResponse } from './health.js';
+import { healthResponse, type CatalogHealthResponse } from './health.js';
 import { createTargetRoutes } from './target-routes.js';
 import { createSubmissionRoutes } from './submission-routes.js';
 import { errorHandler } from './error-handler.js';
@@ -80,6 +80,8 @@ export interface AppDependencies {
   catalog: AcademicCatalog;
   repository: SubmissionRepository;
   checkDatabase?: () => Promise<boolean>;
+  /** Consulta el catálogo de WordPress; sin él (catálogo de fixtures) no hay nada que verificar. */
+  checkCatalog?: () => Promise<CatalogHealthResponse>;
   temporaryFileStorage?: TemporaryFileStoragePort;
   googleDriveRepository?: GoogleDriveRepositoryPort;
   spreadsheetRepository?: SpreadsheetRepository;
@@ -147,6 +149,15 @@ export function createApp(dependencies: AppDependencies): Express {
     const payload = healthResponse({ database: dbStatus });
     const statusCode = payload.status === 'ok' ? 200 : 503;
     res.status(statusCode).json(payload);
+  });
+
+  // Siempre responde 200: el estado va en el cuerpo, para que la guardia de despliegue lo lea con wget.
+  app.get('/api/health/catalog', async (_req, res) => {
+    const payload: CatalogHealthResponse = dependencies.checkCatalog
+      ? await dependencies.checkCatalog()
+      : { status: 'ok', code: 'not_configured', rejectedTargets: 0 };
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(payload);
   });
 
   // Target routes and nested submission routes
