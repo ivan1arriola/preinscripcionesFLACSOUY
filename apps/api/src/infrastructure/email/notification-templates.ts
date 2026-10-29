@@ -13,6 +13,13 @@ export interface RenderedNotification {
   tags: Record<string, string>;
 }
 
+const FONT_STACK = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+const CONTACT_EMAIL = 'inscripciones@flacso.edu.uy';
+
+/** Valor que el snapshot guarda para un campo sin respuesta. */
+const EMPTY_VALUE = '-';
+const ATTACHED_VALUE = 'Archivo adjunto';
+
 function escapeHtml(unsafe: string): string {
   if (!unsafe) return '';
   return unsafe
@@ -23,12 +30,278 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, '&#039;');
 }
 
+/** Sólo enlaces http(s): nunca un esquema que ejecute código. */
+function safeUrl(url: string): string {
+  const trimmed = (url ?? '').trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : '';
+}
+
+interface Section {
+  id: string;
+  title: string;
+  keys: string[];
+}
+
+/** Los campos conocidos del formulario, agrupados como los ve quien revisa la postulación. */
+const SECTIONS: Section[] = [
+  {
+    id: 'personal',
+    title: 'Datos personales',
+    keys: [
+      'nombre1', 'nombre2', 'apellido1', 'apellido2', 'fechaNacimiento', 'tipoDocumento',
+      'paisEmisorDocumento', 'documento', 'genero', 'generoOtra', 'etnia', 'paisNacimiento',
+    ],
+  },
+  {
+    id: 'contacto',
+    title: 'Contacto y residencia',
+    keys: ['paisResidencia', 'ciudadResidencia', 'celular', 'email', 'ocupacion'],
+  },
+  {
+    id: 'formacion',
+    title: 'Formación',
+    keys: [
+      'estudios', 'posgradoFlacso', 'posgradoCual', 'tituloDenominacion', 'sinTituloActual',
+      'orientacion', 'mencion',
+    ],
+  },
+  {
+    id: 'declaracion',
+    title: 'Convenio y consentimientos',
+    keys: ['tieneConvenio', 'convenioWordpressId', 'fuente', 'aceptaDifusion', 'aceptaComunicaciones'],
+  },
+];
+
+const DOCUMENT_KEYS = ['identidad', 'cv', 'titulo', 'cartaMotivacion', 'cartaRecomendacion1', 'cartaRecomendacion2'];
+
+const HUMAN_VALUES: Record<string, string> = {
+  cedula_uruguaya: 'Cédula uruguaya',
+  dni: 'DNI',
+};
+
+/** «cedula_uruguaya» → «Cédula uruguaya»; el resto de los valores queda como llegó. */
+function humanizeValue(value: string): string {
+  const known = HUMAN_VALUES[value];
+  if (known) return known;
+  if (!/^[a-z]+(_[a-z]+)+$/.test(value)) return value;
+  const words = value.split('_').map((word) => (word === 'cedula' ? 'cédula' : word));
+  const sentence = words.join(' ');
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+interface Row {
+  key: string;
+  label: string;
+  value: string;
+}
+
+interface DocumentRow {
+  label: string;
+  attached: boolean;
+}
+
+interface NotificationModel {
+  sections: { title: string; rows: Row[] }[];
+  documents: DocumentRow[];
+  missing: string[];
+}
+
+function isEmpty(value: string | undefined): boolean {
+  return value === undefined || value === '' || value === EMPTY_VALUE;
+}
+
+/**
+ * Ordena los datos del snapshot: cada campo en su sección, los documentos aparte
+ * (con su estado) y los campos sin respuesta juntos, para que el correo sea corto.
+ */
+function buildModel(snapshot: SubmissionNotificationSnapshot): NotificationModel {
+  const orderedKeys = snapshot.orderedFieldKeys?.length ? snapshot.orderedFieldKeys : Object.keys(snapshot.values);
+  const known = new Map<string, string>();
+  for (const section of SECTIONS) for (const key of section.keys) known.set(key, section.id);
+
+  const bySection = new Map<string, Row[]>();
+  const other: Row[] = [];
+  const documents: DocumentRow[] = [];
+  const missing: string[] = [];
+
+  for (const key of orderedKeys) {
+    const item = snapshot.values[key];
+    if (!item) continue;
+
+    const isDocument = DOCUMENT_KEYS.includes(key) || item.value === ATTACHED_VALUE;
+    if (isDocument) {
+      documents.push({ label: item.label, attached: item.value === ATTACHED_VALUE });
+      continue;
+    }
+    if (isEmpty(item.value)) {
+      missing.push(item.label);
+      continue;
+    }
+
+    const row: Row = { key, label: item.label, value: humanizeValue(item.value) };
+    const sectionId = known.get(key);
+    if (sectionId) {
+      const rows = bySection.get(sectionId) ?? [];
+      rows.push(row);
+      bySection.set(sectionId, rows);
+    } else {
+      other.push(row);
+    }
+  }
+
+  const sections = SECTIONS.map((section) => ({ title: section.title, rows: bySection.get(section.id) ?? [] }));
+  sections.push({ title: 'Otros datos', rows: other });
+
+  return { sections: sections.filter((section) => section.rows.length > 0), documents, missing };
+}
+
+function valueOf(snapshot: SubmissionNotificationSnapshot, key: string): string {
+  const value = snapshot.values[key]?.value;
+  return isEmpty(value) ? '' : humanizeValue(value ?? '');
+}
+
+interface SummaryEntry {
+  label: string;
+  html: string;
+  text: string;
+}
+
+/** Lo que más se busca al revisar una postulación, antes de la tabla completa. */
+function buildSummary(snapshot: SubmissionNotificationSnapshot, model: NotificationModel): SummaryEntry[] {
+  const entries: SummaryEntry[] = [];
+  const add = (label: string, html: string, text: string): void => {
+    if (text) entries.push({ label, html, text });
+  };
+
+  const name = snapshot.applicantName || '';
+  add('Postulante', `<strong>${escapeHtml(name || snapshot.applicantEmail)}</strong>`, name || snapshot.applicantEmail);
+
+  const email = snapshot.applicantEmail;
+  add('Correo', `<a href="mailto:${escapeHtml(email)}" style="color: #175cd3; text-decoration: none;">${escapeHtml(email)}</a>`, email);
+
+  const phone = valueOf(snapshot, 'celular');
+  if (phone) {
+    const digits = phone.replace(/\D/g, '');
+    const whatsapp = digits.length >= 8
+      ? ` · <a href="https://wa.me/${digits}" style="color: #175cd3; text-decoration: none;">WhatsApp</a>`
+      : '';
+    add(
+      'Celular',
+      `<a href="tel:${escapeHtml(`+${digits}`)}" style="color: #175cd3; text-decoration: none;">${escapeHtml(phone)}</a>${whatsapp}`,
+      phone,
+    );
+  }
+
+  const documentNumber = valueOf(snapshot, 'documento');
+  if (documentNumber) {
+    const kind = valueOf(snapshot, 'tipoDocumento');
+    const text = [kind, documentNumber].filter(Boolean).join(' ');
+    add('Documento', escapeHtml(text), text);
+  }
+
+  const residence = [valueOf(snapshot, 'ciudadResidencia'), valueOf(snapshot, 'paisResidencia')].filter(Boolean).join(', ');
+  add('Residencia', escapeHtml(residence), residence);
+
+  const convenio = valueOf(snapshot, 'tieneConvenio');
+  if (convenio) {
+    const which = valueOf(snapshot, 'convenioWordpressId');
+    const text = which && !/^no$/i.test(convenio) ? `${convenio} — convenio ${which}` : convenio;
+    add('Convenio', escapeHtml(text), text);
+  }
+
+  const news = valueOf(snapshot, 'aceptaComunicaciones');
+  add('Acepta novedades por correo', escapeHtml(news), news);
+
+  if (model.documents.length > 0) {
+    const attached = model.documents.filter((doc) => doc.attached).length;
+    const text = `${attached} de ${model.documents.length} adjuntos`;
+    add('Documentos', escapeHtml(text), text);
+  }
+
+  return entries;
+}
+
+function renderRowsTable(rows: Row[]): string {
+  const body = rows
+    .map(
+      (row) => `<tr>
+          <td style="padding: 8px 12px; font-weight: 600; color: #475467; border-bottom: 1px solid #eaecf0; width: 35%; vertical-align: top;">${escapeHtml(row.label)}</td>
+          <td style="padding: 8px 12px; color: #101828; border-bottom: 1px solid #eaecf0; vertical-align: top;">${escapeHtml(row.value)}</td>
+        </tr>`,
+    )
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 14px;"><tbody>${body}</tbody></table>`;
+}
+
+function renderSectionHtml(title: string, content: string): string {
+  return `<div style="margin-bottom: 24px;">
+      <h3 style="margin: 0 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #175cd3; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #475467;">${escapeHtml(title)}</h3>
+      ${content}
+    </div>`;
+}
+
+function renderDocumentsHtml(documents: DocumentRow[]): string {
+  const rows = documents
+    .map((doc) => {
+      const badge = doc.attached
+        ? '<span style="color: #027a48; font-weight: 600;">&#10003; Adjunto</span>'
+        : '<span style="color: #b54708; font-weight: 600;">&#10007; No adjunto</span>';
+      return `<tr>
+          <td style="padding: 8px 12px; font-weight: 600; color: #475467; border-bottom: 1px solid #eaecf0; width: 35%;">${escapeHtml(doc.label)}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #eaecf0;">${badge}</td>
+        </tr>`;
+    })
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 14px;"><tbody>${rows}</tbody></table>`;
+}
+
+function renderMissingHtml(missing: string[]): string {
+  if (missing.length === 0) return '';
+  return `<p style="margin: 0 0 8px 0; padding: 12px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #475467;"><strong>No completados:</strong> ${escapeHtml(missing.join(', '))}</p>`;
+}
+
+function renderButton(label: string, url: string, primary: boolean): string {
+  const href = safeUrl(url);
+  if (!href) return '';
+  const colors = primary
+    ? 'background: #175cd3; color: #ffffff; border: 1px solid #175cd3;'
+    : 'background: #ffffff; color: #175cd3; border: 1px solid #175cd3;';
+  return `<a href="${escapeHtml(href)}" target="_blank" style="display: inline-block; margin: 0 8px 8px 0; padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; ${colors}">${escapeHtml(label)}</a>`;
+}
+
+function renderSectionsText(model: NotificationModel): string[] {
+  const lines: string[] = [];
+  for (const section of model.sections) {
+    lines.push(section.title.toUpperCase(), '--------------------------------------------------');
+    for (const row of section.rows) lines.push(`${row.label}: ${row.value}`);
+    lines.push('');
+  }
+  if (model.documents.length > 0) {
+    lines.push('DOCUMENTOS', '--------------------------------------------------');
+    for (const doc of model.documents) lines.push(`${doc.label}: ${doc.attached ? 'Adjunto' : 'No adjunto'}`);
+    lines.push('');
+  }
+  if (model.missing.length > 0) {
+    lines.push(`No completados: ${model.missing.join(', ')}`, '');
+  }
+  return lines;
+}
+
+function renderSectionsHtml(model: NotificationModel): string {
+  const parts = model.sections.map((section) => renderSectionHtml(section.title, renderRowsTable(section.rows)));
+  if (model.documents.length > 0) {
+    parts.push(renderSectionHtml('Documentos', renderDocumentsHtml(model.documents)));
+  }
+  parts.push(renderMissingHtml(model.missing));
+  return parts.join('\n    ');
+}
+
 export function renderApplicantNotification(
   snapshot: SubmissionNotificationSnapshot
 ): RenderedNotification {
   const subject = `Confirmación de preinscripción — ${snapshot.targetTitle}`;
-
   const greetingName = snapshot.applicantName || 'Estimado/a postulante';
+  const model = buildModel(snapshot);
 
   const textLines: string[] = [
     `Hola ${greetingName},`,
@@ -37,71 +310,40 @@ export function renderApplicantNotification(
     `${snapshot.targetTitle}`,
     '',
     'A continuación detallamos los datos registrados:',
-    '--------------------------------------------------',
-  ];
-
-  const orderedKeys = snapshot.orderedFieldKeys?.length
-    ? snapshot.orderedFieldKeys
-    : Object.keys(snapshot.values);
-
-  for (const key of orderedKeys) {
-    const item = snapshot.values[key];
-    if (item) {
-      textLines.push(`${item.label}: ${item.value}`);
-    }
-  }
-
-  textLines.push(
-    '--------------------------------------------------',
     '',
+    ...renderSectionsText(model),
     'Nos pondremos en contacto a la brevedad con los siguientes pasos del proceso de admisión.',
+    `Si algún dato es incorrecto, escribinos a ${CONTACT_EMAIL}.`,
     '',
     'Saludos cordiales,',
-    'Equipo de FLACSO Uruguay'
-  );
-
-  const htmlDataRows = orderedKeys
-    .map((key) => {
-      const item = snapshot.values[key];
-      if (!item) return '';
-      return `<tr>
-        <td style="padding: 8px 12px; font-weight: 600; color: #475467; border-bottom: 1px solid #eaecf0; width: 35%;">${escapeHtml(
-          item.label
-        )}</td>
-        <td style="padding: 8px 12px; color: #101828; border-bottom: 1px solid #eaecf0;">${escapeHtml(
-          item.value
-        )}</td>
-      </tr>`;
-    })
-    .join('');
+    'Equipo de FLACSO Uruguay',
+  ];
 
   const html = `<!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(subject)}</title>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #101828; background-color: #f8fafc; margin: 0; padding: 24px;">
-  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-    <div style="margin-bottom: 24px;">
-      <h2 style="color: #175cd3; margin: 0 0 8px 0; font-size: 20px;">FLACSO Uruguay</h2>
-      <h1 style="color: #101828; font-size: 18px; margin: 0;">Confirmación de preinscripción recibida</h1>
+<body style="font-family: ${FONT_STACK}; line-height: 1.6; color: #101828; background-color: #f1f5f9; margin: 0; padding: 24px 12px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+    <div style="background: #16396f; padding: 22px 32px;">
+      <h2 style="color: #ffffff; margin: 0; font-size: 20px;">FLACSO Uruguay</h2>
     </div>
-    <p style="margin-bottom: 16px;">Hola <strong>${escapeHtml(greetingName)}</strong>,</p>
-    <p style="margin-bottom: 20px;">Hemos recibido tu postulación para <strong>${escapeHtml(
-      snapshot.targetTitle
-    )}</strong>.</p>
-    <div style="margin-bottom: 24px;">
-      <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 12px;">Datos de tu postulación</h3>
-      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-        <tbody>
-          ${htmlDataRows}
-        </tbody>
-      </table>
+    <div style="padding: 28px 32px 32px;">
+      <h1 style="color: #101828; font-size: 20px; margin: 0 0 16px 0;">Recibimos tu preinscripción</h1>
+      <p style="margin: 0 0 12px 0;">Hola <strong>${escapeHtml(greetingName)}</strong>,</p>
+      <p style="margin: 0 0 24px 0;">Hemos recibido tu postulación para <strong>${escapeHtml(snapshot.targetTitle)}</strong>.</p>
+      <div style="background: #eff8ff; border-left: 4px solid #175cd3; border-radius: 4px; padding: 14px 16px; margin-bottom: 28px; font-size: 14px;">
+        <strong>¿Qué sigue?</strong> Nos pondremos en contacto a la brevedad para coordinar los siguientes pasos del proceso de admisión.
+      </div>
+      <h2 style="font-size: 16px; margin: 0 0 16px 0; color: #101828;">Datos de tu postulación</h2>
+      ${renderSectionsHtml(model)}
+      <p style="color: #475467; font-size: 14px; margin: 24px 0 0 0;">Si algún dato es incorrecto, escribinos a <a href="mailto:${CONTACT_EMAIL}" style="color: #175cd3;">${CONTACT_EMAIL}</a>.</p>
+      <hr style="border: none; border-top: 1px solid #eaecf0; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #98a2b3; margin: 0;">FLACSO Uruguay · Programa Académico</p>
     </div>
-    <p style="color: #475467; font-size: 14px; margin-top: 24px;">Nos pondremos en contacto a la brevedad para coordinar los siguientes pasos.</p>
-    <hr style="border: none; border-top: 1px solid #eaecf0; margin: 24px 0;" />
-    <p style="font-size: 12px; color: #98a2b3; margin: 0;">FLACSO Uruguay · Programa Académico</p>
   </div>
 </body>
 </html>`;
@@ -127,93 +369,62 @@ export function renderOperationalNotification(
 ): RenderedNotification {
   const applicantPrefix = snapshot.applicantName ? `${snapshot.applicantName} — ` : '';
   const subject = `[Preinscripción] ${applicantPrefix}${snapshot.targetTitle}`;
+  const model = buildModel(snapshot);
+  const summary = buildSummary(snapshot, model);
 
   const textLines: string[] = [
     `Nueva preinscripción registrada para ${snapshot.targetTitle}`,
-    '',
-    `Postulante: ${snapshot.applicantName || snapshot.applicantEmail}`,
-    `Email: ${snapshot.applicantEmail}`,
     `ID de seguimiento: ${snapshot.submissionId}`,
     '',
-    'ACCESOS OPERATIVOS DIRECTOS:',
+    'RESUMEN',
+    '--------------------------------------------------',
+    ...summary.map((entry) => `${entry.label}: ${entry.text}`),
+    '',
+    'ACCESOS OPERATIVOS DIRECTOS',
+    '--------------------------------------------------',
     `Planilla Google Sheets: ${snapshot.spreadsheetRowUrl}`,
     `Carpeta Google Drive: ${snapshot.documentsFolderUrl}`,
     '',
-    'DATOS COMPLETOS DEL FORMULARIO:',
-    '--------------------------------------------------',
+    ...renderSectionsText(model),
   ];
 
-  const orderedKeys = snapshot.orderedFieldKeys?.length
-    ? snapshot.orderedFieldKeys
-    : Object.keys(snapshot.values);
-
-  for (const key of orderedKeys) {
-    const item = snapshot.values[key];
-    if (item) {
-      textLines.push(`${item.label}: ${item.value}`);
-    }
-  }
-
-  textLines.push('--------------------------------------------------');
-
-  const htmlDataRows = orderedKeys
-    .map((key) => {
-      const item = snapshot.values[key];
-      if (!item) return '';
-      return `<tr>
-        <td style="padding: 8px 12px; font-weight: 600; color: #475467; border-bottom: 1px solid #eaecf0; width: 35%;">${escapeHtml(
-          item.label
-        )}</td>
-        <td style="padding: 8px 12px; color: #101828; border-bottom: 1px solid #eaecf0;">${escapeHtml(
-          item.value
-        )}</td>
-      </tr>`;
-    })
+  const summaryHtml = summary
+    .map(
+      (entry) => `<tr>
+          <td style="padding: 5px 12px 5px 0; color: #667085; font-size: 13px; vertical-align: top; white-space: nowrap;">${escapeHtml(entry.label)}</td>
+          <td style="padding: 5px 0; color: #101828; font-size: 14px; vertical-align: top;">${entry.html}</td>
+        </tr>`,
+    )
     .join('');
 
+  const buttons = [
+    renderButton('Abrir planilla', snapshot.spreadsheetRowUrl, true),
+    renderButton('Abrir documentación', snapshot.documentsFolderUrl, false),
+  ].join('');
+
   const html = `<!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(subject)}</title>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #101828; background-color: #f8fafc; margin: 0; padding: 24px;">
-  <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-    <div style="margin-bottom: 24px;">
+<body style="font-family: ${FONT_STACK}; line-height: 1.6; color: #101828; background-color: #f1f5f9; margin: 0; padding: 24px 12px;">
+  <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 32px;">
+    <div style="margin-bottom: 20px;">
       <span style="background: #eff8ff; color: #175cd3; font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase;">Notificación Operativa</span>
-      <h1 style="color: #101828; font-size: 20px; margin: 12px 0 4px 0;">${escapeHtml(
-        snapshot.targetTitle
-      )}</h1>
+      <h1 style="color: #101828; font-size: 20px; margin: 12px 0 4px 0;">${escapeHtml(snapshot.targetTitle)}</h1>
       <p style="color: #475467; margin: 0;">Nueva postulación recibida</p>
-      <p style="color: #475467; margin: 4px 0 0;">ID de seguimiento: ${escapeHtml(snapshot.submissionId)}</p>
+      <p style="color: #98a2b3; font-size: 12px; margin: 4px 0 0;">ID de seguimiento: ${escapeHtml(snapshot.submissionId)}</p>
     </div>
 
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 24px;">
-      <h3 style="margin: 0 0 12px 0; font-size: 14px; text-transform: uppercase; color: #475467;">Enlaces directos de gestión</h3>
-      <div style="margin-bottom: 8px;">
-        📊 <strong>Planilla:</strong> <a href="${escapeHtml(
-          snapshot.spreadsheetRowUrl
-        )}" target="_blank" style="color: #175cd3; text-decoration: underline;">${escapeHtml(
-    snapshot.spreadsheetRowUrl
-  )}</a>
-      </div>
-      <div>
-        📁 <strong>Documentación (Drive):</strong> <a href="${escapeHtml(
-          snapshot.documentsFolderUrl
-        )}" target="_blank" style="color: #175cd3; text-decoration: underline;">${escapeHtml(
-    snapshot.documentsFolderUrl
-  )}</a>
-      </div>
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px 18px; margin-bottom: 20px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse: collapse;"><tbody>${summaryHtml}</tbody></table>
     </div>
 
-    <div>
-      <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 12px;">Datos ingresados por el postulante</h3>
-      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-        <tbody>
-          ${htmlDataRows}
-        </tbody>
-      </table>
-    </div>
+    <div style="margin-bottom: 28px;">${buttons}</div>
+
+    ${renderSectionsHtml(model)}
   </div>
 </body>
 </html>`;

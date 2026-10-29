@@ -86,6 +86,99 @@ describe('Notification Templates', () => {
     });
   });
 
+  describe('Layout con los campos canónicos del formulario', () => {
+    const field = (key: string, label: string, value: string) => ({ key, label, value });
+    const canonical: SubmissionNotificationSnapshot = {
+      ...sampleSnapshot,
+      applicantName: 'Franco Vignolo',
+      applicantEmail: 'franco@example.com',
+      orderedFieldKeys: [
+        'nombre1', 'nombre2', 'apellido1', 'tipoDocumento', 'documento', 'celular', 'email',
+        'ciudadResidencia', 'paisResidencia', 'estudios', 'tieneConvenio', 'convenioWordpressId',
+        'aceptaComunicaciones', 'identidad', 'cv', 'cartaMotivacion',
+      ],
+      values: {
+        nombre1: field('nombre1', 'Primer nombre', 'Franco'),
+        nombre2: field('nombre2', 'Segundo nombre', '-'),
+        apellido1: field('apellido1', 'Primer apellido', 'Vignolo'),
+        tipoDocumento: field('tipoDocumento', 'Tipo de documento', 'cedula_uruguaya'),
+        documento: field('documento', 'Número de documento', '5.081.244-9'),
+        celular: field('celular', 'Celular', '+59898010671'),
+        email: field('email', 'Correo electrónico', 'franco@example.com'),
+        ciudadResidencia: field('ciudadResidencia', 'Ciudad de residencia', 'Montevideo'),
+        paisResidencia: field('paisResidencia', 'País de residencia', 'Uruguay'),
+        estudios: field('estudios', 'Estudios cursados', 'Licenciatura'),
+        tieneConvenio: field('tieneConvenio', '¿Te corresponde algún convenio?', 'No'),
+        convenioWordpressId: field('convenioWordpressId', '¿Cuál convenio te corresponde?', '-'),
+        aceptaComunicaciones: field('aceptaComunicaciones', '¿Querés recibir novedades?', 'No'),
+        identidad: field('identidad', 'Documento de identidad', 'Archivo adjunto'),
+        cv: field('cv', 'Curriculum Vitae', '-'),
+        cartaMotivacion: field('cartaMotivacion', 'Carta de motivación', '-'),
+      },
+    };
+
+    it('abre con un resumen y botones, y agrupa los campos en secciones', () => {
+      const { html, text } = renderOperationalNotification(canonical, 'target', 'coordinacion@flacso.edu.uy');
+
+      // Resumen con lo que más se busca
+      expect(html).toContain('mailto:franco@example.com');
+      expect(html).toContain('href="tel:+59898010671"');
+      expect(html).toContain('https://wa.me/59898010671');
+      expect(html).toContain('Cédula uruguaya 5.081.244-9');
+      expect(html).toContain('Montevideo, Uruguay');
+      expect(html).toContain('1 de 3 adjuntos');
+      expect(text).toContain('Documento: Cédula uruguaya 5.081.244-9');
+      expect(text).toContain('Acepta novedades por correo: No');
+
+      // Botones y orden: resumen, botones, secciones
+      expect(html).toContain('>Abrir planilla</a>');
+      expect(html).toContain('>Abrir documentación</a>');
+      expect(html.indexOf('Abrir planilla')).toBeLessThan(html.indexOf('Datos personales'));
+      for (const title of ['Datos personales', 'Contacto y residencia', 'Formación', 'Convenio y consentimientos', 'Documentos']) {
+        expect(html).toContain(title);
+      }
+    });
+
+    it('junta los campos sin respuesta y muestra el estado de cada documento', () => {
+      const { html, text } = renderOperationalNotification(canonical, 'master', 'master@flacso.edu.uy');
+
+      expect(html).toContain('No completados:</strong> Segundo nombre, ¿Cuál convenio te corresponde?');
+      expect(text).toContain('No completados: Segundo nombre, ¿Cuál convenio te corresponde?');
+      expect(html).not.toContain('>-</td>');
+      expect(html).toContain('&#10003; Adjunto');
+      expect(html).toContain('&#10007; No adjunto');
+      expect(text).toContain('Documento de identidad: Adjunto');
+      expect(text).toContain('Curriculum Vitae: No adjunto');
+    });
+
+    it('no convierte en enlace una dirección con un esquema peligroso', () => {
+      const hostile = {
+        ...canonical,
+        spreadsheetRowUrl: 'javascript:alert(1)',
+        documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-id-abc',
+      };
+      const { html } = renderOperationalNotification(hostile, 'target', 'coordinacion@flacso.edu.uy');
+
+      expect(html).not.toContain('javascript:');
+      expect(html).not.toContain('Abrir planilla');
+      expect(html).toContain('Abrir documentación');
+    });
+
+    it('la confirmación al postulante también agrupa, oculta lo vacío y nunca expone enlaces internos', () => {
+      const { html, text } = renderApplicantNotification(canonical);
+
+      expect(html).toContain('¿Qué sigue?');
+      expect(html).toContain('Datos personales');
+      expect(html).toContain('Cédula uruguaya');
+      expect(html).toContain('No completados:</strong> Segundo nombre');
+      expect(text).toContain('inscripciones@flacso.edu.uy');
+      expect(html).not.toContain('sub_xyz_789');
+      expect(text).not.toContain('sub_xyz_789');
+      expect(html).not.toContain('docs.google.com');
+      expect(html).not.toContain('Abrir planilla');
+    });
+  });
+
   describe('renderAllNotifications', () => {
     it('creates applicant, target, and master notifications without duplicates', () => {
       const masterEmails = ['master1@flacso.edu.uy', 'coordinacion@flacso.edu.uy', 'master2@flacso.edu.uy'];
