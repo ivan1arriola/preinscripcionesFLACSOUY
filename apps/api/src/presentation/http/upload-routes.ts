@@ -268,9 +268,20 @@ export function createUploadRoutes(
     }
 
     try {
-      await storage.remove(token, sessionId);
+      // Borrado público: solo pendientes. Un archivo ya fijado por un envío nunca se borra desde aquí.
+      if (storage.removePending) await storage.removePending(token, sessionId);
+      else await storage.remove(token, sessionId);
       res.status(200).json({ ok: true });
-    } catch {
+    } catch (error) {
+      if ((error as { code?: string }).code === 'FILE_ALREADY_SUBMITTED') {
+        res.status(409).json({
+          error: {
+            code: 'FILE_ALREADY_SUBMITTED',
+            message: 'El archivo ya forma parte de una preinscripción enviada y no se puede eliminar.',
+          },
+        });
+        return;
+      }
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',

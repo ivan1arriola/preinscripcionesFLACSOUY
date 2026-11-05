@@ -27,5 +27,11 @@ export interface TemporaryFileStoragePort {
   cleanup(before: number): Promise<number>;
   listBySession?(sessionId: string): Promise<TemporaryFileRecord[]>;
   touch?(sessionId: string): Promise<void>;
+  /** Fija los archivos de un envío (reanudable e idempotente). Lanza FILE_EXPIRED o FORBIDDEN. */
+  pinFiles?(tokens: string[], sessionId: string, clientSubmissionId: string): Promise<void>;
+  /** Borrado público: solo pendientes. Lanza FILE_ALREADY_SUBMITTED si el token ya está fijado. */
+  removePending?(token: string, sessionId: string): Promise<void>;
+  /** Borrado interno de un archivo fijado (transiciones terminales). No se expone por HTTP. */
+  releaseRetained?(token: string): Promise<void>;
   extendRetention?(tokens: string | string[], newExpiresAt: Date): Promise<void>;
 }

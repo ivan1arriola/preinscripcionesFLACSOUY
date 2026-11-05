@@ -342,4 +342,25 @@ describe('Upload HTTP Routes', () => {
       await close();
     }
   });
+
+  it('DELETE /api/uploads/:token answers 409 and keeps the file once a submission pinned it', async () => {
+    const { baseUrl, storage, close } = await setupApp();
+    try {
+      const form = new FormData();
+      form.append('targetId', 'diploma-davia');
+      form.append('fieldKey', 'cv');
+      form.append('file', new Blob([pdfBytes('cv content')], { type: 'application/pdf' }), 'cv.pdf');
+      const uploadRes = await fetch(baseUrl, { method: 'POST', headers: { 'x-preinscription-session': 'session-1' }, body: form });
+      const { token } = (await uploadRes.json()) as { token: string };
+
+      await (storage as TemporaryFileStorage).pinFiles([token], 'session-1', 'client-1');
+
+      const late = await fetch(`${baseUrl}/${token}`, { method: 'DELETE', headers: { 'x-preinscription-session': 'session-1' } });
+      expect(late.status).toBe(409);
+      expect(((await late.json()) as { error: { code: string } }).error.code).toBe('FILE_ALREADY_SUBMITTED');
+      expect((await storage.open(token, 'session-1')).data.length).toBeGreaterThan(0);
+    } finally {
+      await close();
+    }
+  });
 });
