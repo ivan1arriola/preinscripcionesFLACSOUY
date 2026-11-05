@@ -33,5 +33,7 @@ export interface TemporaryFileStoragePort {
   removePending?(token: string, sessionId: string): Promise<void>;
   /** Borrado interno de un archivo fijado (transiciones terminales). No se expone por HTTP. */
   releaseRetained?(token: string): Promise<void>;
+  /** Borra los fijados cuya retención venció. */
+  cleanupExpiredRetained?(before: number): Promise<number>;
   extendRetention?(tokens: string | string[], newExpiresAt: Date): Promise<void>;
 }

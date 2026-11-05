@@ -20,6 +20,11 @@ export interface SubmitPreinscriptionOptions {
   isMauticContactSyncEnabled?: () => Promise<boolean>;
   /** Si devuelve true, se encola el aviso de inscripción a Mautic (con o sin aceptación de comunicaciones). */
   isMauticEnrollmentNotifyEnabled?: () => Promise<boolean>;
+  /**
+   * Se ejecuta tras validar y justo antes de guardar una preinscripción nueva (p. ej. fijar los archivos).
+   * Si lanza, no se guarda nada y el error llega a quien llamó.
+   */
+  beforeSave?: () => Promise<void>;
 }
 
 /** Una configuración ilegible nunca bloquea la preinscripción: sólo omite el efecto en Mautic. */
@@ -173,6 +178,7 @@ export async function submitPreinscription(
   const mauticEnrollment = (await isEnabled(options.isMauticEnrollmentNotifyEnabled, 'avisos de inscripción'))
     ? buildMauticEnrollmentNotice(target, normalizedValues)
     : null;
+  await options.beforeSave?.();
   const saved = await repository.saveOrGet({
     clientSubmissionId: command.clientSubmissionId,
     targetId: target.id,

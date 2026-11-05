@@ -188,16 +188,37 @@ export function createSubmissionRoutes(
         }
       }
 
-      const result = await submitPreinscription(catalog, repository, {
-        clientSubmissionId: parsed.data.clientSubmissionId,
-        targetId,
-        configRevision: parsed.data.configRevision,
-        values: parsed.data.values,
-        files: parsed.data.files,
-      }, {
-        isMauticContactSyncEnabled: mauticDependencies?.isContactSyncEnabled,
-        isMauticEnrollmentNotifyEnabled: mauticDependencies?.isEnrollmentNotifyEnabled,
-      });
+      // Fijar los archivos (reanudable e idempotente) después de validar y antes de guardar: así ni la limpieza ni un
+      // DELETE tardío pueden quitárselos a una preinscripción aceptada. Un envío ya aceptado nunca llega aquí.
+      const pinStorage = fileDependencies?.storage;
+      const shouldPin = parsed.data.files.length > 0 && !!sessionHeader && !!pinStorage?.pinFiles;
+      let result: Awaited<ReturnType<typeof submitPreinscription>>;
+      try {
+        result = await submitPreinscription(catalog, repository, {
+          clientSubmissionId: parsed.data.clientSubmissionId,
+          targetId,
+          configRevision: parsed.data.configRevision,
+          values: parsed.data.values,
+          files: parsed.data.files,
+        }, {
+          isMauticContactSyncEnabled: mauticDependencies?.isContactSyncEnabled,
+          isMauticEnrollmentNotifyEnabled: mauticDependencies?.isEnrollmentNotifyEnabled,
+          beforeSave: shouldPin
+            ? () => pinStorage!.pinFiles!(parsed.data.files.map((f) => f.token), sessionHeader!, parsed.data.clientSubmissionId ?? '')
+            : undefined,
+        });
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code === 'FILE_EXPIRED') {
+          res.status(400).json({ error: { code: 'FILE_EXPIRED', message: 'Uno de los archivos adjuntos venció. Volvé a cargarlo.' } });
+          return;
+        }
+        if (code === 'FORBIDDEN') {
+          res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Uno de los archivos adjuntos no pertenece a tu sesión.' } });
+          return;
+        }
+        throw error;
+      }
 
       if (!result.ok) {
         switch (result.code) {
@@ -496,7 +517,8 @@ export function createSubmissionRoutes(
         if (sessionId && fileDependencies) {
           for (const file of storedDriveFiles) {
             try {
-              await fileDependencies.storage.remove(file.token, sessionId);
+              if (fileDependencies.storage.releaseRetained) await fileDependencies.storage.releaseRetained(file.token);
+              else await fileDependencies.storage.remove(file.token, sessionId);
             } catch (cleanupError) {
               console.error('[Uploads] Error al limpiar archivo temporal:', cleanupError);
             }

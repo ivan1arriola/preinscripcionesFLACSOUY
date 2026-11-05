@@ -19,6 +19,9 @@ export async function cleanupExpiredRecoveries(
   let removedFiles = 0;
   if (dependencies.fileStorage) {
     removedFiles = await dependencies.fileStorage.cleanup(now.getTime());
+    if (dependencies.fileStorage.cleanupExpiredRetained) {
+      removedFiles += await dependencies.fileStorage.cleanupExpiredRetained(now.getTime());
+    }
   }
 
   return {

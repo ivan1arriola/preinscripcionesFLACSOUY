@@ -408,6 +408,30 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
     return removed;
   }
 
+  /** Borra los fijados cuya retención venció (el caso de recuperación asociado vence al mismo tiempo). */
+  async cleanupExpiredRetained(before: number): Promise<number> {
+    let removed = 0;
+    let entries: string[] = [];
+    try {
+      entries = await readdir(join(this.options.rootDir, RETAINED_DIR));
+    } catch {
+      return 0;
+    }
+    for (const token of entries) {
+      if (!TOKEN_PATTERN.test(token)) continue;
+      const dir = join(this.options.rootDir, RETAINED_DIR, token);
+      const metadata = await this.readMetadata(dir).catch(() => null);
+      if (!metadata) continue;
+      const expiresAt = metadata.expiresAt ? new Date(metadata.expiresAt).getTime() : Number.POSITIVE_INFINITY;
+      if (expiresAt >= before) continue;
+      if (await this.claimForDeletion(dir, token)) {
+        await this.repository?.remove(token);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   private pendingDir(token: string): string {
     this.assertToken(token);
     return join(this.options.rootDir, token);

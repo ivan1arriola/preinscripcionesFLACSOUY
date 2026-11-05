@@ -178,6 +178,10 @@ const checkDb = async () => {
   }
 };
 
+// El fijado y la limpieza de archivos dependen de un rename atómico: si retained/ o deleting/ no comparten volumen
+// con la raíz, el arranque falla en vez de funcionar sin la garantía de exclusión.
+await temporaryFileStorage.assertSameVolume();
+
 // Attempt migration on startup if database is accessible
 try {
   await runMigrations(db);

@@ -139,4 +139,22 @@ describe('TemporaryFileStorage pinning (P1)', () => {
     const tokens = (await storage.listBySession('s1')).map((r) => r.token).sort();
     expect(tokens).toEqual([a.token, b.token].sort());
   });
+
+  it('cleanupExpiredRetained removes only retained files whose retention has passed', async () => {
+    const { root, storage } = await setup();
+    const fresh = await storage.save('s1', 'cv', pdf());
+    const stale = await storage.save('s1', 'dni', pdf());
+    await storage.pinFiles([fresh.token, stale.token], 's1', 'client-1');
+    await storage.extendRetention(stale.token, new Date(Date.now() - 1000));
+    expect(await storage.cleanupExpiredRetained(Date.now())).toBe(1);
+    expect(await exists(join(root, 'retained', stale.token))).toBe(false);
+    expect(await exists(join(root, 'retained', fresh.token))).toBe(true);
+  });
+
+  it('assertSameVolume creates retained/ and deleting/ and passes on a single volume', async () => {
+    const { root, storage } = await setup();
+    await storage.assertSameVolume();
+    expect(await exists(join(root, 'retained'))).toBe(true);
+    expect(await exists(join(root, 'deleting'))).toBe(true);
+  });
 });
