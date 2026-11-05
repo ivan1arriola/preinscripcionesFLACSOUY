@@ -51,6 +51,8 @@ export type SubmitPreinscriptionResult =
       submissionId: string;
       /** true cuando el clientSubmissionId ya existía: los efectos (Drive, planilla, avisos) ya se ejecutaron. */
       existing: boolean;
+      /** Dueño del lease del envío nuevo; quien procesa debe renovarlo mientras trabaja. */
+      leaseOwner?: string;
       spreadsheet: {
         valuesByColumnName: Record<string, string>;
         requiredColumns: string[];
@@ -200,6 +202,7 @@ export async function submitPreinscription(
     ok: true,
     submissionId: saved.id,
     existing: saved.existing === true,
+    leaseOwner: saved.leaseOwner,
     spreadsheet: {
       valuesByColumnName: buildSpreadsheetValues(form, normalizedValues, saved.id),
       requiredColumns: spreadsheetSchema.requiredColumns,

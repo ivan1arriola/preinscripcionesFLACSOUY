@@ -32,6 +32,8 @@ export interface SubmissionProcessingRepository {
    * espera programada. Dos barridos simultáneos nunca reciben el mismo envío.
    */
   claimAbandoned(owner: string, now: Date, limit: number, leaseTtlMs: number): Promise<AbandonedSubmission[]>;
+  /** Igual que claimAbandoned pero de solo lectura: no arrienda ni modifica nada (para `sweep:once --dry-run`). */
+  listAbandoned(now: Date, limit: number): Promise<AbandonedSubmission[]>;
   /** Encola una tarea; encolar la misma (envío, tipo, momento) dos veces es inocuo. */
   enqueueTask(task: { submissionId: string; kind: SubmissionTaskKind; runAt: Date }): Promise<void>;
   /**

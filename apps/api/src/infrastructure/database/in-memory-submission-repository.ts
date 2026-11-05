@@ -40,7 +40,7 @@ export class InMemorySubmissionRepository implements SubmissionRepository {
     for (const file of record.files ?? []) {
       this.fileStatuses.set(file.token, { status: 'pending' });
     }
-    return { id, existing: false };
+    return { id, existing: false, leaseOwner: `req_${crypto.randomUUID().replace(/-/g, '')}` };
   }
 
   async markProcessing(id: string, status: 'pending' | 'success' | 'failed' | 'unknown', errorMessage?: string): Promise<void> {

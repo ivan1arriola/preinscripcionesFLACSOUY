@@ -1,4 +1,14 @@
-export type RecoveryStage = 'drive' | 'sheets' | 'notifications' | 'unknown';
+export type RecoveryStage =
+  | 'drive'
+  | 'sheets'
+  | 'notifications'
+  | 'unknown'
+  /** Una escritura de Sheets aparece más de una vez: se resuelve a mano. */
+  | 'sheets_duplicate'
+  /** Archivos de un envío que ya no existen y deben volver a cargarse. */
+  | 'files_missing'
+  /** Una tarea diferida agotó sus intentos. */
+  | 'task_failed';
 export type RecoveryStatus = 'pending' | 'retrying' | 'resolved' | 'discarded';
 
 export interface RecoveryFileSummary {

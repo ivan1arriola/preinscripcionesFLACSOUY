@@ -59,6 +59,21 @@ export class PostgresSubmissionProcessingRepository implements SubmissionProcess
     return result.rows.map((row) => ({ submissionId: row.submission_id, targetId: row.target_id, legacy: row.legacy }));
   }
 
+  async listAbandoned(now: Date, limit: number): Promise<AbandonedSubmission[]> {
+    const result = await sql<{ submission_id: string; target_id: string; legacy: boolean }>`
+      SELECT p.submission_id, s.target_id, (p.protocol_version IS NULL) AS legacy
+        FROM submission_processing p JOIN submissions s ON s.id = p.submission_id
+       WHERE p.status = 'pending'
+         AND COALESCE(p.lease_expires_at, p.updated_at + ${LEGACY_GRACE}) < ${now}
+         AND (p.next_attempt_at IS NULL OR p.next_attempt_at <= ${now})
+         AND NOT EXISTS (
+           SELECT 1 FROM submission_recoveries r
+            WHERE r.submission_id = p.submission_id AND r.status IN ('pending', 'retrying'))
+       ORDER BY p.updated_at
+       LIMIT ${limit}`.execute(this.db);
+    return result.rows.map((row) => ({ submissionId: row.submission_id, targetId: row.target_id, legacy: row.legacy }));
+  }
+
   async enqueueTask(task: { submissionId: string; kind: SubmissionTaskKind; runAt: Date }): Promise<void> {
     await this.db
       .insertInto('submission_tasks')

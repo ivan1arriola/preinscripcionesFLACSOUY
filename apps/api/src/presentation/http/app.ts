@@ -5,7 +5,7 @@ import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../../ports/submission-repository.js';
 import { healthResponse, type CatalogHealthResponse } from './health.js';
 import { createTargetRoutes } from './target-routes.js';
-import { createSubmissionRoutes } from './submission-routes.js';
+import { createSubmissionRoutes, type LeaseOptions } from './submission-routes.js';
 import { errorHandler } from './error-handler.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import { createUploadRoutes } from './upload-routes.js';
@@ -97,6 +97,8 @@ export interface AppDependencies {
   getMasterEmails?: () => Promise<string[]> | string[];
   serviceAccountEmail?: string;
   submissionRecoveryRepository?: SubmissionRecoveryRepository;
+  /** Mantiene vivo el lease de cada envío mientras se procesa (P4). */
+  submissionLease?: LeaseOptions;
   telegramAlertRepository?: TelegramAlertRepository;
   getTelegramChatIds?: () => Promise<string[]> | string[];
   getTelegramPreinscriptionChatIds?: () => Promise<string[]> | string[];
@@ -296,6 +298,7 @@ export function createApp(dependencies: AppDependencies): Express {
         }
       : undefined,
     rateLimits ? { perEmail: rateLimits.submissionsPerEmail } : undefined,
+    dependencies.submissionLease,
   );
 
   targetRoutes.use('/:id/submissions', submissionRoutes);

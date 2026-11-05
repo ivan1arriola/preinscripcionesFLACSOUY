@@ -37,6 +37,9 @@ import { loadEmailConfig } from './infrastructure/email/email-config.js';
 import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js';
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
+import { PostgresSubmissionProcessingRepository } from './infrastructure/database/postgres-submission-processing-repository.js';
+import { sweepOnce } from './application/sweep-abandoned-submissions.js';
+import { createSweepDependencies, newSweeperId } from './infrastructure/sweep-runtime.js';
 import { purgeNotificationPersonalData } from './application/purge-notification-personal-data.js';
 
 const port = Number(process.env.PORT || 3000);
@@ -293,6 +296,7 @@ if (process.env.NODE_ENV !== 'test') {
 const app = createApp({
   catalog,
   repository,
+  submissionLease: { repository: new PostgresSubmissionProcessingRepository(db) },
   temporaryFileStorage,
   googleDriveRepository,
   spreadsheetRepository: googleSheetsRepository,
@@ -310,6 +314,30 @@ const app = createApp({
   checkDatabase: checkDb,
   checkCatalog,
 });
+
+// Barrido de envíos abandonados y tareas diferidas (P4). Apagado por defecto: se enciende con
+// SUBMISSION_SWEEPER_ENABLED=true una vez verificado con `pnpm --filter api sweep:once --dry-run`.
+const sweeperEnabled = process.env.SUBMISSION_SWEEPER_ENABLED === 'true';
+const sweeperId = newSweeperId();
+let sweeping = false;
+const sweeperInterval = sweeperEnabled
+  ? setInterval(async () => {
+      if (sweeping) return;
+      sweeping = true;
+      try {
+        const summary = await sweepOnce(createSweepDependencies(db, submissionRecoveryRepository), { owner: sweeperId, now: new Date() });
+        if (summary.abandoned.length > 0 || summary.dueTasks > 0 || summary.errors.length > 0) {
+          console.log(`[Sweeper] ${summary.abandoned.length} envío(s) abandonado(s), ${summary.dueTasks} tarea(s), ${summary.errors.length} error(es).`);
+        }
+      } catch (err) {
+        console.error('[Sweeper] Error en el barrido:', err instanceof Error ? err.message : err);
+      } finally {
+        sweeping = false;
+      }
+    }, 60_000)
+  : undefined;
+sweeperInterval?.unref();
+if (sweeperEnabled) console.log('[Sweeper] Barrido de envíos abandonados habilitado.');
 
 const cleanupInterval = setInterval(async () => {
   try {
@@ -366,6 +394,7 @@ async function shutdown(signal: string) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[Process] ${signal} recibido: cerrando el servidor...`);
+  if (sweeperInterval) clearInterval(sweeperInterval);
   const forceExit = setTimeout(() => process.exit(1), 25_000);
   forceExit.unref();
   server.close(async () => {

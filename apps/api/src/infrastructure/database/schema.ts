@@ -228,7 +228,7 @@ export interface SubmissionRecoveriesTable {
   id: string;
   submission_id: string;
   target_id: string;
-  stage: 'drive' | 'sheets' | 'notifications' | 'unknown';
+  stage: 'drive' | 'sheets' | 'notifications' | 'unknown' | 'sheets_duplicate' | 'files_missing' | 'task_failed';
   status: 'pending' | 'retrying' | 'resolved' | 'discarded';
   safe_error: string;
   spreadsheet_url: Generated<string | null>;

@@ -1,3 +1,4 @@
+import type { SubmissionProcessingRepository } from '../../ports/submission-processing-repository.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
@@ -117,6 +118,41 @@ export interface SubmissionTelegramDependencies {
   getRecoveryChatIds?: () => Promise<string[]> | string[];
 }
 
+export interface LeaseOptions {
+  repository: Pick<SubmissionProcessingRepository, 'renewLease' | 'releaseLease'>;
+  /** Cada cuánto se renueva el lease mientras el envío trabaja. Por defecto 20 s. */
+  renewEveryMs?: number;
+  /** Duración de cada renovación. Por defecto 60 s. */
+  ttlMs?: number;
+}
+
+/**
+ * Mantiene vivo el lease de un envío mientras se procesa. `stop()` detiene el temporizador y libera el lease;
+ * es idempotente y nunca lanza (un fallo al renovar solo se registra: el barrido decidirá).
+ */
+function startLeaseRenewal(options: LeaseOptions, submissionId: string, owner: string): { stop: () => Promise<void> } {
+  const ttlMs = options.ttlMs ?? 60_000;
+  const timer = setInterval(() => {
+    options.repository.renewLease(submissionId, owner, new Date(), ttlMs).catch((error) => {
+      console.error('[Lease] No se pudo renovar el lease del envío:', error instanceof Error ? error.message : error);
+    });
+  }, options.renewEveryMs ?? 20_000);
+  timer.unref?.();
+  let stopped = false;
+  return {
+    async stop() {
+      if (stopped) return;
+      stopped = true;
+      clearInterval(timer);
+      try {
+        await options.repository.releaseLease(submissionId, owner);
+      } catch (error) {
+        console.error('[Lease] No se pudo liberar el lease del envío:', error instanceof Error ? error.message : error);
+      }
+    },
+  };
+}
+
 export function createSubmissionRoutes(
   catalog: AcademicCatalog,
   repository: SubmissionRepository,
@@ -127,11 +163,13 @@ export function createSubmissionRoutes(
   telegramDependencies?: SubmissionTelegramDependencies,
   mauticDependencies?: { isContactSyncEnabled: () => Promise<boolean>; isEnrollmentNotifyEnabled?: () => Promise<boolean> },
   limits?: { perEmail?: RateLimitOptions },
+  lease?: LeaseOptions,
 ): Router {
   const router = Router({ mergeParams: true });
   const emailLimiter = limits?.perEmail ? new RateLimiter(limits.perEmail) : undefined;
 
   router.post('/', async (req, res, next) => {
+    let leaseGuard: { stop: () => Promise<void> } | undefined;
     try {
       const params = req.params as Record<string, string | undefined>;
       const targetId = params.id ?? '';
@@ -283,6 +321,11 @@ export function createSubmissionRoutes(
       }
 
       if (emailLimiter && emailKey) emailLimiter.hit(emailKey);
+
+      // Desde aquí el envío es nuestro: se mantiene vivo su lease hasta terminar, sea cual sea la salida.
+      if (lease && result.leaseOwner) {
+        leaseGuard = startLeaseRenewal(lease, result.submissionId, result.leaseOwner);
+      }
 
       const files = parsed.data.files;
       let storedDriveFiles: Array<{ token: string; driveFileId?: string }> = [];
@@ -529,6 +572,8 @@ export function createSubmissionRoutes(
       res.status(201).json({ submissionId: result.submissionId });
     } catch (err) {
       next(err);
+    } finally {
+      await leaseGuard?.stop();
     }
   });
 
