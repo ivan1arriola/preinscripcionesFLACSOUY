@@ -161,18 +161,10 @@ if [[ "$DRY_RUN" == true ]]; then
 fi
 
 ssh "$REMOTE_HOST" "mkdir -p '$REMOTE_RELEASES/$SHA' '$REMOTE_ROOT'"
-rsync -az --delete \
-  --exclude='.git/' \
-  --exclude='.secrets/' \
-  --exclude='.env' \
-  --exclude='.env.*' \
-  --exclude='node_modules/' \
-  --exclude='dist/' \
-  --exclude='coverage/' \
-  --exclude='test-results/' \
-  --exclude='playwright-report/' \
-  --exclude='backups/' \
-  "$REPO_ROOT/" "$REMOTE_HOST:$REMOTE_RELEASES/$SHA/"
+# Copia con tar sobre ssh (no requiere rsync, que no existe en Git Bash/Windows).
+# Se vacía antes el destino para replicar el --delete de rsync si se repite un SHA.
+ssh "$REMOTE_HOST" "find '$REMOTE_RELEASES/$SHA' -mindepth 1 -delete"
+tar -C "$REPO_ROOT"   --exclude='.git'   --exclude='.secrets'   --exclude='.env'   --exclude='.env.*'   --exclude='node_modules'   --exclude='dist'   --exclude='coverage'   --exclude='test-results'   --exclude='playwright-report'   --exclude='backups'   -cf - . | ssh "$REMOTE_HOST" "tar -xf - -C '$REMOTE_RELEASES/$SHA'"
 
 ssh "$REMOTE_HOST" "bash -s" <<<"$REMOTE_SCRIPT"
 
