@@ -16,7 +16,7 @@ describe('HttpGoogleSheetsClient', () => {
     });
   });
 
-  it('inserts exactly one row below the header', async () => {
+  it('inserts exactly one row below the header and clears inherited colors', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const client = new HttpGoogleSheetsClient({ accessTokenOrProvider: 'token' });
@@ -28,12 +28,21 @@ describe('HttpGoogleSheetsClient', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          requests: [{
-            insertDimension: {
-              range: { sheetId: 123, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
-              inheritFromBefore: false,
+          requests: [
+            {
+              insertDimension: {
+                range: { sheetId: 123, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+                inheritFromBefore: false,
+              },
             },
-          }],
+            {
+              repeatCell: {
+                range: { sheetId: 123, startRowIndex: 1, endRowIndex: 2 },
+                cell: {},
+                fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.backgroundColorStyle,userEnteredFormat.textFormat.foregroundColor,userEnteredFormat.textFormat.foregroundColorStyle',
+              },
+            },
+          ],
         }),
       }),
     );

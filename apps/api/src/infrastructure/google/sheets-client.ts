@@ -198,17 +198,32 @@ export class HttpGoogleSheetsClient implements SheetsClient {
           Accept: 'application/json',
         },
         body: JSON.stringify({
-          requests: [{
-            insertDimension: {
-              range: {
-                sheetId,
-                dimension: 'ROWS',
-                startIndex,
-                endIndex,
+          requests: [
+            {
+              insertDimension: {
+                range: {
+                  sheetId,
+                  dimension: 'ROWS',
+                  startIndex,
+                  endIndex,
+                },
+                inheritFromBefore: false,
               },
-              inheritFromBefore: false,
             },
-          }],
+            // Al insertar, Sheets copia el formato de la fila vecina (la última inscripta,
+            // que las asistentes suelen colorear). Se limpian el color de fondo y el color de texto de la fila nueva.
+            {
+              repeatCell: {
+                range: {
+                  sheetId,
+                  startRowIndex: startIndex,
+                  endRowIndex: endIndex,
+                },
+                cell: {},
+                fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.backgroundColorStyle,userEnteredFormat.textFormat.foregroundColor,userEnteredFormat.textFormat.foregroundColorStyle',
+              },
+            },
+          ],
         }),
       },
       'al insertar una fila en Google Sheets'
