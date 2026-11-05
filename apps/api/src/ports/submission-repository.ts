@@ -23,6 +23,8 @@ export interface ValidatedSubmissionRecord {
 export interface SavedSubmissionResult {
   id: string;
   existing: boolean;
+  /** Dueño del lease con el que nació la fila de procesamiento (solo en envíos nuevos). */
+  leaseOwner?: string;
 }
 
 export interface SubmissionRepository {

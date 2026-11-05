@@ -7,6 +7,9 @@ import type {
 } from '../../ports/submission-repository.js';
 import type { KyselyDb } from './kysely.js';
 
+/** Duración del lease del procesador; se renueva mientras el envío sigue trabajando. */
+export const SUBMISSION_LEASE_TTL_MS = 60_000;
+
 export class PostgresSubmissionRepository implements SubmissionRepository {
   constructor(private readonly db: KyselyDb) {}
 
@@ -37,6 +40,8 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
     }
 
     const submissionId = `sub_${crypto.randomUUID().replace(/-/g, '')}`;
+    // El lease nace con la fila, dentro de la misma transacción: nunca hay una preinscripción guardada sin dueño.
+    const leaseOwner = `req_${crypto.randomUUID().replace(/-/g, '')}`;
 
     try {
       await this.db.transaction().execute(async (trx) => {
@@ -143,6 +148,9 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
             status: 'pending',
             error_message: null,
             updated_at: new Date(),
+            lease_owner: leaseOwner,
+            lease_expires_at: new Date(Date.now() + SUBMISSION_LEASE_TTL_MS),
+            protocol_version: 1,
           })
           .execute();
 
@@ -180,7 +188,7 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
         }
       });
 
-      return { id: submissionId, existing: false };
+      return { id: submissionId, existing: false, leaseOwner };
     } catch (error: any) {
       if (record.clientSubmissionId && error?.code === '23505') {
         const existingAfterRace = await this.db

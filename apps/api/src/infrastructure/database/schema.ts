@@ -57,6 +57,32 @@ export interface SubmissionProcessingTable {
   status: 'pending' | 'success' | 'failed' | 'unknown';
   error_message: string | null;
   updated_at: Generated<Date>;
+  lease_owner: string | null;
+  lease_expires_at: Date | null;
+  next_attempt_at: Date | null;
+  protocol_version: number | null;
+  sheet_attempt_started_at: Date | null;
+  sheet_written_at: Date | null;
+}
+
+export interface SubmissionTasksTable {
+  id: Generated<string>;
+  submission_id: string;
+  kind: 'sheets_reconcile' | 'sheets_recount';
+  run_at: Date;
+  claimed_by: string | null;
+  claimed_until: Date | null;
+  attempts: Generated<number>;
+  done_at: Date | null;
+  last_error: string | null;
+  created_at: Generated<Date>;
+}
+
+export interface DriveFoldersTable {
+  folder_key: string;
+  drive_folder_id: string;
+  created_at: Generated<Date>;
+  confirmed_at: Date | null;
 }
 
 export interface SubmissionFilesTable {
@@ -68,6 +94,7 @@ export interface SubmissionFilesTable {
   size: number;
   status: 'pending' | 'success' | 'failed' | 'unknown';
   drive_file_id: string | null;
+  drive_reserved_id: string | null;
   error_message: string | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
@@ -282,6 +309,8 @@ export interface DatabaseSchema {
   orientation_mentions: OrientationMentionsTable;
   submissions: SubmissionsTable;
   submission_processing: SubmissionProcessingTable;
+  submission_tasks: SubmissionTasksTable;
+  drive_folders: DriveFoldersTable;
   submission_files: SubmissionFilesTable;
   submission_values: SubmissionValuesTable;
   technical_cache: TechnicalCacheTable;
