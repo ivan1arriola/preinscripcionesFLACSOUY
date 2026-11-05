@@ -169,7 +169,8 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
         if (error instanceof FileStorageError) throw error;
         // Una carrera con la limpieza puede dejar un error de sistema de archivos crudo (p. ej. EPERM en Windows).
         // Si el archivo ya no está en ningún sitio, el resultado es el mismo: venció.
-        if (!(await this.locate(token))) {
+        const stillThere = await this.locate(token).then((found) => found !== null, () => true);
+        if (!stillThere) {
           throw new FileStorageError('FILE_EXPIRED', 'El archivo ya venció. Volvé a cargarlo.');
         }
         throw error;
@@ -296,7 +297,7 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
       }
       for (const token of entries) {
         if (!TOKEN_PATTERN.test(token)) continue;
-        const metadata = await this.readMetadata(join(base, token));
+        const metadata = await this.readMetadata(join(base, token)).catch(() => null);
         if (metadata && metadata.sessionId === sessionId) {
           results.push({
             token,
@@ -393,7 +394,8 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
     for (const token of entries) {
       if (!TOKEN_PATTERN.test(token)) continue;
       const dir = join(this.options.rootDir, RETAINED_DIR, token);
-      const metadata = await this.readMetadata(dir);
+      // Metadatos ilegibles: no se asume que el archivo sobra; se deja para revisión.
+      const metadata = await this.readMetadata(dir).catch(() => null);
       if (!metadata) continue;
       const pinnedAt = new Date(metadata.pinnedAt ?? metadata.createdAt).getTime();
       if (pinnedAt >= pinnedBefore) continue;
@@ -427,16 +429,31 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
     return null;
   }
 
+  /**
+   * Devuelve null SOLO si el archivo no existe. Cualquier otro fallo (JSON ilegible, permisos) se propaga:
+   * "no se pudo leer" nunca debe interpretarse como "ya no existe".
+   */
   private async readMetadata(dir: string): Promise<StoredMetadata | null> {
+    let raw: string;
     try {
-      return JSON.parse(await readFile(join(dir, 'metadata.json'), 'utf8')) as StoredMetadata;
-    } catch {
-      return null;
+      raw = await readFile(join(dir, 'metadata.json'), 'utf8');
+    } catch (error) {
+      if (isFsError(error, ['ENOENT', 'ENOTDIR'])) return null;
+      throw error;
     }
+    return JSON.parse(raw) as StoredMetadata;
   }
 
+  /** Escritura atómica: archivo temporal + rename, para que ningún lector vea un JSON a medio escribir. */
   private async writeMetadata(dir: string, metadata: StoredMetadata): Promise<void> {
-    await writeFile(join(dir, 'metadata.json'), JSON.stringify(metadata), { mode: 0o600 });
+    const temporary = join(dir, `metadata.json.${crypto.randomBytes(4).toString('hex')}.tmp`);
+    await writeFile(temporary, JSON.stringify(metadata), { mode: 0o600 });
+    try {
+      await renameWithRetry(temporary, join(dir, 'metadata.json'));
+    } catch (error) {
+      await rm(temporary, { force: true });
+      throw error;
+    }
   }
 
   /** Reclama `source` moviéndolo a `deleting/` y lo borra. Devuelve false si otro ya lo reclamó o no existe. */
