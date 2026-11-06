@@ -267,6 +267,37 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
       .execute();
   }
 
+  async getReservedDriveFileId(token: string): Promise<string | null> {
+    const row = await this.db
+      .selectFrom('submission_files')
+      .select('drive_reserved_id')
+      .where('token', '=', token)
+      .executeTakeFirst();
+    return row?.drive_reserved_id ?? null;
+  }
+
+  async reserveDriveFileId(token: string, driveReservedId: string): Promise<string> {
+    const updated = await this.db
+      .updateTable('submission_files')
+      .set({ drive_reserved_id: driveReservedId, updated_at: new Date() })
+      .where('token', '=', token)
+      .where('drive_reserved_id', 'is', null)
+      .returning('drive_reserved_id')
+      .executeTakeFirst();
+
+    if (updated?.drive_reserved_id) {
+      return updated.drive_reserved_id;
+    }
+
+    const existing = await this.db
+      .selectFrom('submission_files')
+      .select('drive_reserved_id')
+      .where('token', '=', token)
+      .executeTakeFirst();
+
+    return existing?.drive_reserved_id ?? driveReservedId;
+  }
+
   async recordProcessingFailure(
     id: string,
     stage: 'drive' | 'sheets' | 'notifications' | 'unknown',

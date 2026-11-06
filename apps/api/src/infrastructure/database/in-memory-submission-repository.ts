@@ -10,6 +10,7 @@ export class InMemorySubmissionRepository implements SubmissionRepository {
   public submissions: Array<ValidatedSubmissionRecord & { id: string; submittedAt: Date }> = [];
   public processingStatuses: Map<string, { status: string; errorMessage?: string }> = new Map();
   public fileStatuses: Map<string, { status: string; driveFileId?: string; errorMessage?: string }> = new Map();
+  public reservedFileIds: Map<string, string> = new Map();
 
   constructor(public recoveryRepository?: SubmissionRecoveryRepository) {}
 
@@ -53,6 +54,17 @@ export class InMemorySubmissionRepository implements SubmissionRepository {
 
   async markFileFailed(token: string, errorMessage: string): Promise<void> {
     this.fileStatuses.set(token, { status: 'failed', errorMessage });
+  }
+
+  async getReservedDriveFileId(token: string): Promise<string | null> {
+    return this.reservedFileIds.get(token) ?? null;
+  }
+
+  async reserveDriveFileId(token: string, driveReservedId: string): Promise<string> {
+    const existing = this.reservedFileIds.get(token);
+    if (existing) return existing;
+    this.reservedFileIds.set(token, driveReservedId);
+    return driveReservedId;
   }
 
   async recordProcessingFailure(
