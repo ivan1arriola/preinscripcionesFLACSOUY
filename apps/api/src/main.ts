@@ -38,6 +38,7 @@ import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
 import { PostgresSubmissionProcessingRepository } from './infrastructure/database/postgres-submission-processing-repository.js';
+import { createGracefulShutdownHandler } from './graceful-shutdown.js';
 import { sweepOnce } from './application/sweep-abandoned-submissions.js';
 import { createSweepDependencies, newSweeperId } from './infrastructure/sweep-runtime.js';
 import { purgeNotificationPersonalData } from './application/purge-notification-personal-data.js';
@@ -388,22 +389,16 @@ const server = app.listen(port, () => {
   console.log(`API server listening on port ${port}`);
 });
 
-// Apagado ordenado: deja terminar las peticiones en curso (envíos con Drive/Sheets) antes de cerrar.
-let shuttingDown = false;
-async function shutdown(signal: string) {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  console.log(`[Process] ${signal} recibido: cerrando el servidor...`);
-  if (sweeperInterval) clearInterval(sweeperInterval);
-  const forceExit = setTimeout(() => process.exit(1), 25_000);
-  forceExit.unref();
-  server.close(async () => {
-    try {
-      await db.destroy();
-    } finally {
-      process.exit(0);
-    }
-  });
-}
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
-process.on('SIGINT', () => void shutdown('SIGINT'));
+// Apagado ordenado: deja terminar las peticiones en curso (envíos con Drive/Sheets) hasta 110 s antes de salir.
+const handleShutdown = createGracefulShutdownHandler({
+  server,
+  onBeforeClose: () => {
+    if (sweeperInterval) clearInterval(sweeperInterval);
+    clearInterval(cleanupInterval);
+  },
+  onAfterClose: async () => {
+    await db.destroy();
+  },
+});
+process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
+process.on('SIGINT', () => void handleShutdown('SIGINT'));
