@@ -7,7 +7,7 @@ Este documento detalla el procedimiento operativo, de verificación y de rollbac
 ## 1. Procedimiento de Rollback
 
 El diseño del protocolo es aditivo y hacia atrás compatible:
-- **Base de datos:** Todas las nuevas columnas (`lease_owner`, `lease_expires_at`, `next_attempt_at`, `protocol_version`, `sheet_attempt_started_at`, `sheet_written_at`, `drive_reserved_id`) son nulas o tienen valores por defecto, y las nuevas tablas (`drive_folders`, `submission_tasks`) no interfieren con el código previo.
+- **Base de datos:** Todas las nuevas columnas (`lease_owner`, `lease_expires_at`, `next_attempt_at`, `protocol_version`, `sheet_attempt_started_at`, `sheet_written_at`, `sheet_payload`, `sheet_reconcile_until`, `drive_reserved_id`) son nulas o tienen valores por defecto, y las nuevas tablas (`drive_folders`, `submission_tasks`) no interfieren con el código previo.
 - **Archivos en disco:** El subdirectorio `<root>/retained/` almacena los archivos fijados. El código viejo solo interactúa con `<root>/<token>`, por lo que no colisiona con el almacenamiento retained.
 - **Drive:** Los archivos creados con `drive_reserved_id` mantienen los metadatos `appProperties` que el código anterior utiliza para su indexación.
 
@@ -70,7 +70,7 @@ El comando `sweep:once` permite ejecutar manualmente el barrido de envíos aband
 - Cuando está en `true`, se activa un temporizador en segundo plano que cada 60 s invoca la rutina de barrido para reclamar envíos abandonados y ejecutar tareas diferidas pendientes.
 
 ### Recomendación operativa
-Durante la fase inicial de Release B, mantener `SUBMISSION_SWEEPER_ENABLED=false`. Una vez verificado el comportamiento del sistema y tras realizar pruebas controladas con `sweep:once`, activar la variable configurando `SUBMISSION_SWEEPER_ENABLED=true` en el entorno de producción.
+Las tareas `sheets_reconcile` y `sheets_recount` **solo las ejecuta el barrido del servicio** (`sweep:once` no tiene credenciales de Google y no las toma). Con la bandera en `false`, una duda de Sheets queda como caso `sheets` visible pero no se reconcilia sola. Durante la fase inicial de Release B, mantener `SUBMISSION_SWEEPER_ENABLED=false`. Una vez verificado el comportamiento del sistema y tras realizar pruebas controladas con `sweep:once`, activar la variable configurando `SUBMISSION_SWEEPER_ENABLED=true` en el entorno de producción.
 
 ---
 
