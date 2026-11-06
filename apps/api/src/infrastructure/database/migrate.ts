@@ -24,6 +24,7 @@ import * as mauticEnrollmentNotifySchema from './migrations/024_mautic_enrollmen
 import * as recoveryNotificationLinksSchema from './migrations/025_recovery_notification_links.js';
 import * as offerRegistrationLinksSchema from './migrations/026_offer_registration_links.js';
 import * as submissionProtocolSchema from './migrations/027_submission_protocol.js';
+import * as sheetPayloadSchema from './migrations/028_sheet_payload.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -52,6 +53,7 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await recoveryNotificationLinksSchema.up(db);
   await offerRegistrationLinksSchema.up(db);
   await submissionProtocolSchema.up(db);
+  await sheetPayloadSchema.up(db);
   console.log('Migrations complete.');
 }
 

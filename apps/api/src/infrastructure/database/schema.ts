@@ -63,6 +63,7 @@ export interface SubmissionProcessingTable {
   protocol_version: number | null;
   sheet_attempt_started_at: Date | null;
   sheet_written_at: Date | null;
+  sheet_payload: unknown | null;
 }
 
 export interface SubmissionTasksTable {

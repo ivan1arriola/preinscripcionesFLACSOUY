@@ -44,7 +44,7 @@ export class PostgresSubmissionProcessingRepository implements SubmissionProcess
            SET lease_owner = ${owner}, lease_expires_at = ${expires}
          WHERE sp.submission_id IN (
            SELECT p.submission_id FROM submission_processing p
-            WHERE p.status = 'pending'
+            WHERE p.status IN ('pending', 'sheet_uncertain')
               AND COALESCE(p.lease_expires_at, p.updated_at + ${LEGACY_GRACE}) < ${now}
               AND (p.next_attempt_at IS NULL OR p.next_attempt_at <= ${now})
               AND NOT EXISTS (
@@ -63,7 +63,7 @@ export class PostgresSubmissionProcessingRepository implements SubmissionProcess
     const result = await sql<{ submission_id: string; target_id: string; legacy: boolean }>`
       SELECT p.submission_id, s.target_id, (p.protocol_version IS NULL) AS legacy
         FROM submission_processing p JOIN submissions s ON s.id = p.submission_id
-       WHERE p.status = 'pending'
+       WHERE p.status IN ('pending', 'sheet_uncertain')
          AND COALESCE(p.lease_expires_at, p.updated_at + ${LEGACY_GRACE}) < ${now}
          AND (p.next_attempt_at IS NULL OR p.next_attempt_at <= ${now})
          AND NOT EXISTS (

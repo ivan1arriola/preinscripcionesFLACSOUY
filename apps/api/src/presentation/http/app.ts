@@ -1,3 +1,4 @@
+import type { SheetsAttemptDependencies } from '../../application/write-sheets-row.js';
 import type { MauticClient } from '../../infrastructure/mautic/mautic-client.js';
 import { shouldQueueEnrollmentNotice, loadMauticConfig, type MauticConfig } from '../../infrastructure/mautic/mautic-config.js';
 import express, { type Express } from 'express';
@@ -85,6 +86,8 @@ export interface AppDependencies {
   temporaryFileStorage?: TemporaryFileStoragePort;
   googleDriveRepository?: GoogleDriveRepositoryPort;
   spreadsheetRepository?: SpreadsheetRepository;
+  /** Intentos durables de Sheets (P3). */
+  sheetsAttempts?: SheetsAttemptDependencies;
   targetSpreadsheetService?: TargetSpreadsheetService;
   targetSpreadsheetRepository?: TargetSpreadsheetRepository;
   googleIdentityVerifier?: GoogleIdentityVerifierPort;
@@ -206,6 +209,7 @@ export function createApp(dependencies: AppDependencies): Express {
       ? {
           repository: dependencies.spreadsheetRepository,
           targetSpreadsheetService: dependencies.targetSpreadsheetService,
+          attempts: dependencies.sheetsAttempts,
         }
       : undefined,
     dependencies.emailNotificationRepository
@@ -339,6 +343,7 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.telegramProviderFactory,
     dependencies.telegramAlertRepository,
     dependencies.mauticClientFactory,
+    dependencies.sheetsAttempts,
   ));
 
   // Central error handler

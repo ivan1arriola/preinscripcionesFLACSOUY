@@ -1,3 +1,4 @@
+import type { SheetsAttemptDependencies } from '../../application/write-sheets-row.js';
 import type { Router } from 'express';
 import { createAsyncRouter } from './async-router.js';
 import { z } from 'zod';
@@ -228,6 +229,7 @@ export function createAdminSettingsRoutes(
   telegramProviderFactory?: (botToken: string) => TelegramProvider,
   telegramAlertRepository?: TelegramAlertRepository,
   mauticClientFactory?: (config: MauticConfig) => Pick<MauticClient, 'verify'>,
+  sheetsAttempts?: SheetsAttemptDependencies,
 ): Router {
   const router = createAsyncRouter();
   const requireAdmin = createRequireAdminSession(sessionStore);
@@ -1131,7 +1133,7 @@ export function createAdminSettingsRoutes(
           ? { storage: temporaryFileStorage, drive: googleDriveRepository }
           : undefined,
         spreadsheetDependencies: targetSpreadsheetService && spreadsheetRepository
-          ? { targetSpreadsheetService, repository: spreadsheetRepository }
+          ? { targetSpreadsheetService, repository: spreadsheetRepository, attempts: sheetsAttempts }
           : undefined,
         notificationDependencies: emailNotificationRepository
           ? {

@@ -143,7 +143,13 @@ export async function writeSubmissionToSheets(
 
   // 3. Camino normal (sin incertidumbre previa)
   const startedAt = now;
-  await deps.store.recordAttemptStarted(input.submissionId, startedAt);
+  await deps.store.recordAttemptStarted(input.submissionId, startedAt, {
+    spreadsheetId: input.spreadsheetId,
+    sheetName,
+    requiredColumns: input.requiredColumns,
+    trackingId,
+    valuesByColumnName: input.valuesByColumnName,
+  });
 
   let appendResult: AppendResult;
   try {

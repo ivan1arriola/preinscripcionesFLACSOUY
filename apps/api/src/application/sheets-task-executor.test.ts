@@ -163,6 +163,22 @@ describe('sheets-task-executor', () => {
       expect(record?.sheetWrittenAt).not.toBeNull();
     });
 
+    it('a premature reconciliation does not write, read the sheet or burn an attempt (the rescheduled task will run it)', async () => {
+      const { deps, spreadsheetRepository, store, setTime } = setup();
+      const task: SubmissionTask = {
+        id: 'task-early', submissionId: 'sub-dup-123', kind: 'sheets_reconcile',
+        runAt: new Date('2026-11-06T12:03:20Z'), attempts: 1,
+      };
+      await store.recordAttemptStarted('sub-dup-123', new Date('2026-11-06T12:00:00Z'));
+      await store.markUncertain('sub-dup-123', new Date('2026-11-06T12:06:40Z'), 'timeout');
+      setTime(new Date('2026-11-06T12:03:25Z'));
+
+      await expect(executeSheetsTask(deps, task)).resolves.toBeUndefined();
+
+      expect(spreadsheetRepository.countTrackingId).not.toHaveBeenCalled();
+      expect(spreadsheetRepository.appendByHeaders).not.toHaveBeenCalled();
+    });
+
     it('throws when writeSubmissionToSheets returns uncertain error so worker can failTask and reschedule', async () => {
       const { deps, spreadsheetRepository, store, setTime } = setup();
       const task: SubmissionTask = {

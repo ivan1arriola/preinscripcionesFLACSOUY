@@ -58,6 +58,15 @@ integrationDescribe('sweepOnce (Integration with PostgreSQL)', () => {
     expect(await db.selectFrom('submission_recoveries').select('id').where('submission_id', '=', id).execute()).toHaveLength(1);
   });
 
+  it('also finds an abandoned submission left in sheet_uncertain (crash between the uncertainty and the failure case)', async () => {
+    const id = await abandonedSubmission();
+    await db.updateTable('submission_processing').set({ status: 'sheet_uncertain', next_attempt_at: new Date(Date.now() - 60_000) })
+      .where('submission_id', '=', id).execute();
+    const summary = await sweepOnce(createSweepDependencies(db), { owner: 'u', now: new Date() });
+    expect(summary.abandoned.map((a) => a.submissionId)).toContain(id);
+    expect(await db.selectFrom('submission_recoveries').select('id').where('submission_id', '=', id).execute()).toHaveLength(1);
+  });
+
   it('two simultaneous sweepers produce a single case', async () => {
     const id = await abandonedSubmission();
     const deps = createSweepDependencies(db);

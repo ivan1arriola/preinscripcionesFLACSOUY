@@ -41,6 +41,8 @@ import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveri
 import { PostgresSubmissionProcessingRepository } from './infrastructure/database/postgres-submission-processing-repository.js';
 import { createGracefulShutdownHandler } from './graceful-shutdown.js';
 import { startupReconcile } from './application/startup-reconcile.js';
+import { PostgresSheetsAttemptStore } from './infrastructure/database/postgres-sheets-attempt-store.js';
+import { createSheetsTaskExecutors } from './application/sheets-task-executor.js';
 import { sweepOnce } from './application/sweep-abandoned-submissions.js';
 import { createSweepDependencies, newSweeperId } from './infrastructure/sweep-runtime.js';
 import { purgeNotificationPersonalData } from './application/purge-notification-personal-data.js';
@@ -301,8 +303,13 @@ if (process.env.NODE_ENV !== 'test') {
 
 const submissionProcessingRepository = new PostgresSubmissionProcessingRepository(db);
 
+// Intentos durables de Sheets (P3): la fila se escribe con estado persistido y las dudas se reconcilian por cola.
+const sheetsAttemptStore = new PostgresSheetsAttemptStore(db);
+const sheetsAttempts = { store: sheetsAttemptStore, tasks: submissionProcessingRepository };
+
 const app = createApp({
   catalog,
+  sheetsAttempts,
   repository,
   submissionLease: { repository: submissionProcessingRepository },
   temporaryFileStorage,
@@ -333,7 +340,29 @@ const sweeperInterval = sweeperEnabled
       if (sweeping) return;
       sweeping = true;
       try {
-        const summary = await sweepOnce(createSweepDependencies(db, submissionRecoveryRepository), { owner: sweeperId, now: new Date() });
+        const summary = await sweepOnce(createSweepDependencies(db, submissionRecoveryRepository), {
+          owner: sweeperId,
+          now: new Date(),
+          // Sin credenciales de Google no hay hoja que reconciliar: las tareas quedan en cola sin gastar intentos.
+          executors: googleSheetsRepository
+            ? createSheetsTaskExecutors({
+                store: sheetsAttemptStore,
+                spreadsheetRepository: googleSheetsRepository,
+                tasks: submissionProcessingRepository,
+                recoveryRepository: submissionRecoveryRepository,
+                loadSubmissionContext: async (id) => (await sheetsAttemptStore.loadContext(id)) ?? null,
+                telegramAlertRepository,
+                getTelegramChatIds: async () => {
+                  try {
+                    const cfg = await loadTelegramConfig(encryptedSettingsService);
+                    return cfg.enabled ? cfg.chatIds : [];
+                  } catch {
+                    return [];
+                  }
+                },
+              })
+            : undefined,
+        });
         if (summary.abandoned.length > 0 || summary.dueTasks > 0 || summary.errors.length > 0) {
           console.log(`[Sweeper] ${summary.abandoned.length} envío(s) abandonado(s), ${summary.dueTasks} tarea(s), ${summary.errors.length} error(es).`);
         }

@@ -1,3 +1,4 @@
+import { writeSheetsRow, type SheetsAttemptDependencies } from '../../application/write-sheets-row.js';
 import type { SubmissionProcessingRepository } from '../../ports/submission-processing-repository.js';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -98,6 +99,8 @@ interface SubmissionFileDependencies {
 interface SubmissionSpreadsheetDependencies {
   repository: SpreadsheetRepository;
   targetSpreadsheetService: TargetSpreadsheetService;
+  /** Intentos durables de Sheets (P3); sin ellos se escribe directo. */
+  attempts?: SheetsAttemptDependencies;
 }
 
 export interface SubmissionNotificationDependencies {
@@ -430,12 +433,13 @@ export function createSubmissionRoutes(
             }
           );
 
-          await spreadsheetDependencies.repository.appendByHeaders(
-            spreadsheet.spreadsheetId,
+          await writeSheetsRow(spreadsheetDependencies, {
+            submissionId: result.submissionId,
+            spreadsheetId: spreadsheet.spreadsheetId,
+            sheetName: spreadsheet.sheetName,
+            requiredColumns: result.spreadsheet.requiredColumns,
             valuesByColumnName,
-            result.spreadsheet.requiredColumns,
-            spreadsheet.sheetName,
-          );
+          });
           spreadsheetRowUrl = `https://docs.google.com/spreadsheets/d/${spreadsheet.spreadsheetId}/edit`;
         } catch (error) {
           const safeError = sanitizeSafeError(error, 'No se pudo crear o guardar la planilla de la preinscripción.');

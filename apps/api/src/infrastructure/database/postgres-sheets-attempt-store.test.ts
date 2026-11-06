@@ -80,4 +80,29 @@ integrationDescribe('PostgresSheetsAttemptStore (Integration with PostgreSQL)', 
     const record = await store.get(saved.id);
     expect(record?.sheetWrittenAt).toEqual(writtenAt);
   });
+  it('keeps the row snapshot with the attempt and drops the personal values once written', async () => {
+    const saved = await newSubmission();
+    const payload = {
+      spreadsheetId: 'sheet-1', sheetName: 'Hoja 1', requiredColumns: ['ID de seguimiento'],
+      trackingId: saved.id, valuesByColumnName: { 'ID de seguimiento': saved.id, Email: 'a@example.com' },
+    };
+    await store.recordAttemptStarted(saved.id, new Date('2026-11-06T10:00:00Z'), payload);
+    expect((await store.get(saved.id))?.payload).toEqual(payload);
+
+    await store.recordWritten(saved.id, new Date('2026-11-06T10:00:01Z'));
+    const after = await store.get(saved.id);
+    expect(after?.payload).toEqual({ ...payload, valuesByColumnName: {} });
+    expect(JSON.stringify(after?.payload)).not.toContain('a@example.com');
+  });
+
+  it('loads the sheets context with the target of the submission', async () => {
+    const saved = await newSubmission();
+    const payload = {
+      spreadsheetId: 'sheet-1', sheetName: 'Hoja 1', requiredColumns: ['ID de seguimiento'],
+      trackingId: saved.id, valuesByColumnName: { 'ID de seguimiento': saved.id },
+    };
+    expect(await store.loadContext(saved.id)).toBeNull();
+    await store.recordAttemptStarted(saved.id, new Date(), payload);
+    expect(await store.loadContext(saved.id)).toEqual({ targetId: 'davia-c11', ...payload });
+  });
 });

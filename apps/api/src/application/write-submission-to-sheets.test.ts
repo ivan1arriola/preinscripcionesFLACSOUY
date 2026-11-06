@@ -15,7 +15,10 @@ class MemorySheetsAttemptStore implements SheetsAttemptStore {
     return this.records.get(submissionId) ?? null;
   }
 
-  async recordAttemptStarted(submissionId: string, startedAt: Date): Promise<void> {
+  public payloads = new Map<string, unknown>();
+
+  async recordAttemptStarted(submissionId: string, startedAt: Date, payload?: unknown): Promise<void> {
+    this.payloads.set(submissionId, payload);
     const existing = this.records.get(submissionId) ?? {
       submissionId,
       status: 'pending',
@@ -114,6 +117,20 @@ describe('writeSubmissionToSheets', () => {
     expect(spreadsheetRepository.countTrackingId).not.toHaveBeenCalled();
     expect(tasks.enqueueTask).not.toHaveBeenCalled();
     expect(spreadsheetRepository.appendByHeaders).toHaveBeenCalledOnce();
+  });
+
+  it('guarda la instantánea de la fila junto con el inicio del intento (para reconciliar sin reconstruirla)', async () => {
+    const { store, deps, baseInput } = setup();
+
+    await writeSubmissionToSheets(deps, baseInput);
+
+    expect(store.payloads.get('sub-123')).toEqual({
+      spreadsheetId: 'sheet-1',
+      sheetName: 'Respuestas',
+      requiredColumns: ['Nombre', 'ID de seguimiento'],
+      trackingId: 'sub-123',
+      valuesByColumnName: { Nombre: 'Ana', 'ID de seguimiento': 'sub-123' },
+    });
   });
 
   it('fallo antes de aplicarse (error de red/timeout): deja sheet_uncertain a +200 s y encola sheets_reconcile', async () => {

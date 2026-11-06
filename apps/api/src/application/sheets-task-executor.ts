@@ -82,11 +82,8 @@ export async function executeSheetsTask(
     if (result.status === 'uncertain') {
       throw new Error(result.error);
     }
-    if (result.status === 'wait') {
-      throw new Error(
-        `Reconciliación prematura para ${task.submissionId}: next_attempt_at es ${result.retryAt.toISOString()}`
-      );
-    }
+    // 'wait': todavía no corresponde reconciliar. Quien reprogramó la espera encoló otra tarea para ese momento,
+    // así que esta termina sin gastar un intento.
     return;
   }
 

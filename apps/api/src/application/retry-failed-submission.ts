@@ -1,3 +1,4 @@
+import { writeSheetsRow, type SheetsAttemptDependencies } from './write-sheets-row.js';
 import type { AcademicCatalog } from '../ports/academic-catalog.js';
 import type { SubmissionRepository } from '../ports/submission-repository.js';
 import type { SubmissionRecoveryRepository } from '../ports/submission-recovery-repository.js';
@@ -26,6 +27,7 @@ export interface RetrySubmissionDependencies {
   spreadsheetDependencies?: {
     targetSpreadsheetService: TargetSpreadsheetService;
     repository: SpreadsheetRepository;
+    attempts?: SheetsAttemptDependencies;
   };
   notificationDependencies?: {
     repository: EmailNotificationRepository;
@@ -347,12 +349,14 @@ export async function retryFailedSubmission(
       const requiredColumns = spreadsheetSchema.requiredColumns;
 
       const spreadsheet = await dependencies.spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target);
-      await dependencies.spreadsheetDependencies.repository.appendByHeaders(
-        spreadsheet.spreadsheetId,
-        valuesByColumnName,
+      await writeSheetsRow(dependencies.spreadsheetDependencies, {
+        submissionId,
+        spreadsheetId: spreadsheet.spreadsheetId,
+        sheetName: spreadsheet.sheetName,
         requiredColumns,
-        spreadsheet.sheetName
-      );
+        valuesByColumnName,
+        now,
+      });
       spreadsheetRowUrl = `https://docs.google.com/spreadsheets/d/${spreadsheet.spreadsheetId}/edit`;
     } catch (err) {
       const safeError = sanitizeSafeError(err, 'No se pudo crear o guardar la planilla de la preinscripción.');
