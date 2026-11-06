@@ -223,6 +223,53 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
   }
 
   /**
+   * Adopta archivos heredados a `retained/` sin comprobar sesión (uso administrativo en el arranque).
+   * Rename atómico de `<root>/<token>` a `<root>/retained/<token>` si sigue pendiente.
+   * Si ya está retenido cuenta como éxito. Devuelve la lista de tokens ausentes en ambos sitios.
+   */
+  async adoptFiles(tokens: string[]): Promise<string[]> {
+    const missing: string[] = [];
+    for (const token of tokens) {
+      this.assertToken(token);
+      const pending = join(this.options.rootDir, token);
+      const retained = join(this.options.rootDir, RETAINED_DIR, token);
+
+      let moved = false;
+      const pendingMeta = await this.readMetadata(pending);
+      if (pendingMeta) {
+        await mkdir(join(this.options.rootDir, RETAINED_DIR), { recursive: true, mode: 0o700 });
+        try {
+          await renameWithRetry(pending, retained);
+          moved = true;
+        } catch (error) {
+          if (!isFsError(error, ['ENOENT', 'EEXIST', 'ENOTEMPTY'])) throw error;
+        }
+      }
+
+      const retainedMeta = await this.readMetadata(retained);
+      if (!retainedMeta) {
+        missing.push(token);
+        continue;
+      }
+
+      const expiresAt = new Date(Date.now() + RETENTION_MS);
+      if (moved || !retainedMeta.pinnedAt) {
+        await this.writeMetadata(retained, {
+          ...retainedMeta,
+          pinnedAt: retainedMeta.pinnedAt ?? new Date().toISOString(),
+          pinnedFor: retainedMeta.pinnedFor ?? 'legacy-adoption',
+          expiresAt: expiresAt.toISOString(),
+        });
+      }
+      if (this.repository?.extendExpiry) {
+        await this.repository.extendExpiry(token, expiresAt);
+      }
+    }
+
+    return missing;
+  }
+
+  /**
    * Borrado público de un archivo pendiente (DELETE /uploads/:token). Nunca toca `retained/`: si el archivo
    * ya fue fijado por un envío responde FILE_ALREADY_SUBMITTED y lo deja intacto.
    */

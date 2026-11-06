@@ -35,5 +35,7 @@ export interface TemporaryFileStoragePort {
   releaseRetained?(token: string): Promise<void>;
   /** Borra los fijados cuya retención venció. */
   cleanupExpiredRetained?(before: number): Promise<number>;
+  /** Adopta archivos heredados a retained/ sin comprobar sesión (uso administrativo). Devuelve cuáles faltan. */
+  adoptFiles?(tokens: string[]): Promise<string[]>;
   extendRetention?(tokens: string | string[], newExpiresAt: Date): Promise<void>;
 }
