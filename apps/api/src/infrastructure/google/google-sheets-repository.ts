@@ -9,7 +9,7 @@ import {
   resolveAdditiveHeaders,
   validateSpreadsheetHeaders,
 } from '../../domain/spreadsheet-row.js';
-import { collapseLegacySpreadsheetRow } from '../../domain/spreadsheet-schema.js';
+import { collapseLegacySpreadsheetRow, SPREADSHEET_TRACKING_COLUMN } from '../../domain/spreadsheet-schema.js';
 import { type SheetsClient, buildSpreadsheetRowUrl } from './sheets-client.js';
 
 export class IncompatibleSpreadsheetError extends Error {
@@ -35,6 +35,35 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
   async readHeaders(spreadsheetId: string, sheetName = 'Sheet1'): Promise<string[]> {
     const actualSheetName = await this.resolveSheetName(spreadsheetId, sheetName);
     return this.readHeadersFromSheet(spreadsheetId, actualSheetName);
+  }
+
+  async countTrackingId(
+    spreadsheetId: string,
+    sheetName = 'Sheet1',
+    trackingId: string
+  ): Promise<number> {
+    const actualSheetName = await this.resolveSheetName(spreadsheetId, sheetName);
+    const range = `${toSheetRange(actualSheetName)}!A:ZZ`;
+    const columns = await this.client.getValues(spreadsheetId, range, 'COLUMNS');
+
+    if (!columns || columns.length === 0) {
+      throw new Error(
+        `Columna "${SPREADSHEET_TRACKING_COLUMN}" no encontrada en la planilla ${spreadsheetId} hoja "${actualSheetName}"`
+      );
+    }
+
+    const trackingColumn = columns.find(
+      (col) => col[0]?.trim() === SPREADSHEET_TRACKING_COLUMN
+    );
+
+    if (!trackingColumn) {
+      throw new Error(
+        `Columna "${SPREADSHEET_TRACKING_COLUMN}" no encontrada en la planilla ${spreadsheetId} hoja "${actualSheetName}"`
+      );
+    }
+
+    const trimmedTarget = trackingId.trim();
+    return trackingColumn.slice(1).filter((cell) => cell.trim() === trimmedTarget).length;
   }
 
   private async readHeadersFromSheet(spreadsheetId: string, sheetName: string): Promise<string[]> {
@@ -114,10 +143,70 @@ export class GoogleSheetsRepository implements SpreadsheetRepository {
       }
     }
 
-    await this.client.insertRows(spreadsheetId, sheetId, 1, 2);
-
     const rowRange = `${toSheetRange(actualSheetName)}!A2:${columnName(buildResult.row.length)}2`;
-    await this.client.updateValues(spreadsheetId, rowRange, [buildResult.row], 'USER_ENTERED');
+
+    if (this.client.batchUpdate) {
+      const cellValues = buildResult.row.map((cell) => {
+        if (cell.startsWith('=')) {
+          return {
+            userEnteredValue: {
+              formulaValue: cell,
+            },
+          };
+        }
+        return {
+          userEnteredValue: {
+            stringValue: cell,
+          },
+        };
+      });
+
+      await this.client.batchUpdate(spreadsheetId, [
+        {
+          insertDimension: {
+            range: {
+              sheetId,
+              dimension: 'ROWS',
+              startIndex: 1,
+              endIndex: 2,
+            },
+            inheritFromBefore: false,
+          },
+        },
+        {
+          updateCells: {
+            range: {
+              sheetId,
+              startRowIndex: 1,
+              endRowIndex: 2,
+              startColumnIndex: 0,
+              endColumnIndex: buildResult.row.length,
+            },
+            rows: [
+              {
+                values: cellValues,
+              },
+            ],
+            fields: 'userEnteredValue',
+          },
+        },
+        {
+          repeatCell: {
+            range: {
+              sheetId,
+              startRowIndex: 1,
+              endRowIndex: 2,
+            },
+            cell: {},
+            fields:
+              'userEnteredFormat.backgroundColor,userEnteredFormat.backgroundColorStyle,userEnteredFormat.textFormat.foregroundColor,userEnteredFormat.textFormat.foregroundColorStyle',
+          },
+        },
+      ]);
+    } else {
+      await this.client.insertRows(spreadsheetId, sheetId, 1, 2);
+      await this.client.updateValues(spreadsheetId, rowRange, [buildResult.row], 'USER_ENTERED');
+    }
 
     const rowUrl = buildSpreadsheetRowUrl(spreadsheetId, sheetId, rowRange);
 

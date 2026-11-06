@@ -12,7 +12,11 @@ export interface SheetMetadata {
 }
 
 export interface SheetsClient {
-  getValues(spreadsheetId: string, range: string): Promise<string[][]>;
+  getValues(
+    spreadsheetId: string,
+    range: string,
+    majorDimension?: 'ROWS' | 'COLUMNS',
+  ): Promise<string[][]>;
   updateValues(
     spreadsheetId: string,
     range: string,
@@ -26,6 +30,7 @@ export interface SheetsClient {
     range: string,
     values: string[][]
   ): Promise<{ updatedRange: string; updatedRows: number }>;
+  batchUpdate?(spreadsheetId: string, requests: unknown[]): Promise<unknown>;
   getSheetMetadata?(spreadsheetId: string, sheetTitle?: string): Promise<SheetMetadata | null>;
 }
 
@@ -107,11 +112,16 @@ export class HttpGoogleSheetsClient implements SheetsClient {
     }
   }
 
-  async getValues(spreadsheetId: string, range: string): Promise<string[][]> {
+  async getValues(
+    spreadsheetId: string,
+    range: string,
+    majorDimension?: 'ROWS' | 'COLUMNS',
+  ): Promise<string[][]> {
     const token = await this.tokenProvider();
+    const dimensionQuery = majorDimension ? `&majorDimension=${encodeURIComponent(majorDimension)}` : '';
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
       spreadsheetId
-    )}/values/${encodeURIComponent(range)}?valueRenderOption=FORMULA`;
+    )}/values/${encodeURIComponent(range)}?valueRenderOption=FORMULA${dimensionQuery}`;
 
     const res = await this.executeFetch(
       url,
@@ -177,6 +187,35 @@ export class HttpGoogleSheetsClient implements SheetsClient {
       updatedRange: data.updates?.updatedRange ?? range,
       updatedRows: data.updates?.updatedRows ?? values.length,
     };
+  }
+
+  async batchUpdate(spreadsheetId: string, requests: unknown[]): Promise<unknown> {
+    const token = await this.tokenProvider();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}:batchUpdate`;
+
+    const res = await this.executeFetch(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ requests }),
+      },
+      'al ejecutar batchUpdate en Google Sheets'
+    );
+
+    if (!res.ok) {
+      const details = await readGoogleApiError(res);
+      throw new GoogleSheetsClientError(
+        `Google Sheets API respondió con error HTTP ${res.status} al ejecutar batchUpdate${details ? `: ${details}` : ''}`,
+        res.status
+      );
+    }
+
+    return res.json();
   }
 
   async insertRows(

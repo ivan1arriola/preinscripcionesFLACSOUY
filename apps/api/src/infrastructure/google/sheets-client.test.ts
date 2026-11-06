@@ -48,6 +48,23 @@ describe('HttpGoogleSheetsClient', () => {
     );
   });
 
+  it('executes arbitrary batchUpdate requests via POST :batchUpdate', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"replies": []}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new HttpGoogleSheetsClient({ accessTokenOrProvider: 'token' });
+
+    const requests = [{ updateCells: { fields: 'userEnteredValue' } }];
+    await client.batchUpdate('sheet-xyz', requests);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://sheets.googleapis.com/v4/spreadsheets/sheet-xyz:batchUpdate',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ requests }),
+      }),
+    );
+  });
+
   it('retries on HTTP 429 and succeeds on subsequent attempt', async () => {
     const fetchMock = vi
       .fn()

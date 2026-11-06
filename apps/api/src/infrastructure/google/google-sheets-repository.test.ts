@@ -60,6 +60,7 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
       getValues: vi.fn().mockResolvedValue([
         ['Marca temporal', 'Observaciones Asistente', 'Nombre', 'Apellido', 'Documento'],
       ]),
+      batchUpdate: vi.fn().mockResolvedValue(undefined),
       updateValues: vi.fn(),
       insertRows: vi.fn().mockResolvedValue(undefined),
       appendValues: vi.fn(),
@@ -85,11 +86,192 @@ describe('GoogleSheetsRepository (Integration & Port Adapter)', () => {
     expect(result.sheetId).toBe(0);
     expect(result.rowUrl).toBe('https://docs.google.com/spreadsheets/d/sheet_123/edit#gid=0&range=A2:E2');
 
-    expect(mockClient.insertRows).toHaveBeenCalledWith('sheet_123', 0, 1, 2);
-    expect(mockClient.updateValues).toHaveBeenCalledWith('sheet_123', 'Respuestas!A2:E2', [
-      ['2026-10-02 12:00:00', '', 'Lucía', 'Pérez', '3.210.987-6'],
-    ], 'USER_ENTERED');
+    expect(mockClient.batchUpdate).toHaveBeenCalledWith('sheet_123', [
+      {
+        insertDimension: {
+          range: { sheetId: 0, dimension: 'ROWS', startIndex: 1, endIndex: 2 },
+          inheritFromBefore: false,
+        },
+      },
+      {
+        updateCells: {
+          range: { sheetId: 0, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 5 },
+          rows: [
+            {
+              values: [
+                { userEnteredValue: { stringValue: '2026-10-02 12:00:00' } },
+                { userEnteredValue: { stringValue: '' } },
+                { userEnteredValue: { stringValue: 'Lucía' } },
+                { userEnteredValue: { stringValue: 'Pérez' } },
+                { userEnteredValue: { stringValue: '3.210.987-6' } },
+              ],
+            },
+          ],
+          fields: 'userEnteredValue',
+        },
+      },
+      {
+        repeatCell: {
+          range: { sheetId: 0, startRowIndex: 1, endRowIndex: 2 },
+          cell: {},
+          fields:
+            'userEnteredFormat.backgroundColor,userEnteredFormat.backgroundColorStyle,userEnteredFormat.textFormat.foregroundColor,userEnteredFormat.textFormat.foregroundColorStyle',
+        },
+      },
+    ]);
     expect(mockClient.appendValues).not.toHaveBeenCalled();
+  });
+
+  it('uses formulaValue for =HYPERLINK cells and stringValue for regular cells in updateCells', async () => {
+    const mockClient: SheetsClient = {
+      getValues: vi.fn().mockResolvedValue([['Nombre', 'Documento']]),
+      batchUpdate: vi.fn().mockResolvedValue(undefined),
+      insertRows: vi.fn(),
+      updateValues: vi.fn(),
+      appendValues: vi.fn(),
+    };
+
+    const repo = new GoogleSheetsRepository(mockClient);
+    await repo.appendByHeaders(
+      'sheet_123',
+      {
+        Nombre: 'Lucía',
+        Documento: '=HYPERLINK("https://drive.google.com/file/d/123"; "Ver documento")',
+      },
+      ['Nombre', 'Documento'],
+      'Respuestas'
+    );
+
+    expect(mockClient.batchUpdate).toHaveBeenCalledWith(
+      'sheet_123',
+      expect.arrayContaining([
+        expect.objectContaining({
+          updateCells: expect.objectContaining({
+            rows: [
+              {
+                values: [
+                  { userEnteredValue: { stringValue: 'Lucía' } },
+                  {
+                    userEnteredValue: {
+                      formulaValue: '=HYPERLINK("https://drive.google.com/file/d/123"; "Ver documento")',
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+        }),
+      ])
+    );
+  });
+
+  describe('countTrackingId', () => {
+    it('reads the ID de seguimiento column in one call with majorDimension=COLUMNS and returns count', async () => {
+      const mockClient: SheetsClient = {
+        getValues: vi.fn().mockResolvedValue([
+          ['Marca temporal', '2026-10-01', '2026-10-02'],
+          ['ID de seguimiento', 'sub-1', 'sub-2'],
+          ['Nombre', 'Ana', 'Beto'],
+        ]),
+        insertRows: vi.fn(),
+        updateValues: vi.fn(),
+        appendValues: vi.fn(),
+      };
+
+      const repo = new GoogleSheetsRepository(mockClient);
+      const count = await repo.countTrackingId('sheet_123', 'Respuestas', 'sub-1');
+
+      expect(count).toBe(1);
+      expect(mockClient.getValues).toHaveBeenCalledWith('sheet_123', 'Respuestas!A:ZZ', 'COLUMNS');
+    });
+
+    it('returns 0 when trackingId is not in the column', async () => {
+      const mockClient: SheetsClient = {
+        getValues: vi.fn().mockResolvedValue([
+          ['ID de seguimiento', 'sub-1', 'sub-2'],
+        ]),
+        insertRows: vi.fn(),
+        updateValues: vi.fn(),
+        appendValues: vi.fn(),
+      };
+
+      const repo = new GoogleSheetsRepository(mockClient);
+      const count = await repo.countTrackingId('sheet_123', 'Respuestas', 'sub-unknown');
+
+      expect(count).toBe(0);
+    });
+
+    it('returns count > 1 when trackingId appears multiple times (duplicate)', async () => {
+      const mockClient: SheetsClient = {
+        getValues: vi.fn().mockResolvedValue([
+          ['ID de seguimiento', 'sub-dup', 'sub-other', 'sub-dup'],
+        ]),
+        insertRows: vi.fn(),
+        updateValues: vi.fn(),
+        appendValues: vi.fn(),
+      };
+
+      const repo = new GoogleSheetsRepository(mockClient);
+      const count = await repo.countTrackingId('sheet_123', 'Respuestas', 'sub-dup');
+
+      expect(count).toBe(2);
+    });
+
+    it('finds the tracking ID even when located at row 25000 in a huge sheet', async () => {
+      const hugeColumn: string[] = ['ID de seguimiento'];
+      for (let i = 1; i < 25000; i++) {
+        hugeColumn.push(`sub-${i}`);
+      }
+      hugeColumn.push('sub-target-at-25000');
+
+      const mockClient: SheetsClient = {
+        getValues: vi.fn().mockResolvedValue([hugeColumn]),
+        insertRows: vi.fn(),
+        updateValues: vi.fn(),
+        appendValues: vi.fn(),
+      };
+
+      const repo = new GoogleSheetsRepository(mockClient);
+      const count = await repo.countTrackingId('sheet_123', 'Respuestas', 'sub-target-at-25000');
+
+      expect(count).toBe(1);
+    });
+
+    it('finds ID de seguimiento when columns are reordered in the sheet', async () => {
+      const mockClient: SheetsClient = {
+        getValues: vi.fn().mockResolvedValue([
+          ['Columna random', 'x', 'y'],
+          ['Nombre', 'Carlos', 'David'],
+          ['ID de seguimiento', 'sub-reordered-1', 'sub-reordered-2'],
+        ]),
+        insertRows: vi.fn(),
+        updateValues: vi.fn(),
+        appendValues: vi.fn(),
+      };
+
+      const repo = new GoogleSheetsRepository(mockClient);
+      const count = await repo.countTrackingId('sheet_123', 'Respuestas', 'sub-reordered-2');
+
+      expect(count).toBe(1);
+    });
+
+    it('fails closed with a clear error if the ID de seguimiento column does not exist', async () => {
+      const mockClient: SheetsClient = {
+        getValues: vi.fn().mockResolvedValue([
+          ['Marca temporal', '2026-10-01'],
+          ['Nombre', 'Lucía'],
+          ['Apellido', 'Pérez'],
+        ]),
+        insertRows: vi.fn(),
+        updateValues: vi.fn(),
+        appendValues: vi.fn(),
+      };
+
+      const repo = new GoogleSheetsRepository(mockClient);
+      await expect(
+        repo.countTrackingId('sheet_123', 'Respuestas', 'sub-1')
+      ).rejects.toThrow(/ID de seguimiento/);
+    });
   });
 
   it('serializes concurrent appends so two applicants never write to the same row', async () => {
