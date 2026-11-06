@@ -54,7 +54,7 @@ export interface SubmissionsTable {
 
 export interface SubmissionProcessingTable {
   submission_id: string;
-  status: 'pending' | 'success' | 'failed' | 'unknown';
+  status: 'pending' | 'success' | 'failed' | 'unknown' | 'sheet_uncertain';
   error_message: string | null;
   updated_at: Generated<Date>;
   lease_owner: string | null;
