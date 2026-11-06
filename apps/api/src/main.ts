@@ -39,6 +39,8 @@ import { loadTelegramConfig } from './infrastructure/telegram/telegram-config.js
 import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provider.js';
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
 import { PostgresSubmissionProcessingRepository } from './infrastructure/database/postgres-submission-processing-repository.js';
+import { createGracefulShutdownHandler } from './graceful-shutdown.js';
+import { startupReconcile } from './application/startup-reconcile.js';
 import { sweepOnce } from './application/sweep-abandoned-submissions.js';
 import { createSweepDependencies, newSweeperId } from './infrastructure/sweep-runtime.js';
 import { purgeNotificationPersonalData } from './application/purge-notification-personal-data.js';
@@ -297,10 +299,12 @@ if (process.env.NODE_ENV !== 'test') {
   mauticEnrollmentNotifyDispatcher.start(10_000);
 }
 
+const submissionProcessingRepository = new PostgresSubmissionProcessingRepository(db);
+
 const app = createApp({
   catalog,
   repository,
-  submissionLease: { repository: new PostgresSubmissionProcessingRepository(db) },
+  submissionLease: { repository: submissionProcessingRepository },
   temporaryFileStorage,
   googleDriveRepository,
   spreadsheetRepository: googleSheetsRepository,
@@ -342,6 +346,24 @@ const sweeperInterval = sweeperEnabled
   : undefined;
 sweeperInterval?.unref();
 if (sweeperEnabled) console.log('[Sweeper] Barrido de envíos abandonados habilitado.');
+
+// Conciliación de archivos y tareas de envíos heredados (Release A/B); corre antes de iniciar la limpieza periódica.
+try {
+  const summary = await startupReconcile({
+    db,
+    fileStorage: temporaryFileStorage,
+    recoveryRepository: submissionRecoveryRepository,
+    processingRepository: submissionProcessingRepository,
+  });
+  if (summary.reconciledCount > 0) {
+    console.log(
+      `[StartupReconcile] Conciliados ${summary.reconciledCount} envío(s) heredado(s) o en recuperación ` +
+      `(${summary.missingFilesCases} caso(s) de archivos faltantes, ${summary.tasksEnqueued} tarea(s) encolada(s)).`
+    );
+  }
+} catch (err) {
+  console.error('[StartupReconcile] Error en la conciliación de arranque:', err instanceof Error ? err.message : err);
+}
 
 const cleanupInterval = setInterval(async () => {
   try {
@@ -392,22 +414,16 @@ const server = app.listen(port, () => {
   console.log(`API server listening on port ${port}`);
 });
 
-// Apagado ordenado: deja terminar las peticiones en curso (envíos con Drive/Sheets) antes de cerrar.
-let shuttingDown = false;
-async function shutdown(signal: string) {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  console.log(`[Process] ${signal} recibido: cerrando el servidor...`);
-  if (sweeperInterval) clearInterval(sweeperInterval);
-  const forceExit = setTimeout(() => process.exit(1), 25_000);
-  forceExit.unref();
-  server.close(async () => {
-    try {
-      await db.destroy();
-    } finally {
-      process.exit(0);
-    }
-  });
-}
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
-process.on('SIGINT', () => void shutdown('SIGINT'));
+// Apagado ordenado: deja terminar las peticiones en curso (envíos con Drive/Sheets) hasta 110 s antes de salir.
+const handleShutdown = createGracefulShutdownHandler({
+  server,
+  onBeforeClose: () => {
+    if (sweeperInterval) clearInterval(sweeperInterval);
+    clearInterval(cleanupInterval);
+  },
+  onAfterClose: async () => {
+    await db.destroy();
+  },
+});
+process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
+process.on('SIGINT', () => void handleShutdown('SIGINT'));

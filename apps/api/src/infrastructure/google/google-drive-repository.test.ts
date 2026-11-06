@@ -30,6 +30,14 @@ describe('GoogleDriveRepository', () => {
     await expect(repository.storeSubmissionFiles({ submissionId: 'sub_1', files: [{ token: 'tmp-token', originalName: 'cv.pdf', mimeType: 'application/pdf', data: Buffer.from('pdf') }] })).rejects.toThrow(/HTTP 403/);
   });
 
+  it('aplica un tiempo de espera predeterminado de 60 segundos para operaciones con Drive', () => {
+    const repository = new GoogleDriveRepository({
+      accessTokenOrProvider: 'token',
+      folderId: 'folder-1',
+    });
+    expect((repository as any).timeoutMs).toBe(60_000);
+  });
+
   it('reads the folder name and creation capability for admin configuration', async () => {
     let request: Request | undefined;
     const repository = new GoogleDriveRepository({

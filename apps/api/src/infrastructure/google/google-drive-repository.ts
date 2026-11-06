@@ -62,7 +62,7 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
         };
 
     this.fetchImpl = options.fetchImpl ?? fetch;
-    this.timeoutMs = options.timeoutMs ?? 15000;
+    this.timeoutMs = options.timeoutMs ?? 60000;
     this.folderRepository = options.folderRepository;
     this.fileReservation = options.fileRepository ?? options.submissionRepository;
   }

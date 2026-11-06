@@ -23,6 +23,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: preinscripciones-api
     restart: unless-stopped
+    stop_grace_period: 120s
     environment:
       PORT: 3000
       NODE_ENV: production
