@@ -39,6 +39,7 @@ import { FetchTelegramProvider } from './infrastructure/telegram/telegram-provid
 import { cleanupExpiredRecoveries } from './application/cleanup-expired-recoveries.js';
 import { PostgresSubmissionProcessingRepository } from './infrastructure/database/postgres-submission-processing-repository.js';
 import { createGracefulShutdownHandler } from './graceful-shutdown.js';
+import { startupReconcile } from './application/startup-reconcile.js';
 import { sweepOnce } from './application/sweep-abandoned-submissions.js';
 import { createSweepDependencies, newSweeperId } from './infrastructure/sweep-runtime.js';
 import { purgeNotificationPersonalData } from './application/purge-notification-personal-data.js';
@@ -294,10 +295,12 @@ if (process.env.NODE_ENV !== 'test') {
   mauticEnrollmentNotifyDispatcher.start(10_000);
 }
 
+const submissionProcessingRepository = new PostgresSubmissionProcessingRepository(db);
+
 const app = createApp({
   catalog,
   repository,
-  submissionLease: { repository: new PostgresSubmissionProcessingRepository(db) },
+  submissionLease: { repository: submissionProcessingRepository },
   temporaryFileStorage,
   googleDriveRepository,
   spreadsheetRepository: googleSheetsRepository,
@@ -339,6 +342,24 @@ const sweeperInterval = sweeperEnabled
   : undefined;
 sweeperInterval?.unref();
 if (sweeperEnabled) console.log('[Sweeper] Barrido de envíos abandonados habilitado.');
+
+// Conciliación de archivos y tareas de envíos heredados (Release A/B); corre antes de iniciar la limpieza periódica.
+try {
+  const summary = await startupReconcile({
+    db,
+    fileStorage: temporaryFileStorage,
+    recoveryRepository: submissionRecoveryRepository,
+    processingRepository: submissionProcessingRepository,
+  });
+  if (summary.reconciledCount > 0) {
+    console.log(
+      `[StartupReconcile] Conciliados ${summary.reconciledCount} envío(s) heredado(s) o en recuperación ` +
+      `(${summary.missingFilesCases} caso(s) de archivos faltantes, ${summary.tasksEnqueued} tarea(s) encolada(s)).`
+    );
+  }
+} catch (err) {
+  console.error('[StartupReconcile] Error en la conciliación de arranque:', err instanceof Error ? err.message : err);
+}
 
 const cleanupInterval = setInterval(async () => {
   try {
