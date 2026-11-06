@@ -105,4 +105,17 @@ integrationDescribe('PostgresSheetsAttemptStore (Integration with PostgreSQL)', 
     await store.recordAttemptStarted(saved.id, new Date(), payload);
     expect(await store.loadContext(saved.id)).toEqual({ targetId: 'davia-c11', ...payload });
   });
+  it('grants the reconciliation claim to one caller at a time and lets it expire or be released', async () => {
+    const saved = await newSubmission();
+    const t0 = new Date('2026-11-06T12:00:00Z');
+    const results = await Promise.all([
+      store.claimReconcile(saved.id, t0, 60_000),
+      store.claimReconcile(saved.id, t0, 60_000),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(await store.claimReconcile(saved.id, new Date(t0.getTime() + 30_000), 60_000)).toBe(false);
+    expect(await store.claimReconcile(saved.id, new Date(t0.getTime() + 61_000), 60_000)).toBe(true);
+    await store.releaseReconcile(saved.id);
+    expect(await store.claimReconcile(saved.id, new Date(t0.getTime() + 62_000), 60_000)).toBe(true);
+  });
 });

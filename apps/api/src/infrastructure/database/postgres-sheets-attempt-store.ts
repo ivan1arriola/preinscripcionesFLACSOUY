@@ -38,6 +38,22 @@ export class PostgresSheetsAttemptStore implements SheetsAttemptStore {
     };
   }
 
+  async claimReconcile(submissionId: string, now: Date, ttlMs: number): Promise<boolean> {
+    const claimed = await this.db
+      .updateTable('submission_processing')
+      .set({ sheet_reconcile_until: new Date(now.getTime() + ttlMs) })
+      .where('submission_id', '=', submissionId)
+      .where((eb) => eb.or([eb('sheet_reconcile_until', 'is', null), eb('sheet_reconcile_until', '<=', now)]))
+      .returning('submission_id')
+      .executeTakeFirst();
+    return claimed !== undefined;
+  }
+
+  async releaseReconcile(submissionId: string): Promise<void> {
+    await this.db.updateTable('submission_processing').set({ sheet_reconcile_until: null })
+      .where('submission_id', '=', submissionId).execute();
+  }
+
   async loadContext(submissionId: string): Promise<SheetsContext | null> {
     const row = await this.db
       .selectFrom('submission_processing as p')

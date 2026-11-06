@@ -4,6 +4,8 @@ import type { SubmissionProcessingRepository } from '../ports/submission-process
 
 export const UNCERTAIN_DELAY_MS = 200 * 1000; // 200 s (por encima de los 180 s documentados por Google)
 export const RECOUNT_15_MIN_MS = 15 * 60 * 1000; // +15 min
+/** Vigencia del reclamo de reconciliación: cubre el timeout de Sheets con margen. */
+export const RECONCILE_CLAIM_TTL_MS = 120 * 1000;
 export const RECOUNT_2_H_MS = 2 * 60 * 60 * 1000; // +2 h
 
 export interface WriteSubmissionToSheetsInput {
@@ -75,70 +77,78 @@ export async function writeSubmissionToSheets(
       };
     }
 
-    // Al llegar next_attempt_at: reconciliar primero
-    if (!deps.spreadsheetRepository.countTrackingId) {
-      throw new Error('El repositorio de planillas no implementa countTrackingId');
+    // Un solo reconciliador por envío: la tarea diferida y un reintento no deben contar e insertar a la vez.
+    if (deps.store.claimReconcile && !(await deps.store.claimReconcile(input.submissionId, now, RECONCILE_CLAIM_TTL_MS))) {
+      return { status: 'wait', retryAt: new Date(now.getTime() + RECONCILE_CLAIM_TTL_MS) };
     }
+    try {
+      // Al llegar next_attempt_at: reconciliar primero
+      if (!deps.spreadsheetRepository.countTrackingId) {
+        throw new Error('El repositorio de planillas no implementa countTrackingId');
+      }
 
-    const count = await deps.spreadsheetRepository.countTrackingId(
-      input.spreadsheetId,
-      sheetName,
-      trackingId
-    );
+      const count = await deps.spreadsheetRepository.countTrackingId(
+        input.spreadsheetId,
+        sheetName,
+        trackingId
+      );
 
-    if (count > 0) {
-      // El batch anterior se aplicó en Google Sheets: confirmar sin volver a insertar
+      if (count > 0) {
+        // El batch anterior se aplicó en Google Sheets: confirmar sin volver a insertar
+        await deps.store.recordWritten(input.submissionId, now);
+        return {
+          status: 'success',
+          writtenAt: now,
+          alreadyPresent: true,
+        };
+      }
+
+      // El ID no está en la hoja: insertar
+      let appendResult: AppendResult;
+      try {
+        appendResult = await deps.spreadsheetRepository.appendByHeaders(
+          input.spreadsheetId,
+          input.valuesByColumnName,
+          input.requiredColumns,
+          sheetName
+        );
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        const newNext = new Date(now.getTime() + UNCERTAIN_DELAY_MS);
+        await deps.store.markUncertain(input.submissionId, newNext, errorMsg);
+        await deps.tasks.enqueueTask({
+          submissionId: input.submissionId,
+          kind: 'sheets_reconcile',
+          runAt: newNext,
+        });
+        return {
+          status: 'uncertain',
+          nextAttemptAt: newNext,
+          error: errorMsg,
+        };
+      }
+
+      // Inserción en estado incierto completada: encolar recuentos diferidos (+15 min y +2 h)
+      await deps.tasks.enqueueTask({
+        submissionId: input.submissionId,
+        kind: 'sheets_recount',
+        runAt: new Date(now.getTime() + RECOUNT_15_MIN_MS),
+      });
+      await deps.tasks.enqueueTask({
+        submissionId: input.submissionId,
+        kind: 'sheets_recount',
+        runAt: new Date(now.getTime() + RECOUNT_2_H_MS),
+      });
+
       await deps.store.recordWritten(input.submissionId, now);
       return {
         status: 'success',
         writtenAt: now,
-        alreadyPresent: true,
+        rowUrl: appendResult.rowUrl,
       };
+    } finally {
+      await deps.store.releaseReconcile?.(input.submissionId);
     }
-
-    // El ID no está en la hoja: insertar
-    let appendResult: AppendResult;
-    try {
-      appendResult = await deps.spreadsheetRepository.appendByHeaders(
-        input.spreadsheetId,
-        input.valuesByColumnName,
-        input.requiredColumns,
-        sheetName
-      );
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      const newNext = new Date(now.getTime() + UNCERTAIN_DELAY_MS);
-      await deps.store.markUncertain(input.submissionId, newNext, errorMsg);
-      await deps.tasks.enqueueTask({
-        submissionId: input.submissionId,
-        kind: 'sheets_reconcile',
-        runAt: newNext,
-      });
-      return {
-        status: 'uncertain',
-        nextAttemptAt: newNext,
-        error: errorMsg,
-      };
-    }
-
-    // Inserción en estado incierto completada: encolar recuentos diferidos (+15 min y +2 h)
-    await deps.tasks.enqueueTask({
-      submissionId: input.submissionId,
-      kind: 'sheets_recount',
-      runAt: new Date(now.getTime() + RECOUNT_15_MIN_MS),
-    });
-    await deps.tasks.enqueueTask({
-      submissionId: input.submissionId,
-      kind: 'sheets_recount',
-      runAt: new Date(now.getTime() + RECOUNT_2_H_MS),
-    });
-
-    await deps.store.recordWritten(input.submissionId, now);
-    return {
-      status: 'success',
-      writtenAt: now,
-      rowUrl: appendResult.rowUrl,
-    };
   }
 
   // 3. Camino normal (sin incertidumbre previa)

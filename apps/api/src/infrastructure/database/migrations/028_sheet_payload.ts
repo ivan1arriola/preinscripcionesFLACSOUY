@@ -7,9 +7,10 @@ import { Kysely, sql } from 'kysely';
  * Solo agrega una columna nula que el código anterior ignora.
  */
 export async function up(db: Kysely<any>): Promise<void> {
-  await sql`ALTER TABLE submission_processing ADD COLUMN IF NOT EXISTS sheet_payload jsonb`.execute(db);
+  await sql`ALTER TABLE submission_processing ADD COLUMN IF NOT EXISTS sheet_payload jsonb,
+    ADD COLUMN IF NOT EXISTS sheet_reconcile_until timestamp`.execute(db);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  await sql`ALTER TABLE submission_processing DROP COLUMN IF EXISTS sheet_payload`.execute(db);
+  await sql`ALTER TABLE submission_processing DROP COLUMN IF EXISTS sheet_payload, DROP COLUMN IF EXISTS sheet_reconcile_until`.execute(db);
 }

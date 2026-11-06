@@ -30,6 +30,14 @@ export interface SheetsAttemptStore {
   /** Deja el estado 'sheet_uncertain' y fija next_attempt_at (started_at + 200 s). */
   markUncertain(submissionId: string, nextAttemptAt: Date, error?: string): Promise<void>;
 
+  /**
+   * Reclamo atómico por envío para reconciliar (contar + insertar): la tarea diferida y un reintento no deben
+   * correr a la vez. Vence solo si el titular muere. Devuelve false si otro ya lo tiene.
+   */
+  claimReconcile?(submissionId: string, now: Date, ttlMs: number): Promise<boolean>;
+
+  releaseReconcile?(submissionId: string): Promise<void>;
+
   /** Contexto para tareas diferidas (destino + instantánea); null si el envío no tiene intento registrado. */
   loadContext?(submissionId: string): Promise<SheetsContext | null>;
 

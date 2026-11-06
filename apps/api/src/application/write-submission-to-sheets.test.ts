@@ -16,6 +16,19 @@ class MemorySheetsAttemptStore implements SheetsAttemptStore {
   }
 
   public payloads = new Map<string, unknown>();
+  private reconcileUntil = new Map<string, number>();
+
+  async claimReconcile(submissionId: string, now: Date, ttlMs: number): Promise<boolean> {
+    const until = this.reconcileUntil.get(submissionId);
+    if (until !== undefined && until > now.getTime()) return false;
+    this.reconcileUntil.set(submissionId, now.getTime() + ttlMs);
+    return true;
+  }
+
+  async releaseReconcile(submissionId: string): Promise<void> {
+    this.reconcileUntil.delete(submissionId);
+  }
+
 
   async recordAttemptStarted(submissionId: string, startedAt: Date, payload?: unknown): Promise<void> {
     this.payloads.set(submissionId, payload);
@@ -185,6 +198,38 @@ describe('writeSubmissionToSheets', () => {
     expect(spreadsheetRepository.appendByHeaders).not.toHaveBeenCalled();
     expect(spreadsheetRepository.countTrackingId).not.toHaveBeenCalled();
     expect(tasks.enqueueTask).not.toHaveBeenCalled();
+  });
+
+  it('reconciliación concurrente (tarea + reintento): solo uno cuenta e inserta; el otro espera sin escribir', async () => {
+    const { store, spreadsheetRepository, deps, baseInput } = setup();
+    await store.recordAttemptStarted('sub-123', new Date('2026-11-06T12:00:00Z'));
+    await store.markUncertain('sub-123', new Date('2026-11-06T12:03:20Z'), 'timeout previo');
+    const now = new Date('2026-11-06T12:03:25Z');
+    // Ambos ven la hoja vacía; el append tarda lo suficiente para que se solapen.
+    vi.mocked(spreadsheetRepository.countTrackingId!).mockResolvedValue(0);
+    vi.mocked(spreadsheetRepository.appendByHeaders).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return { spreadsheetId: 'sheet-1', sheetName: 'Respuestas', sheetId: 0, updatedRange: 'A2', rowUrl: 'u', updatedRows: 1 };
+    });
+
+    const [a, b] = await Promise.all([
+      writeSubmissionToSheets(deps, { ...baseInput, now }),
+      writeSubmissionToSheets(deps, { ...baseInput, now }),
+    ]);
+
+    expect(spreadsheetRepository.appendByHeaders).toHaveBeenCalledOnce();
+    expect([a.status, b.status].sort()).toEqual(['success', 'wait']);
+  });
+
+  it('si la reconciliación falla libera el reclamo para que la siguiente pueda continuar', async () => {
+    const { store, spreadsheetRepository, deps, baseInput } = setup();
+    await store.recordAttemptStarted('sub-123', new Date('2026-11-06T12:00:00Z'));
+    await store.markUncertain('sub-123', new Date('2026-11-06T12:03:20Z'), 'timeout previo');
+    const now = new Date('2026-11-06T12:03:25Z');
+    vi.mocked(spreadsheetRepository.countTrackingId!).mockRejectedValueOnce(new Error('boom'));
+    await expect(writeSubmissionToSheets(deps, { ...baseInput, now })).rejects.toThrow('boom');
+    const again = await writeSubmissionToSheets(deps, { ...baseInput, now });
+    expect(again.status).toBe('success');
   });
 
   it('reintento a tiempo (now >= next_attempt_at) cuando el batch NO se aplicó: reconcilia (count 0), inserta, encola recuentos a +15 min y +2 h y guarda sheet_written_at', async () => {

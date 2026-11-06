@@ -64,6 +64,7 @@ export interface SubmissionProcessingTable {
   sheet_attempt_started_at: Date | null;
   sheet_written_at: Date | null;
   sheet_payload: unknown | null;
+  sheet_reconcile_until: Date | null;
 }
 
 export interface SubmissionTasksTable {
