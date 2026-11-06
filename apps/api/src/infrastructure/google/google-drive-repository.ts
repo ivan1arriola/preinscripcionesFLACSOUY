@@ -10,6 +10,7 @@ import type {
   SpreadsheetDiscovery,
   SpreadsheetDiscoveryPort,
 } from '../../ports/spreadsheet-discovery.js';
+import type { DriveFolderRepository } from '../../ports/drive-folder-repository.js';
 import {
   buildDriveFolderNames,
   buildSemanticDriveFileName,
@@ -17,12 +18,20 @@ import {
   driveTargetDescriptor,
 } from '../../domain/google-drive-naming.js';
 
-interface GoogleDriveRepositoryOptions {
+export interface DriveFileReservationPort {
+  getReservedDriveFileId(token: string): Promise<string | null>;
+  reserveDriveFileId(token: string, driveReservedId: string): Promise<string>;
+}
+
+export interface GoogleDriveRepositoryOptions {
   folderId?: string;
   folderIdOrProvider?: string | (() => Promise<string>);
   accessTokenOrProvider: string | (() => Promise<string>);
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  folderRepository?: DriveFolderRepository;
+  fileRepository?: DriveFileReservationPort;
+  submissionRepository?: DriveFileReservationPort;
 }
 
 /** Escapa un valor para la sintaxis `q` de Drive (barra invertida y comilla simple). */
@@ -36,6 +45,8 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
   private readonly folderIdProvider: () => Promise<string>;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
+  private readonly folderRepository?: DriveFolderRepository;
+  private readonly fileReservation?: DriveFileReservationPort;
 
   constructor(options: GoogleDriveRepositoryOptions) {
     this.tokenProvider = typeof options.accessTokenOrProvider === 'function'
@@ -52,6 +63,8 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
 
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.timeoutMs = options.timeoutMs ?? 15000;
+    this.folderRepository = options.folderRepository;
+    this.fileReservation = options.fileRepository ?? options.submissionRepository;
   }
 
   async inspectFolder(folderId: string): Promise<GoogleDriveFolderInfo> {
@@ -89,24 +102,34 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
     const token = await this.tokenProvider();
     const folderId = await this.folderIdProvider();
     let uploadFolderId = folderId;
+    let logicalFolderKey = folderId;
+
     if (command.target) {
       for (const name of buildDriveFolderNames(command.target)) {
-        uploadFolderId = await this.ensureChildFolder(uploadFolderId, name, token);
+        logicalFolderKey = `${logicalFolderKey}/${name}`;
+        uploadFolderId = await this.ensureChildFolder(uploadFolderId, name, token, logicalFolderKey);
       }
-      const preinscripcionesId = await this.ensureChildFolder(uploadFolderId, 'Preinscripciones', token);
-      const documentacionId = await this.ensureChildFolder(preinscripcionesId, 'Documentación', token);
+      logicalFolderKey = `${logicalFolderKey}/Preinscripciones`;
+      const preinscripcionesId = await this.ensureChildFolder(uploadFolderId, 'Preinscripciones', token, logicalFolderKey);
+
+      logicalFolderKey = `${logicalFolderKey}/Documentación`;
+      const documentacionId = await this.ensureChildFolder(preinscripcionesId, 'Documentación', token, logicalFolderKey);
+
       if (command.values) {
         const submissionFolderName = buildSubmissionFolderName({
           submissionId: command.submissionId,
           values: command.values,
         });
-        uploadFolderId = await this.ensureChildFolder(documentacionId, submissionFolderName, token);
+        logicalFolderKey = `${logicalFolderKey}/${submissionFolderName}`;
+        uploadFolderId = await this.ensureChildFolder(documentacionId, submissionFolderName, token, logicalFolderKey);
       } else {
         uploadFolderId = documentacionId;
       }
     }
+
     const result: StoredDriveFile[] = [];
     const ordinals = new Map<string, number>();
+
     for (const file of command.files) {
       const ordinal = (ordinals.get(file.fieldKey ?? '') ?? 0) + 1;
       ordinals.set(file.fieldKey ?? '', ordinal);
@@ -115,6 +138,17 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
       if (existingFileId) {
         result.push({ token: file.token, driveFileId: existingFileId });
         continue;
+      }
+
+      let reservedId: string | undefined;
+      if (this.fileReservation) {
+        const existingReserved = await this.fileReservation.getReservedDriveFileId(file.token);
+        if (existingReserved) {
+          reservedId = existingReserved;
+        } else {
+          const generatedId = await this.generateDriveId(token);
+          reservedId = await this.fileReservation.reserveDriveFileId(file.token, generatedId);
+        }
       }
 
       const boundary = `flacso-${command.submissionId}-${file.token}`;
@@ -128,7 +162,8 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
             ordinal,
           })
         : file.originalName;
-      const metadata = JSON.stringify({
+
+      const metadataPayload: Record<string, any> = {
         name: fileName,
         parents: [uploadFolderId],
         appProperties: {
@@ -138,19 +173,32 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
           flacsoFieldKey: file.fieldKey,
           flacsoOriginalName: file.originalName,
         },
-      });
+      };
+      if (reservedId) {
+        metadataPayload.id = reservedId;
+      }
+
+      const metadata = JSON.stringify(metadataPayload);
       const body = Buffer.concat([
         Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
         Buffer.from(`--${boundary}\r\nContent-Type: ${file.mimeType}\r\n\r\n`),
         file.data,
         Buffer.from(`\r\n--${boundary}--\r\n`),
       ]);
-      const response = await this.fetchImpl('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name', {
+
+      const response = await this.fetchImpl('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name&supportsAllDrives=true', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
         body,
         signal: AbortSignal.timeout(this.timeoutMs),
       });
+
+      if (response.status === 409 && reservedId) {
+        const recoveredId = await this.retrieveExistingFileById(reservedId, token);
+        result.push({ token: file.token, driveFileId: recoveredId });
+        continue;
+      }
+
       if (!response.ok) {
         throw new Error(`Google Drive API respondió con error HTTP ${response.status}`);
       }
@@ -191,23 +239,57 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
     return payload.files?.[0]?.id ?? null;
   }
 
-  private async ensureChildFolder(parentId: string, name: string, token: string): Promise<string> {
-    const query = [
-      `'${escapeDriveQueryValue(parentId)}' in parents`,
-      `name = '${escapeDriveQueryValue(name)}'`,
-      `mimeType = 'application/vnd.google-apps.folder'`,
-      'trashed = false',
-    ].join(' and ');
-    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-    const listResponse = await this.fetchImpl(listUrl, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-    if (!listResponse.ok) {
-      throw new Error(`Google Drive no permitió buscar la carpeta "${name}" (HTTP ${listResponse.status}).`);
+  private async ensureChildFolder(
+    parentId: string,
+    name: string,
+    token: string,
+    logicalFolderKey?: string
+  ): Promise<string> {
+    if (!this.folderRepository) {
+      return this.ensureChildFolderLegacy(parentId, name, token);
     }
-    const listPayload = await listResponse.json() as { files?: Array<{ id?: string }> };
-    const existing = listPayload.files?.[0]?.id;
+
+    const folderKey = logicalFolderKey ?? `${parentId}/${name}`;
+
+    // (a) Fila existente
+    const existingRow = await this.folderRepository.findFolder(folderKey);
+    if (existingRow) {
+      if (existingRow.confirmedAt) {
+        return existingRow.driveFolderId;
+      }
+      // Fila persistida sin confirmed_at tras una caída: la siguiente la completa
+      // (d) Crear en Drive solo con el ID ganador tolerando 409 (ya existe)
+      await this.createDriveFolderWithId(existingRow.driveFolderId, parentId, name, token);
+      // (e) confirm
+      await this.folderRepository.confirm(folderKey);
+      return existingRow.driveFolderId;
+    }
+
+    // (b) Si no hay, adoptar una carpeta ya existente en Drive buscando por nombre y padre,
+    // o generar un ID nuevo con files.generateIds
+    const existingInDrive = await this.findFolderInDrive(parentId, name, token);
+    let candidateId: string;
+    if (existingInDrive) {
+      candidateId = existingInDrive;
+    } else {
+      candidateId = await this.generateDriveId(token);
+    }
+
+    // (c) claimFolder y usar el ID GANADOR
+    const claim = await this.folderRepository.claimFolder(folderKey, candidateId);
+    const winnerId = claim.driveFolderId;
+
+    // (d) Crear en Drive solo con el ID ganador tolerando 409 (ya existe)
+    await this.createDriveFolderWithId(winnerId, parentId, name, token);
+
+    // (e) confirm
+    await this.folderRepository.confirm(folderKey);
+
+    return winnerId;
+  }
+
+  private async ensureChildFolderLegacy(parentId: string, name: string, token: string): Promise<string> {
+    const existing = await this.findFolderInDrive(parentId, name, token);
     if (existing) return existing;
 
     const createResponse = await this.fetchImpl('https://www.googleapis.com/drive/v3/files?fields=id,name&supportsAllDrives=true', {
@@ -230,6 +312,85 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
     const created = await createResponse.json() as { id?: string };
     if (!created.id) throw new Error(`Google Drive no devolvió el identificador de la carpeta "${name}".`);
     return created.id;
+  }
+
+  private async findFolderInDrive(parentId: string, name: string, token: string): Promise<string | null> {
+    const query = [
+      `'${escapeDriveQueryValue(parentId)}' in parents`,
+      `name = '${escapeDriveQueryValue(name)}'`,
+      `mimeType = 'application/vnd.google-apps.folder'`,
+      'trashed = false',
+    ].join(' and ');
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+    const listResponse = await this.fetchImpl(listUrl, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!listResponse.ok) {
+      throw new Error(`Google Drive no permitió buscar la carpeta "${name}" (HTTP ${listResponse.status}).`);
+    }
+    const listPayload = await listResponse.json() as { files?: Array<{ id?: string }> };
+    return listPayload.files?.[0]?.id ?? null;
+  }
+
+  private async createDriveFolderWithId(
+    folderId: string,
+    parentId: string,
+    name: string,
+    token: string
+  ): Promise<void> {
+    const createResponse = await this.fetchImpl('https://www.googleapis.com/drive/v3/files?fields=id,name&supportsAllDrives=true', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        id: folderId,
+        name,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [parentId],
+      }),
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (createResponse.status === 409) {
+      return;
+    }
+    if (!createResponse.ok) {
+      throw new Error(`Google Drive no permitió crear la carpeta "${name}" (HTTP ${createResponse.status}).`);
+    }
+  }
+
+  private async generateDriveId(token: string): Promise<string> {
+    const response = await this.fetchImpl('https://www.googleapis.com/drive/v3/files/generateIds?count=1&space=drive', {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(this.timeoutMs),
+    });
+    if (!response.ok) {
+      throw new Error(`Google Drive no permitió generar identificadores de archivo (HTTP ${response.status}).`);
+    }
+    const payload = (await response.json()) as { ids?: string[] };
+    const id = payload.ids?.[0];
+    if (!id) {
+      throw new Error('Google Drive no devolvió un identificador generado.');
+    }
+    return id;
+  }
+
+  private async retrieveExistingFileById(fileId: string, token: string): Promise<string> {
+    const response = await this.fetchImpl(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name&supportsAllDrives=true`,
+      {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`Google Drive no permitió recuperar el archivo con ID "${fileId}" tras 409 (HTTP ${response.status}).`);
+    }
+    const payload = (await response.json()) as { id?: string };
+    return payload.id ?? fileId;
   }
 
   async findSpreadsheetByTargetId(_rootFolderId: string, targetId: string): Promise<SpreadsheetDiscovery | null> {
@@ -282,8 +443,10 @@ export class GoogleDriveRepository implements GoogleDriveRepositoryPort, Spreads
     const descriptor = driveTargetDescriptor(target);
     const folderNames = buildDriveFolderNames(descriptor);
     let currentFolderId = rootFolderId;
+    let currentLogicalPath = rootFolderId;
     for (const name of folderNames) {
-      currentFolderId = await this.ensureChildFolder(currentFolderId, name, token);
+      currentLogicalPath = `${currentLogicalPath}/${name}`;
+      currentFolderId = await this.ensureChildFolder(currentFolderId, name, token, currentLogicalPath);
     }
     return currentFolderId;
   }

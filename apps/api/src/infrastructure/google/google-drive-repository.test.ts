@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GoogleDriveRepository } from './google-drive-repository.js';
+import { InMemoryDriveFolderRepository } from '../database/in-memory-drive-folder-repository.js';
 
 describe('GoogleDriveRepository', () => {
   it('uploads files with an idempotency property and returns Drive identifiers', async () => {
@@ -459,6 +460,323 @@ describe('GoogleDriveRepository', () => {
       expect(result.files).toHaveLength(0);
       expect(result.documentsFolderId).toBe('folder-empty-target-docs');
       expect(result.documentsFolderUrl).toBe('https://drive.google.com/drive/folders/folder-empty-target-docs');
+    });
+  });
+
+  describe('P2: Robustez de Drive (carpetas únicas e IDs reservados)', () => {
+    it('dos preinscripciones distintas a una oferta nueva en paralelo (una sola jerarquía)', async () => {
+      const folderRepo = new InMemoryDriveFolderRepository();
+      const requests: Request[] = [];
+      let generatedIdSeq = 0;
+      const createdFolders = new Map<string, any>();
+
+      const makeRepo = () =>
+        new GoogleDriveRepository({
+          folderId: 'root-1',
+          accessTokenOrProvider: 'token',
+          folderRepository: folderRepo,
+          fetchImpl: async (input, init) => {
+            const req = new Request(input, init);
+            requests.push(req);
+
+            // generateIds endpoint
+            if (req.url.includes('/files/generateIds')) {
+              generatedIdSeq++;
+              return new Response(JSON.stringify({ ids: [`gen-id-${generatedIdSeq}`] }), { status: 200 });
+            }
+
+            // Folder search in Drive: none exists initially
+            if (req.url.includes('/files?q=') && !req.url.includes('flacsoSubmissionId')) {
+              return new Response(JSON.stringify({ files: [] }), { status: 200 });
+            }
+
+            // Folder creation: POST /drive/v3/files?fields=
+            if (req.method === 'POST' && req.url.includes('/drive/v3/files?fields=')) {
+              const body = JSON.parse(await req.clone().text());
+              if (createdFolders.has(body.id)) {
+                // If already created with this ID, Drive returns 409 Conflict
+                return new Response(JSON.stringify({ error: { code: 409, message: 'File already exists' } }), { status: 409 });
+              }
+              createdFolders.set(body.id, body);
+              return new Response(JSON.stringify({ id: body.id, name: body.name }), { status: 200 });
+            }
+
+            // File upload
+            return new Response(JSON.stringify({ id: `file-${Date.now()}` }), { status: 200 });
+          },
+        });
+
+      const repo1 = makeRepo();
+      const repo2 = makeRepo();
+
+      const target = {
+        targetId: 'diploma-2026',
+        kind: 'academic_offer' as const,
+        offerName: 'Diploma 2026',
+        cohortName: 'Cohorte I',
+      };
+
+      const [res1, res2] = await Promise.all([
+        repo1.storeSubmissionFiles({
+          submissionId: 'sub-A',
+          target,
+          values: { apellido1: 'Gomez', nombre1: 'Ana' },
+          files: [],
+        }),
+        repo2.storeSubmissionFiles({
+          submissionId: 'sub-B',
+          target,
+          values: { apellido1: 'Lopez', nombre1: 'Juan' },
+          files: [],
+        }),
+      ]);
+
+      // Both must have created applicant folders under the SAME Documentación folder
+      const docFolderKey = 'root-1/Ofertas académicas/Diploma 2026/Cohorte I/Preinscripciones/Documentación';
+      const docFolder = await folderRepo.findFolder(docFolderKey);
+      expect(docFolder).not.toBeNull();
+      expect(docFolder?.confirmedAt).toBeInstanceOf(Date);
+
+      // Verify the parent of applicant folders is that same Documentación folder
+      const applicantFolderA = createdFolders.get(res1.documentsFolderId);
+      const applicantFolderB = createdFolders.get(res2.documentsFolderId);
+
+      expect(applicantFolderA.parents).toEqual([docFolder?.driveFolderId]);
+      expect(applicantFolderB.parents).toEqual([docFolder?.driveFolderId]);
+      expect(res1.documentsFolderId).not.toBe(res2.documentsFolderId);
+    });
+
+    it('candidato perdedor que no se crea', async () => {
+      const folderRepo = new InMemoryDriveFolderRepository();
+      const driveCreatedFolderIds: string[] = [];
+
+      // Interceptamos claimFolder para simular la carrera exacta:
+      // Cuando este proceso va a reclamar con 'candidate-loser', otro proceso ya ganó con 'winner-folder-id'
+      const originalClaim = folderRepo.claimFolder.bind(folderRepo);
+      folderRepo.claimFolder = async (key, candidate) => {
+        if (candidate === 'candidate-loser') {
+          await originalClaim(key, 'winner-folder-id');
+        }
+        return originalClaim(key, candidate);
+      };
+
+      const repo = new GoogleDriveRepository({
+        folderId: 'root-1',
+        accessTokenOrProvider: 'token',
+        folderRepository: folderRepo,
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          if (req.url.includes('/files/generateIds')) {
+            return new Response(JSON.stringify({ ids: ['candidate-loser'] }), { status: 200 });
+          }
+          if (req.url.includes('/files?q=')) {
+            return new Response(JSON.stringify({ files: [] }), { status: 200 });
+          }
+          if (req.method === 'POST' && req.url.includes('/drive/v3/files?fields=')) {
+            const body = JSON.parse(await req.clone().text());
+            driveCreatedFolderIds.push(body.id);
+            return new Response(JSON.stringify({ id: body.id }), { status: 200 });
+          }
+          return new Response(JSON.stringify({ id: 'dummy' }), { status: 200 });
+        },
+      });
+
+      await repo.storeSubmissionFiles({
+        submissionId: 'sub-test',
+        target: { targetId: 'offer-1', kind: 'academic_offer' as const, offerName: 'Diploma 2026' },
+        files: [],
+      });
+
+      // El candidato perdedor NUNCA se crea en Drive; solo se crea el ganador
+      expect(driveCreatedFolderIds).not.toContain('candidate-loser');
+      expect(driveCreatedFolderIds).toContain('winner-folder-id');
+    });
+
+    it('adopción de carpeta preexistente', async () => {
+      const folderRepo = new InMemoryDriveFolderRepository();
+      let generateIdsCalled = false;
+
+      const repo = new GoogleDriveRepository({
+        folderId: 'root-1',
+        accessTokenOrProvider: 'token',
+        folderRepository: folderRepo,
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          if (req.url.includes('/files/generateIds')) {
+            generateIdsCalled = true;
+            return new Response(JSON.stringify({ ids: ['gen-id-not-needed'] }), { status: 200 });
+          }
+          // Drive already has this folder!
+          if (req.url.includes('/files?q=') && req.url.includes('Preinscripciones')) {
+            return new Response(JSON.stringify({ files: [{ id: 'preexisting-preinscripciones-id' }] }), { status: 200 });
+          }
+          if (req.url.includes('/files?q=')) {
+            return new Response(JSON.stringify({ files: [{ id: 'preexisting-offer-id' }] }), { status: 200 });
+          }
+          if (req.method === 'POST' && req.url.includes('/drive/v3/files?fields=')) {
+            // 409 because preexisting folder already exists in Drive
+            return new Response(JSON.stringify({ error: { code: 409 } }), { status: 409 });
+          }
+          return new Response(JSON.stringify({ id: 'doc-file' }), { status: 200 });
+        },
+      });
+
+      await repo.storeSubmissionFiles({
+        submissionId: 'sub-preexist',
+        target: { targetId: 'offer-1', kind: 'academic_offer' as const, offerName: 'Oferta Preexistente' },
+        files: [],
+      });
+
+      // It must adopt preexisting-offer-id and register it in folderRepo
+      expect(generateIdsCalled).toBe(false);
+      const record = await folderRepo.findFolder('root-1/Ofertas académicas/Oferta Preexistente');
+      expect(record).not.toBeNull();
+      expect(record?.driveFolderId).toBe('preexisting-offer-id');
+      expect(record?.confirmedAt).toBeInstanceOf(Date);
+    });
+
+    it('fila persistida sin confirmed_at tras una caída que la siguiente completa', async () => {
+      const folderRepo = new InMemoryDriveFolderRepository();
+      // Simulate crash after claim: row exists in folderRepo but confirmedAt is null
+      await folderRepo.claimFolder('root-1/Ofertas académicas/Oferta Caida', 'crashed-folder-id');
+      const unconfirmed = await folderRepo.findFolder('root-1/Ofertas académicas/Oferta Caida');
+      expect(unconfirmed?.confirmedAt).toBeNull();
+
+      let driveCreateCalledWithId = '';
+      const repo = new GoogleDriveRepository({
+        folderId: 'root-1',
+        accessTokenOrProvider: 'token',
+        folderRepository: folderRepo,
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          if (req.method === 'POST' && req.url.includes('/drive/v3/files?fields=')) {
+            const body = JSON.parse(await req.clone().text());
+            if (body.name === 'Oferta Caida') {
+              driveCreateCalledWithId = body.id;
+            }
+            return new Response(JSON.stringify({ id: body.id }), { status: 200 });
+          }
+          if (req.url.includes('/files?q=')) {
+            return new Response(JSON.stringify({ files: [] }), { status: 200 });
+          }
+          if (req.url.includes('/files/generateIds')) {
+            return new Response(JSON.stringify({ ids: ['gen-child-id'] }), { status: 200 });
+          }
+          return new Response(JSON.stringify({ id: 'dummy' }), { status: 200 });
+        },
+      });
+
+      await repo.storeSubmissionFiles({
+        submissionId: 'sub-recovery',
+        target: { targetId: 'offer-1', kind: 'academic_offer' as const, offerName: 'Oferta Caida' },
+        files: [],
+      });
+
+      // The crashed folder id was used to ensure creation in Drive
+      expect(driveCreateCalledWithId).toBe('crashed-folder-id');
+      // And now it is confirmed!
+      const confirmed = await folderRepo.findFolder('root-1/Ofertas académicas/Oferta Caida');
+      expect(confirmed?.confirmedAt).toBeInstanceOf(Date);
+    });
+
+    it('subida con 409: tolera conflicto y recupera el archivo existente', async () => {
+      const reservedIds = new Map<string, string>();
+      const fileRepo = {
+        async getReservedDriveFileId(token: string) { return reservedIds.get(token) ?? null; },
+        async reserveDriveFileId(token: string, id: string) {
+          if (reservedIds.has(token)) return reservedIds.get(token)!;
+          reservedIds.set(token, id);
+          return id;
+        },
+      };
+
+      let getFileCalledForId = '';
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-1',
+        accessTokenOrProvider: 'token',
+        submissionRepository: fileRepo,
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+
+          if (req.url.includes('/files/generateIds')) {
+            return new Response(JSON.stringify({ ids: ['reserved-file-id-409'] }), { status: 200 });
+          }
+          // AppProperties search returns null (e.g. index delay)
+          if (req.url.includes('/files?q=') && req.url.includes('flacsoFileToken')) {
+            return new Response(JSON.stringify({ files: [] }), { status: 200 });
+          }
+          // Upload returns 409 Conflict
+          if (req.url.includes('/upload/drive/v3/files')) {
+            return new Response(JSON.stringify({ error: { code: 409, message: 'File already exists' } }), { status: 409 });
+          }
+          // GET file by ID
+          if (req.method === 'GET' && req.url.includes('/drive/v3/files/reserved-file-id-409')) {
+            getFileCalledForId = 'reserved-file-id-409';
+            return new Response(JSON.stringify({ id: 'reserved-file-id-409', name: 'cv.pdf' }), { status: 200 });
+          }
+          return new Response(JSON.stringify({ id: 'default' }), { status: 200 });
+        },
+      });
+
+      const result = await repository.storeSubmissionFiles({
+        submissionId: 'sub-409',
+        files: [{ token: 'tok-409', originalName: 'cv.pdf', mimeType: 'application/pdf', data: Buffer.from('data') }],
+      });
+
+      expect(result.files).toEqual([{ token: 'tok-409', driveFileId: 'reserved-file-id-409' }]);
+      expect(getFileCalledForId).toBe('reserved-file-id-409');
+    });
+
+    it('archivos: pide IDs con files.generateIds, los guarda en drive_reserved_id y mantiene appProperties', async () => {
+      const reservedIds = new Map<string, string>();
+      const fileRepo = {
+        async getReservedDriveFileId(token: string) { return reservedIds.get(token) ?? null; },
+        async reserveDriveFileId(token: string, id: string) {
+          if (reservedIds.has(token)) return reservedIds.get(token)!;
+          reservedIds.set(token, id);
+          return id;
+        },
+      };
+
+      const requests: Request[] = [];
+      const repository = new GoogleDriveRepository({
+        folderId: 'root-1',
+        accessTokenOrProvider: 'token',
+        submissionRepository: fileRepo,
+        fetchImpl: async (input, init) => {
+          const req = new Request(input, init);
+          requests.push(req);
+          if (req.url.includes('/files/generateIds')) {
+            return new Response(JSON.stringify({ ids: ['generated-file-id-abc'] }), { status: 200 });
+          }
+          if (req.url.includes('/files?q=')) {
+            return new Response(JSON.stringify({ files: [] }), { status: 200 });
+          }
+          if (req.url.includes('/upload/drive/v3/files')) {
+            return new Response(JSON.stringify({ id: 'generated-file-id-abc', name: 'cv.pdf' }), { status: 200 });
+          }
+          return new Response(JSON.stringify({ id: 'default' }), { status: 200 });
+        },
+      });
+
+      const result = await repository.storeSubmissionFiles({
+        submissionId: 'sub-res-test',
+        target: { targetId: 'offer-1', kind: 'academic_offer' as const, offerName: 'Diploma' },
+        values: { apellido1: 'Perez', nombre1: 'Juan' },
+        files: [{ token: 'token-xyz', fieldKey: 'cv', originalName: 'cv.pdf', mimeType: 'application/pdf', data: Buffer.from('pdf') }],
+      });
+
+      // 1. Saved in reserved ID repo
+      expect(reservedIds.get('token-xyz')).toBe('generated-file-id-abc');
+      expect(result.files).toEqual([{ token: 'token-xyz', driveFileId: 'generated-file-id-abc' }]);
+
+      // 2. Upload request contains the reserved id and appProperties
+      const uploadReq = requests.find((r) => r.url.includes('/upload/drive/v3/files'));
+      expect(uploadReq).toBeDefined();
+      const bodyText = await uploadReq!.text();
+      expect(bodyText).toContain('"id":"generated-file-id-abc"');
+      expect(bodyText).toContain('"flacsoSubmissionId":"sub-res-test"');
+      expect(bodyText).toContain('"flacsoFileToken":"token-xyz"');
     });
   });
 });
