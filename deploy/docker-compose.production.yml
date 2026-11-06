@@ -21,6 +21,8 @@ services:
       context: ..
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
+    # El apagado ordenado espera hasta 110 s a los envíos en curso (ver docs/operacion-envios.md).
+    stop_grace_period: 120s
     environment:
       PORT: 3000
       NODE_ENV: production
@@ -36,6 +38,8 @@ services:
       ADMIN_ALLOWED_EMAILS: ${ADMIN_ALLOWED_EMAILS:?ADMIN_ALLOWED_EMAILS es obligatorio}
       APP_SETTINGS_ENCRYPTION_KEY: ${APP_SETTINGS_ENCRYPTION_KEY:?APP_SETTINGS_ENCRYPTION_KEY es obligatorio}
       UPLOAD_TMP_DIR: /tmp/flacso-preinscripciones
+      # Barrido de envíos abandonados y reconciliación de Sheets cada 60 s.
+      SUBMISSION_SWEEPER_ENABLED: ${SUBMISSION_SWEEPER_ENABLED:-false}
       # Proxies delante de la API (Apache del servidor → nginx del contenedor web). Con esto el límite de
       # frecuencia distingue a cada visitante; sin él todos compartirían la IP del proxy.
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
