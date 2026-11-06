@@ -160,4 +160,29 @@ integrationDescribe('PostgresSubmissionRepository (Integration with PostgreSQL)'
     expect(fileRowFailed?.status).toBe('failed');
     expect(fileRowFailed?.error_message).toBe('Network error');
   });
+
+  it('manages reserved Drive file IDs for submission files (P2)', async () => {
+    const fileToken = `token-res-${Date.now()}-${Math.random()}`;
+    await repository.save({
+      targetId: 'davia-c11',
+      configRevision: 'davia-c11-v1',
+      targetTitle: 'DAVIA',
+      targetKind: 'academic_offer',
+      values: { nombre: 'Lucia' },
+      files: [{ token: fileToken, fieldKey: 'cv', originalName: 'cv.pdf', mimeType: 'application/pdf', size: 1024 }],
+    });
+
+    // Initially null
+    expect(await (repository as any).getReservedDriveFileId(fileToken)).toBeNull();
+
+    // First reservation succeeds
+    const reserved1 = await (repository as any).reserveDriveFileId(fileToken, 'drive-res-1');
+    expect(reserved1).toBe('drive-res-1');
+    expect(await (repository as any).getReservedDriveFileId(fileToken)).toBe('drive-res-1');
+
+    // Second reservation for same token returns the winner ID (first one), not the second candidate
+    const reserved2 = await (repository as any).reserveDriveFileId(fileToken, 'drive-res-2');
+    expect(reserved2).toBe('drive-res-1');
+    expect(await (repository as any).getReservedDriveFileId(fileToken)).toBe('drive-res-1');
+  });
 });

@@ -14,6 +14,7 @@ import { PostgresOfferRegistrationLinkRepository } from './infrastructure/databa
 import { PostgresWordPressCache } from './infrastructure/wordpress/wordpress-cache.js';
 import { TemporaryFileStorage } from './infrastructure/files/temporary-file-storage.js';
 import { GoogleDriveRepository } from './infrastructure/google/google-drive-repository.js';
+import { PostgresDriveFolderRepository } from './infrastructure/database/postgres-drive-folder-repository.js';
 import { GoogleSheetsRepository } from './infrastructure/google/google-sheets-repository.js';
 import { HttpGoogleSheetsClient } from './infrastructure/google/sheets-client.js';
 import { GoogleSpreadsheetProvisioner } from './infrastructure/google/google-spreadsheet-provisioner.js';
@@ -91,6 +92,7 @@ if (process.env.WORDPRESS_URL && !process.env.WORDPRESS_CATALOG_TOKEN?.trim()) {
 }
 
 const repository = new PostgresSubmissionRepository(db);
+const driveFolderRepository = new PostgresDriveFolderRepository(db);
 
 const temporaryFileStorage = new TemporaryFileStorage({
   rootDir: process.env.UPLOAD_TMP_DIR || '/tmp/flacso-preinscripciones',
@@ -122,6 +124,8 @@ const googleDriveRepository = !isMockDrive && googleCreds.tokenProvider
           return configuredFolder;
         })(),
       accessTokenOrProvider: googleCreds.tokenProvider,
+      folderRepository: driveFolderRepository,
+      submissionRepository: repository,
     })
   : process.env.NODE_ENV !== 'production' || isMockDrive
   ? {
