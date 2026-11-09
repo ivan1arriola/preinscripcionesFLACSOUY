@@ -62,12 +62,15 @@ export interface BuildSnapshotParams {
   fields?: FormFieldInfo[];
   formDefinition?: FormDefinition;
   payload: Record<string, unknown>;
+  /** Field keys confirmed stored in Drive; authoritative for document status. */
+  storedDocumentKeys?: string[];
   spreadsheetRowUrl: string;
   documentsFolderUrl: string;
 }
 
 export function buildSubmissionNotificationSnapshot(params: BuildSnapshotParams): SubmissionNotificationSnapshot {
   const { submissionId, target, fields: explicitFields, formDefinition, payload, spreadsheetRowUrl, documentsFolderUrl } = params;
+  const storedDocumentKeys = params.storedDocumentKeys === undefined ? null : new Set(params.storedDocumentKeys);
 
   let fields: FormFieldInfo[] = [];
 
@@ -106,7 +109,7 @@ export function buildSubmissionNotificationSnapshot(params: BuildSnapshotParams)
     let displayVal = '';
 
     if (field.type === 'file') {
-      if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
+      if (storedDocumentKeys ? storedDocumentKeys.has(field.key) : (rawVal !== undefined && rawVal !== null && rawVal !== '')) {
         displayVal = 'Archivo adjunto';
       } else {
         displayVal = '-';
