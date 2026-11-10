@@ -208,6 +208,21 @@ export function createSubmissionRoutes(
         const uploaded = new Map(
           (await fileDependencies.storage.listBySession(sessionHeader)).map((record) => [record.token, record]),
         );
+        // Un token ausente no es un archivo «de otro campo»: la limpieza lo borró porque venció (30 min sin
+        // actividad). Se avisa con FILE_EXPIRED y con todos los campos afectados para que se recarguen de una vez.
+        const expired = parsed.data.files.filter((file) => !uploaded.has(file.token));
+        if (expired.length > 0) {
+          const fields = [...new Set(expired.map((file) => file.fieldKey))];
+          res.status(400).json({
+            error: {
+              code: 'FILE_EXPIRED',
+              message: 'Uno o más archivos adjuntos vencieron y ya no están disponibles. Volvé a cargarlos.',
+              field: fields[0],
+              fields,
+            },
+          });
+          return;
+        }
         const mismatched = parsed.data.files.find((file) => uploaded.get(file.token)?.fieldKey !== file.fieldKey);
         if (mismatched) {
           res.status(400).json({

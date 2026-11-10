@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { apiClient, ApiError } from '../api/client.js';
 import { getRecaptchaToken } from '../api/recaptcha.js';
+import { EXPIRED_FILE_MESSAGE, expiredFileFields } from '../api/file-errors.js';
 import { DynamicForm } from '../components/DynamicForm.js';
 
 interface TargetPageProps {
@@ -17,6 +18,8 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
   const [issues, setIssues] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string[]>>({});
+  // Documentos cuyos archivos venció el servidor: el formulario los quita de pantalla para que se vuelvan a cargar.
+  const [expiredFields, setExpiredFields] = useState<string[]>([]);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [pendingProcessing, setPendingProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -73,7 +76,11 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
       setSubmissionId(res.submissionId);
       if (!res.existing) void trackSubmitApplication(res.submissionId, form.title);
     } catch (err) {
-      if (err instanceof ApiError) {
+      const expired = expiredFileFields(err);
+      if (expired.length > 0) {
+        setServerErrors(Object.fromEntries(expired.map((field) => [field, [EXPIRED_FILE_MESSAGE]])));
+        setExpiredFields(expired);
+      } else if (err instanceof ApiError) {
         if (err.fieldErrors) {
           setServerErrors(err.fieldErrors);
         } else {
@@ -191,6 +198,7 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
         onSubmit={handleSubmit}
         isSubmitting={isSubmitting}
         serverErrors={serverErrors}
+        expiredFields={expiredFields}
       />
     </div>
   );

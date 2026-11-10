@@ -5,18 +5,36 @@ import { OrientationMentionFields } from './OrientationMentionFields.js';
 import { UniversalFields } from './UniversalFields.js';
 import { DocumentUploadFields } from './DocumentUploadFields.js';
 import { PreinscriptionWizard } from './PreinscriptionWizard.js';
+import { useUploadKeepAlive } from './useUploadKeepAlive.js';
+import { withoutExpiredFiles } from '../api/file-errors.js';
+
+const NO_EXPIRED_FIELDS: string[] = [];
 
 interface DynamicFormProps {
   form: FormDefinition;
   onSubmit: (values: Record<string, string>, files?: SubmissionFileToken[]) => Promise<void>;
   isSubmitting?: boolean;
   serverErrors?: Record<string, string[]>;
+  /** Campos de documentos cuyos archivos ya no están en el servidor. */
+  expiredFields?: string[];
 }
 
-export const DynamicForm: React.FC<DynamicFormProps> = ({ form, onSubmit, isSubmitting = false, serverErrors = {} }) => {
+export const DynamicForm: React.FC<DynamicFormProps> = ({
+  form,
+  onSubmit,
+  isSubmitting = false,
+  serverErrors = {},
+  expiredFields = NO_EXPIRED_FIELDS,
+}) => {
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<SubmissionFileToken[]>([]);
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
+  const usesWizard = !!form.steps && form.steps.length > 0;
+  // El asistente por pasos guarda y renueva sus propios archivos; este camino es el formulario de una sola página.
+  useUploadKeepAlive(!usesWizard && files.length > 0, apiClient.keepAlive);
+  React.useEffect(() => {
+    if (!usesWizard && expiredFields.length > 0) setFiles((current) => withoutExpiredFiles(current, expiredFields));
+  }, [usesWizard, expiredFields]);
   const hasOrientationInput = form.inputs.some((input) => input.key === 'orientacion');
   const hasMentionInput = form.inputs.some((input) => input.key === 'mencion');
   const orientacionInput = form.inputs.find((input) => input.key === 'orientacion');
@@ -62,6 +80,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({ form, onSubmit, isSubm
         onSubmit={(vals, fls) => onSubmit(vals, fls)}
         isSubmitting={isSubmitting}
         serverErrors={serverErrors}
+        expiredFields={expiredFields}
       />
     );
   }

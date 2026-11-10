@@ -9,7 +9,9 @@ export class ApiError extends Error {
     public readonly issues?: string[],
     public readonly field?: string,
     public readonly reason?: string,
-    public readonly action?: string
+    public readonly action?: string,
+    /** Campos de documentos afectados (FILE_EXPIRED puede traer varios). */
+    public readonly fields?: string[]
   ) {
     super(message);
     this.name = 'ApiError';
@@ -144,11 +146,24 @@ export const apiClient = {
         err.error?.code || 'SUBMISSION_ERROR',
         err.error?.message || 'Error al procesar la preinscripción',
         err.error?.fieldErrors,
-        err.error?.issues
+        err.error?.issues,
+        err.error?.field,
+        undefined,
+        undefined,
+        Array.isArray(err.error?.fields) ? err.error.fields : undefined
       );
     }
 
     return res.json();
+  },
+
+  /** Avisa que el formulario sigue abierto: renueva el vencimiento de los archivos ya subidos. */
+  async keepAlive(): Promise<void> {
+    const res = await fetch('/api/uploads/keepalive', {
+      method: 'POST',
+      headers: { 'x-preinscription-session': apiClient.sessionId() },
+    });
+    if (!res.ok) throw new Error(`keepalive ${res.status}`);
   },
 
   async getAdminAuthUrl(redirectUri: string): Promise<{ url: string; state: string }> {
