@@ -126,7 +126,7 @@ export const apiClient = {
     files: SubmissionFileToken[] = [],
     clientSubmissionId?: string,
     recaptchaToken?: string
-  ): Promise<{ submissionId: string; status?: string }> {
+  ): Promise<{ submissionId: string; status?: string; existing?: boolean }> {
     const res = await fetch(`/api/targets/${encodeURIComponent(id)}/submissions`, {
       method: 'POST',
       headers: {
@@ -611,6 +611,7 @@ export const apiClient = {
 
 export interface PublicConfig {
   recaptcha: { enabled: boolean; siteKey?: string; action?: string };
+  meta?: { pixelId: string | null };
 }
 
 export interface AdminRecaptchaSettings {

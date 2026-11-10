@@ -15,6 +15,7 @@ describe('Submission HTTP Routes', () => {
   let baseUrl: string;
   let repository: InMemorySubmissionRepository;
   let notificationRepository: InMemoryEmailNotificationRepository;
+  const metaEvents: Array<Record<string, unknown>> = [];
 
   const validPayload = {
     configRevision: 'davia-c11-v1',
@@ -88,6 +89,12 @@ describe('Submission HTTP Routes', () => {
       temporaryFileStorage: storage,
       googleDriveRepository: drive,
       emailNotificationRepository: notificationRepository,
+      metaTracker: {
+        pixelId: '999',
+        sendSubmitApplication: async (event) => {
+          metaEvents.push({ ...event });
+        },
+      },
     });
 
     await new Promise<void>((resolve) => {
@@ -111,6 +118,8 @@ describe('Submission HTTP Routes', () => {
       headers: {
         'Content-Type': 'application/json',
         'x-preinscription-session': 'session-test',
+        Cookie: '_fbp=fb.1.1700000000.123; _fbc=fb.1.1700000000.abc',
+        Referer: 'https://preinscripciones.flacso.edu.uy/diploma-en-genero',
       },
       body: JSON.stringify(validPayload),
     });
@@ -119,6 +128,15 @@ describe('Submission HTTP Routes', () => {
     const data = await res.json();
     expect(data.submissionId).toBeDefined();
     expect(data.submissionId).toMatch(/^sub_/);
+
+    // SubmitApplication por CAPI con el mismo event_id que usará el navegador.
+    expect(metaEvents).toHaveLength(1);
+    expect(metaEvents[0]).toMatchObject({
+      eventId: data.submissionId,
+      fbp: 'fb.1.1700000000.123',
+      fbc: 'fb.1.1700000000.abc',
+      eventSourceUrl: 'https://preinscripciones.flacso.edu.uy/diploma-en-genero',
+    });
 
     const queuedNotifications = await notificationRepository.listNotifications({ submissionId: data.submissionId });
     expect(queuedNotifications.length).toBeGreaterThan(0);

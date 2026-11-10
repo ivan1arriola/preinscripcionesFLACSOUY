@@ -1,3 +1,4 @@
+import { trackSubmitApplication } from '../api/meta-pixel.js';
 import React, { useEffect, useRef, useState } from 'react';
 import type { FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { apiClient, ApiError } from '../api/client.js';
@@ -70,6 +71,7 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
       const res = await apiClient.submit(targetId, form.effectiveRevision, values, files, clientSubmissionIdRef.current, recaptchaToken);
       setPendingProcessing(res.status === 'pending_processing');
       setSubmissionId(res.submissionId);
+      if (!res.existing) void trackSubmitApplication(res.submissionId, form.title);
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.fieldErrors) {
