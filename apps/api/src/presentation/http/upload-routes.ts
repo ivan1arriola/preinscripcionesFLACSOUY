@@ -192,8 +192,10 @@ export function createUploadRoutes(
           }
 
           if (storage.listBySession) {
-            const sessionFiles = await storage.listBySession(sessionId);
-            const existingForField = sessionFiles.filter((f) => f.fieldKey === fieldKey);
+            const sessionFiles = storage.listPendingBySession
+              ? await storage.listPendingBySession(sessionId)
+              : await storage.listBySession(sessionId);
+            const existingForField = sessionFiles.filter((f) => f.fieldKey === fieldKey && f.targetId === targetId);
             const maxFiles = docDef.maxFiles ?? 1;
             if (existingForField.length >= maxFiles) {
               res.status(400).json({

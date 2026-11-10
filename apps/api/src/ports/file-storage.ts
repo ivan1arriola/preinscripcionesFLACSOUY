@@ -26,6 +26,8 @@ export interface TemporaryFileStoragePort {
   remove(token: string, sessionId?: string): Promise<void>;
   cleanup(before: number): Promise<number>;
   listBySession?(sessionId: string): Promise<TemporaryFileRecord[]>;
+  /** Solo archivos pendientes que existen físicamente, excluyendo envíos retenidos y metadatos huérfanos. */
+  listPendingBySession?(sessionId: string): Promise<TemporaryFileRecord[]>;
   touch?(sessionId: string): Promise<void>;
   /** Fija los archivos de un envío (reanudable e idempotente). Lanza FILE_EXPIRED o FORBIDDEN. */
   pinFiles?(tokens: string[], sessionId: string, clientSubmissionId: string): Promise<void>;
