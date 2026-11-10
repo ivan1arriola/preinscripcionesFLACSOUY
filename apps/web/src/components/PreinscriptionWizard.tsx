@@ -9,12 +9,20 @@ import { MobileWizardNavigation } from './MobileWizardNavigation.js';
 import { FormErrorSummary } from './FormErrorSummary.js';
 import { FormHelp } from './FormHelp.js';
 import { apiClient } from '../api/client.js';
+import { withoutExpiredFiles } from '../api/file-errors.js';
+import { useUploadKeepAlive } from './useUploadKeepAlive.js';
+
+const NO_EXPIRED_FIELDS: string[] = [];
 
 interface PreinscriptionWizardProps {
   form: FormDefinition;
   onSubmit: (values: Record<string, string>, files: SubmissionFileToken[]) => Promise<void>;
   isSubmitting?: boolean;
   serverErrors?: Record<string, string[]>;
+  /** Campos de documentos cuyos archivos venció el servidor: se quitan de pantalla para volver a cargarlos. */
+  expiredFields?: string[];
+  /** Renueva el vencimiento de los archivos subidos mientras el formulario está abierto. */
+  onKeepAlive?: () => Promise<unknown>;
   onUpload?: (fieldKey: string, file: File, onProgress?: (percent: number) => void) => Promise<SubmissionFileToken>;
 }
 
@@ -23,6 +31,8 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   onSubmit,
   isSubmitting = false,
   serverErrors = {},
+  expiredFields = NO_EXPIRED_FIELDS,
+  onKeepAlive = () => apiClient.keepAlive(),
   onUpload = (fieldKey, file, onProgress) => apiClient.upload(form.targetId, fieldKey, file, onProgress),
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -35,6 +45,13 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
   // El recuadro con la lista de errores aparece solo al intentar avanzar; al salir de un campo
   // se avisa junto al campo, sin mover el resto del formulario.
   const [summaryVisible, setSummaryVisible] = useState(false);
+
+  // Los archivos subidos vencen a los 30 minutos sin actividad: mientras el formulario siga abierto se renuevan.
+  useUploadKeepAlive(files.length > 0, onKeepAlive);
+  // Si el servidor avisa que algunos ya no existen, se quitan de la pantalla en vez de mostrarlos como cargados.
+  React.useEffect(() => {
+    if (expiredFields.length > 0) setFiles((current) => withoutExpiredFiles(current, expiredFields));
+  }, [expiredFields]);
 
   const steps: FormStepDefinition[] = form.steps && form.steps.length > 0
     ? [...form.steps].sort((a, b) => a.order - b.order)

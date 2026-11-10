@@ -244,6 +244,26 @@ export function createUploadRoutes(
     (req as Request).pipe(parser);
   });
 
+  // Aviso periódico del formulario abierto: renueva el vencimiento de los archivos de la sesión. Sin esto vencen
+  // 30 minutos después de la última subida aunque la persona siga completando el formulario, y se pierden.
+  router.post('/keepalive', async (req, res) => {
+    const sessionId = req.header('x-preinscription-session')?.trim();
+    if (!sessionId) {
+      res.status(400).json({
+        error: { code: 'INVALID_REQUEST', message: 'La sesión de preinscripción es obligatoria.' },
+      });
+      return;
+    }
+    try {
+      await storage.touch?.(sessionId);
+      res.status(200).json({ ok: true });
+    } catch {
+      res.status(503).json({
+        error: { code: 'KEEPALIVE_UNAVAILABLE', message: 'No se pudo renovar la sesión; se reintentará.' },
+      });
+    }
+  });
+
   router.delete('/:token', async (req, res) => {
     const sessionId = req.header('x-preinscription-session')?.trim();
     if (!sessionId) {
