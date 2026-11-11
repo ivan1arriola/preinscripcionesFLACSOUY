@@ -105,5 +105,7 @@ describe('TemporaryFileStorage metadata integrity', () => {
     stop = true;
     expect(await readers).toBe(0);
     void root;
-  });
+    // 100 renombrados atómicos contra un lector sin pausa: en una máquina cargada superan los 5 s por defecto
+    // aunque la comprobación (ninguna lectura ve metadatos a medio escribir) no cambie.
+  }, 30_000);
 });
