@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import express from 'express';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import type { AcademicTarget } from '@flacso/contracts';
 import { createUploadRoutes } from './upload-routes.js';
-import { TemporaryFileStorage } from '../../infrastructure/files/temporary-file-storage.js';
 import type { AcademicCatalog } from '../../ports/academic-catalog.js';
+import type { TemporaryFileRecord, TemporaryFileStoragePort } from '../../ports/file-storage.js';
 
 const MiB = 1024 * 1024;
 const pdfBytes = (size = 16) => Buffer.concat([Buffer.from('%PDF-1.4\n'), Buffer.alloc(Math.floor(size))]);
@@ -22,12 +20,30 @@ const catalog: AcademicCatalog = {
   revalidateTarget: async () => maestria, revalidateTargets: async () => [maestria],
 };
 
+/**
+ * Almacenamiento en memoria: estos tests suben hasta ~60 MiB y la lógica de límites solo necesita `save` y
+ * `listBySession`. Escribir a disco cargaba a los tests de concurrencia del almacenamiento real.
+ */
+function memoryStorage(): TemporaryFileStoragePort {
+  const records: TemporaryFileRecord[] = [];
+  return {
+    save: async (sessionId, fieldKey, upload) => {
+      const record: TemporaryFileRecord = {
+        token: randomBytes(16).toString('hex'), sessionId, fieldKey,
+        originalName: upload.originalName, mimeType: upload.mimeType, size: upload.data.byteLength, createdAt: new Date(),
+      };
+      records.push(record);
+      return record;
+    },
+    open: async () => { throw new Error('unused'); },
+    remove: async () => undefined,
+    cleanup: async () => 0,
+    listBySession: async (sessionId) => records.filter((record) => record.sessionId === sessionId),
+  };
+}
+
 async function setup() {
-  const storage = new TemporaryFileStorage({
-    rootDir: await mkdtemp(join(tmpdir(), 'flacso-two-files-')),
-    maxBytes: 10 * MiB,
-    allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'],
-  });
+  const storage = memoryStorage();
   const app = express();
   app.use(express.json());
   app.use('/api/uploads', createUploadRoutes(storage, catalog));
