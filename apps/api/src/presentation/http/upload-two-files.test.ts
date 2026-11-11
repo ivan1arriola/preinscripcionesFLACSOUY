@@ -56,7 +56,7 @@ async function setup() {
     const form = new FormData();
     form.append('targetId', maestria.id);
     form.append('fieldKey', fieldKey);
-    form.append('file', new Blob([bytes], { type }), name);
+    form.append('file', new Blob([new Uint8Array(bytes)], { type }), name);
     const response = await fetch(url, { method: 'POST', headers: { 'x-preinscription-session': session }, body: form });
     return { status: response.status, json: (await response.json()) as Record<string, any> };
   };
