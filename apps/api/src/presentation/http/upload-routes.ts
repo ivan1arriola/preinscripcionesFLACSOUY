@@ -5,7 +5,7 @@ import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import { getCanonicalFormDefinition } from '../../domain/canonical-forms.js';
 
 const MAX_UPLOAD_FILE_BYTES = 10 * 1024 * 1024; // 10 MiB per file
-const MAX_TOTAL_SESSION_BYTES = 25 * 1024 * 1024; // 25 MiB total per preinscription
+const MAX_TOTAL_SESSION_BYTES = 60 * 1024 * 1024; // 60 MiB total per preinscription (hasta 2 archivos por campo)
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -210,7 +210,7 @@ export function createUploadRoutes(
               res.status(400).json({
                 error: {
                   code: 'TOTAL_SIZE_EXCEEDED',
-                  message: 'La suma de archivos de la preinscripción no puede superar 25 MiB.',
+                  message: 'La suma de archivos de la preinscripción no puede superar 60 MiB.',
                 },
               });
               return;

@@ -5,6 +5,7 @@ import { rememberPreview } from '../domain/file-previews.js';
 import { usePendingUploads } from '../domain/pending-upload.js';
 import { UploadingFileRow } from './UploadingFileRow.js';
 import { UploadedFileChip } from './UploadedFileChip.js';
+import { fileLimitInfo } from './file-limits.js';
 
 export interface TitleDocumentFieldsProps {
   document: DocumentDefinition;
@@ -36,6 +37,7 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
   const isAbsent = values.sinTituloActual === 'Si';
   const denomination = values.tituloDenominacion ?? '';
   const uploadedFiles = files.filter((f) => f.fieldKey === document.key);
+  const { max, multi, full } = fileLimitInfo(document, uploadedFiles.length);
   const denominationError = errors.tituloDenominacion;
   const fileError = errors[document.key];
 
@@ -150,15 +152,20 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
               id={`file-${document.key}`}
               type="file"
               accept={document.acceptedMimeTypes?.join(',')}
-              disabled={disabled || uploading}
+              disabled={disabled || uploading || full}
               onChange={handleFileChange}
               className="file-input"
             />
             <p className="field-hint">
-              {uploadedFiles.length > 0
-                ? `${uploadedFiles.length} archivo cargado`
+              {multi
+                ? `Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB cada uno). Hasta ${max} archivos: podés combinar PDF e imágenes.`
                 : 'Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB)'}
             </p>
+            {uploadedFiles.length > 0 && (
+              <p className="field-hint">
+                {multi ? `${uploadedFiles.length} de ${max} archivos cargados` : `${uploadedFiles.length} archivo cargado`}
+              </p>
+            )}
             {pendingUploads.pending[document.key] && <UploadingFileRow upload={pendingUploads.pending[document.key]} />}
             {uploadedFiles.length > 0 && (
               <ul className="file-list">
