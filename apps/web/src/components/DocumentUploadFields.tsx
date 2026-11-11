@@ -8,6 +8,7 @@ import { usePendingUploads } from '../domain/pending-upload.js';
 import { UploadingFileRow } from './UploadingFileRow.js';
 import { UploadedFileChip } from './UploadedFileChip.js';
 import { getDocumentProgress } from './preinscription-form-view-model.js';
+import { fileLimitInfo } from './file-limits.js';
 
 export interface DocumentUploadFieldsProps {
   documents: DocumentDefinition[];
@@ -131,7 +132,7 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                     id={`file-${document.key}`}
                     type="file"
                     accept={document.acceptedMimeTypes?.join(',')}
-                    disabled={disabled || uploading[document.key]}
+                    disabled={disabled || uploading[document.key] || fileLimitInfo(document, uploaded.length).full}
                     onChange={async (event) => {
                       const input = event.target;
                       const file = input.files?.[0];
@@ -158,10 +159,17 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                     className="file-input"
                   />
                   <p className="field-hint">
-                    {uploaded.length > 0
-                      ? `${uploaded.length} archivo cargado`
+                    {fileLimitInfo(document, uploaded.length).multi
+                      ? `Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB cada uno). Hasta ${document.maxFiles} archivos: podés combinar PDF e imágenes.`
                       : 'Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB)'}
                   </p>
+                  {uploaded.length > 0 && (
+                    <p className="field-hint">
+                      {fileLimitInfo(document, uploaded.length).multi
+                        ? `${uploaded.length} de ${document.maxFiles} archivos cargados`
+                        : `${uploaded.length} archivo cargado`}
+                    </p>
+                  )}
                   {pendingUploads.pending[document.key] && <UploadingFileRow upload={pendingUploads.pending[document.key]} />}
                   {uploaded.length > 0 && (
                     <ul className="file-list">

@@ -4,6 +4,7 @@ import { rememberPreview } from '../domain/file-previews.js';
 import { usePendingUploads } from '../domain/pending-upload.js';
 import { UploadedFileChip } from './UploadedFileChip.js';
 import { UploadingFileRow } from './UploadingFileRow.js';
+import { fileLimitInfo } from './file-limits.js';
 
 export interface DocumentUploadCardProps {
   document: DocumentDefinition;
@@ -34,6 +35,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
   const current = pending[document.key];
   const busy = uploading || Boolean(current);
   const state = busy ? 'uploading' : files.length > 0 ? 'done' : 'pending';
+  const { max, multi, full } = fileLimitInfo(document, files.length);
 
   return (
     <article className={`document-upload-card${state === 'done' ? ' is-done' : ''}${busy ? ' is-uploading' : ''}`} aria-busy={busy}>
@@ -42,7 +44,11 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
           <h4 className="document-upload-card__title">
             {document.label} {document.required && <span className="field-required" aria-label="obligatorio">*</span>}
           </h4>
-          <p className="document-upload-card__formats">Formatos: {formatLabel}. Máx. 10 MiB.</p>
+          <p className="document-upload-card__formats">
+            {multi
+              ? `Formatos: ${formatLabel}. Hasta ${max} archivos: podés combinar PDF e imágenes. Máx. 10 MiB cada uno.`
+              : `Formatos: ${formatLabel}. Máx. 10 MiB.`}
+          </p>
         </div>
         <span className={`pill pill--${state}`}>
           {state === 'uploading' ? 'Subiendo' : state === 'done' ? 'Listo' : 'Pendiente'}
@@ -56,7 +62,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
           id={inputId}
           type="file"
           accept={document.acceptedMimeTypes?.join(',')}
-          disabled={disabled || busy}
+          disabled={disabled || busy || full}
           onChange={async (event) => {
             const input = event.target;
             const file = input.files?.[0];
@@ -85,6 +91,8 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
           {busy && <li className="file-list__item"><UploadingFileRow upload={current} /></li>}
         </ul>
       )}
+      {multi && files.length > 0 && <p className="document-upload-card__count">{files.length} de {max} archivos</p>}
+      {multi && full && <p className="document-upload-card__full">Alcanzaste el máximo de {max} archivos. Quitá uno para cambiarlo.</p>}
       {files.length === 0 && !busy && <p className="document-upload-card__empty">Pendiente de carga</p>}
       {error && <p className="document-upload-card__error" role="alert">{error}</p>}
     </article>
