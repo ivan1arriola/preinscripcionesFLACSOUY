@@ -72,6 +72,17 @@ const SECTIONS: Section[] = [
   },
 ];
 
+/** Campos que solo se solicitan si se cumple su condición. */
+const OPTIONAL_KEYS = new Set(['nombre2', 'apellido2', 'generoOtra', 'posgradoCual', 'orientacion', 'mencion', 'convenioWordpressId']);
+
+function isApplicable(key: string, snapshot: SubmissionNotificationSnapshot): boolean {
+  const answer = (field: string) => snapshot.values[field]?.value?.trim().toLowerCase() ?? '';
+  if (key === 'generoOtra') return ['otra', 'otro', 'other'].includes(answer('genero'));
+  if (key === 'posgradoCual') return ['sí', 'si'].includes(answer('posgradoFlacso'));
+  if (key === 'convenioWordpressId') return ['sí', 'si'].includes(answer('tieneConvenio'));
+  return true;
+}
+
 const DOCUMENT_KEYS = ['identidad', 'cv', 'titulo', 'cartaMotivacion', 'cartaRecomendacion1', 'cartaRecomendacion2'];
 
 const HUMAN_VALUES: Record<string, string> = {
@@ -134,7 +145,7 @@ function buildModel(snapshot: SubmissionNotificationSnapshot): NotificationModel
       continue;
     }
     if (isEmpty(item.value)) {
-      missing.push(item.label);
+      if (!OPTIONAL_KEYS.has(key) && isApplicable(key, snapshot)) missing.push(item.label);
       continue;
     }
 
