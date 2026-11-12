@@ -18,7 +18,7 @@ interface UniversalFieldsProps {
 
 const choices: Record<string, Array<[string, string]>> = {
   tipoDocumento: [['cedula_uruguaya', 'Cédula de identidad uruguaya'], ['pasaporte', 'Pasaporte'], ['documento_extranjero', 'Documento extranjero']],
-  genero: [['Mujer', 'Mujer'], ['Varon', 'Varón'], ['Mujer trans', 'Mujer trans'], ['Varon trans', 'Varón trans'], ['No binarie / no conforme', 'No binarie / no conforme'], ['Otra', 'Otra'], ['Prefiero no responder', 'Prefiero no responder']],
+  genero: [['Mujer', 'Mujer'], ['Varon', 'Varón'], ['Mujer trans', 'Mujer trans'], ['Varon trans', 'Varón trans'], ['No binarie', 'No binarie'], ['Otra', 'Otra'], ['Prefiero no responder', 'Prefiero no responder']],
   tieneConvenio: [['No', 'No'], ['Si', 'Sí']],
   aceptaDifusion: [['No', 'No'], ['Si', 'Sí']],
   aceptaComunicaciones: [['No', 'No'], ['Si', 'Sí']],
