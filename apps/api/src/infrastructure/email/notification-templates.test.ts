@@ -142,8 +142,8 @@ describe('Notification Templates', () => {
     it('junta los campos sin respuesta y muestra el estado de cada documento', () => {
       const { html, text } = renderOperationalNotification(canonical, 'master', 'master@flacso.edu.uy');
 
-      expect(html).toContain('No completados:</strong> Segundo nombre, ¿Cuál convenio te corresponde?');
-      expect(text).toContain('No completados: Segundo nombre, ¿Cuál convenio te corresponde?');
+      expect(html).not.toContain('No completados:');
+      expect(text).not.toContain('No completados:');
       expect(html).not.toContain('>-</td>');
       expect(html).toContain('&#10003; Adjunto');
       expect(html).toContain('&#10007; No adjunto');
@@ -170,7 +170,7 @@ describe('Notification Templates', () => {
       expect(html).toContain('¿Qué sigue?');
       expect(html).toContain('Datos personales');
       expect(html).toContain('Cédula uruguaya');
-      expect(html).toContain('No completados:</strong> Segundo nombre');
+      expect(html).not.toContain('No completados:');
       expect(text).toContain('inscripciones@flacso.edu.uy');
       expect(html).not.toContain('sub_xyz_789');
       expect(text).not.toContain('sub_xyz_789');
