@@ -130,7 +130,7 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                   <input
                     id={`file-${document.key}`}
                     type="file"
-                    accept={document.acceptedMimeTypes?.join(',')}
+                    accept={[...(document.acceptedMimeTypes ?? []), '.wspimage'].join(',')}
                     disabled={disabled || uploading[document.key]}
                     onChange={async (event) => {
                       const input = event.target;
