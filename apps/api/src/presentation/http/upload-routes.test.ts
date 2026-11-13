@@ -293,35 +293,24 @@ describe('Upload HTTP Routes', () => {
     }
   });
 
-  it('rejects file exceeding max files per requirement (e.g. second CV)', async () => {
+  it('rejects file exceeding max files per requirement (e.g. third CV, since each field admits up to 2)', async () => {
     const { baseUrl, close } = await setupApp();
     try {
-      // 1st CV upload: succeeds
-      const form1 = new FormData();
-      form1.append('targetId', 'diploma-davia');
-      form1.append('fieldKey', 'cv');
-      form1.append('file', new Blob([pdfBytes('cv 1')], { type: 'application/pdf' }), 'cv1.pdf');
+      const upload = async (name: string) => {
+        const form = new FormData();
+        form.append('targetId', 'diploma-davia');
+        form.append('fieldKey', 'cv');
+        form.append('file', new Blob([pdfBytes(name)], { type: 'application/pdf' }), `${name}.pdf`);
+        return fetch(baseUrl, { method: 'POST', headers: { 'x-preinscription-session': 'session-beta' }, body: form });
+      };
 
-      const res1 = await fetch(baseUrl, {
-        method: 'POST',
-        headers: { 'x-preinscription-session': 'session-beta' },
-        body: form1,
-      });
-      expect(res1.status).toBe(201);
+      expect((await upload('cv 1')).status).toBe(201);
+      expect((await upload('cv 2')).status).toBe(201);
 
-      // 2nd CV upload for same session: fails
-      const form2 = new FormData();
-      form2.append('targetId', 'diploma-davia');
-      form2.append('fieldKey', 'cv');
-      form2.append('file', new Blob([pdfBytes('cv 2')], { type: 'application/pdf' }), 'cv2.pdf');
-
-      const res2 = await fetch(baseUrl, {
-        method: 'POST',
-        headers: { 'x-preinscription-session': 'session-beta' },
-        body: form2,
-      });
-      expect(res2.status).toBe(400);
-      const data = await res2.json();
+      // 3rd CV upload for the same session: fails
+      const res3 = await upload('cv 3');
+      expect(res3.status).toBe(400);
+      const data = await res3.json();
       expect(data.error.message).toMatch(/máximo de archivos/i);
     } finally {
       await close();
