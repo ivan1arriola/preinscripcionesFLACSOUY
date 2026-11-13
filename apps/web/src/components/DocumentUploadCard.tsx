@@ -55,7 +55,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
         <input
           id={inputId}
           type="file"
-          accept={document.acceptedMimeTypes?.join(',')}
+          accept={[...(document.acceptedMimeTypes ?? []), '.wspimage'].join(',')}
           disabled={disabled || busy}
           onChange={async (event) => {
             const input = event.target;
