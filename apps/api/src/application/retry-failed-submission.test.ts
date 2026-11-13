@@ -76,7 +76,7 @@ describe('retryFailedSubmission', () => {
 
   it('retries only notification creation without writing another spreadsheet row', async () => {
     const record = await recoveryRepo.recordFailure({ submissionId: 'sub_notify', targetId: 'diplomado-salud-c2', stage: 'notifications', safeError: 'No se pudo encolar', retentionDays: 7, spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/original/edit', documentsFolderUrl: 'https://drive.google.com/drive/folders/original' });
-    recoveryRepo.setDetails(record.id, { values: { email: 'maria@example.com' }, files: [] });
+    recoveryRepo.setDetails(record.id, { values: { email: 'maria@example.com' }, files: [{ token: 'file-1', fieldKey: 'cv', originalName: 'cv.pdf', size: 10, mimeType: 'application/pdf', status: 'success', driveFileId: 'drive-cv' }] });
     const result = await retryFailedSubmission({ recoveryIdOrSubmissionId: record.id, adminEmail: 'admin@flacso.edu.uy' }, {
       recoveryRepository: recoveryRepo, submissionRepository: submissionRepo, catalog,
       spreadsheetDependencies: { targetSpreadsheetService: mockTargetSpreadsheetService as any, repository: mockSpreadsheetRepo as any },
@@ -85,6 +85,7 @@ describe('retryFailedSubmission', () => {
     expect(result.ok).toBe(true);
     expect(mockSpreadsheetRepo.appendByHeaders).not.toHaveBeenCalled();
     expect(mockNotificationRepo.ensureForSubmission).toHaveBeenCalledOnce();
+    expect(mockNotificationRepo.ensureForSubmission.mock.calls[0][0].snapshot.values.cv.value).toBe('Archivo adjunto');
     expect(mockNotificationRepo.ensureForSubmission.mock.calls[0][0].snapshot).toMatchObject({ spreadsheetRowUrl: 'https://docs.google.com/spreadsheets/d/original/edit', documentsFolderUrl: 'https://drive.google.com/drive/folders/original' });
     expect((await recoveryRepo.findById(record.id))?.status).toBe('resolved');
   });
