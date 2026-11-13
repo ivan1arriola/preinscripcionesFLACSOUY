@@ -329,6 +329,20 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
     await this.repository?.remove(token, sessionId);
   }
 
+  async listPendingBySession(sessionId: string): Promise<TemporaryFileRecord[]> {
+    const records = await this.listBySession(sessionId);
+    const pending: TemporaryFileRecord[] = [];
+    for (const record of records) {
+      // La base puede conservar metadatos de archivos vencidos o ya fijados.
+      // Solo los archivos realmente pendientes consumen el cupo de carga.
+      const metadata = await this.readMetadata(this.pendingDir(record.token));
+      if (metadata && metadata.sessionId === sessionId) {
+        pending.push(record);
+      }
+    }
+    return pending;
+  }
+
   async listBySession(sessionId: string): Promise<TemporaryFileRecord[]> {
     if (this.repository) {
       return this.repository.listBySession(sessionId);

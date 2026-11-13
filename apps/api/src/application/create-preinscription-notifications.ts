@@ -13,6 +13,7 @@ export interface CreateNotificationsInput {
   target: AcademicTarget;
   form: FormDefinition;
   values: Record<string, string>;
+  storedDocumentKeys?: string[];
   spreadsheetRowUrl: string;
   documentsFolderUrl: string;
   masterRecipients: string[];
@@ -69,6 +70,7 @@ export async function createPreinscriptionNotifications(
       ...(input.form.documents ?? []).map((doc) => ({ key: doc.key, label: doc.label, type: 'file', required: doc.required })),
     ],
     payload: input.values,
+    storedDocumentKeys: input.storedDocumentKeys,
     spreadsheetRowUrl: input.spreadsheetRowUrl,
     documentsFolderUrl: input.documentsFolderUrl,
   });

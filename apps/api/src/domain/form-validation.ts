@@ -5,7 +5,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DOCUMENT_TYPES = new Set(['cedula_uruguaya', 'pasaporte', 'documento_extranjero']);
 const GENDER_VALUES = new Set([
   'Mujer', 'Varon', 'Mujer trans', 'Varon trans',
-  'No binarie / no conforme', 'Otra', 'Prefiero no responder',
+  'No binarie', 'No binarie / no conforme', 'Otra', 'Prefiero no responder',
 ]);
 const YES_NO_VALUES = new Set(['Si', 'No']);
 /** Tope por campo: evita que un envío manual guarde textos arbitrariamente largos en la base y la planilla. */

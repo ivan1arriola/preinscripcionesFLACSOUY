@@ -72,6 +72,17 @@ const SECTIONS: Section[] = [
   },
 ];
 
+/** Campos que solo se solicitan si se cumple su condición. */
+const OPTIONAL_KEYS = new Set(['nombre2', 'apellido2', 'generoOtra', 'posgradoCual', 'orientacion', 'mencion', 'convenioWordpressId']);
+
+function isApplicable(key: string, snapshot: SubmissionNotificationSnapshot): boolean {
+  const answer = (field: string) => snapshot.values[field]?.value?.trim().toLowerCase() ?? '';
+  if (key === 'generoOtra') return ['otra', 'otro', 'other'].includes(answer('genero'));
+  if (key === 'posgradoCual') return ['sí', 'si'].includes(answer('posgradoFlacso'));
+  if (key === 'convenioWordpressId') return ['sí', 'si'].includes(answer('tieneConvenio'));
+  return true;
+}
+
 const DOCUMENT_KEYS = ['identidad', 'cv', 'titulo', 'cartaMotivacion', 'cartaRecomendacion1', 'cartaRecomendacion2'];
 
 const HUMAN_VALUES: Record<string, string> = {
@@ -134,7 +145,7 @@ function buildModel(snapshot: SubmissionNotificationSnapshot): NotificationModel
       continue;
     }
     if (isEmpty(item.value)) {
-      missing.push(item.label);
+      if (!OPTIONAL_KEYS.has(key) && isApplicable(key, snapshot)) missing.push(item.label);
       continue;
     }
 
@@ -225,17 +236,17 @@ function renderRowsTable(rows: Row[]): string {
   const body = rows
     .map(
       (row) => `<tr>
-          <td style="padding: 8px 12px; font-weight: 600; color: #475467; border-bottom: 1px solid #eaecf0; width: 35%; vertical-align: top;">${escapeHtml(row.label)}</td>
-          <td style="padding: 8px 12px; color: #101828; border-bottom: 1px solid #eaecf0; vertical-align: top;">${escapeHtml(row.value)}</td>
+          <td style="padding: 8px 12px; font-weight: 600; color: #475467; border-bottom: 1px solid #eaecf0; width: 40%; vertical-align: top; overflow-wrap: anywhere;">${escapeHtml(row.label)}</td>
+          <td style="padding: 8px 12px; color: #101828; border-bottom: 1px solid #eaecf0; vertical-align: top; overflow-wrap: anywhere; word-break: break-word;">${escapeHtml(row.value)}</td>
         </tr>`,
     )
     .join('');
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 14px;"><tbody>${body}</tbody></table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed;"><tbody>${body}</tbody></table>`;
 }
 
 function renderSectionHtml(title: string, content: string): string {
-  return `<div style="margin-bottom: 24px;">
-      <h3 style="margin: 0 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #175cd3; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #475467;">${escapeHtml(title)}</h3>
+  return `<div style="margin-bottom: 26px;">
+      <h3 style="margin: 0 0 8px 0; padding-bottom: 6px; border-bottom: 1px solid #d8e2ef; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #475467;">${escapeHtml(title)}</h3>
       ${content}
     </div>`;
 }
@@ -252,7 +263,7 @@ function renderDocumentsHtml(documents: DocumentRow[]): string {
         </tr>`;
     })
     .join('');
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 14px;"><tbody>${rows}</tbody></table>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed;"><tbody>${rows}</tbody></table>`;
 }
 
 function renderMissingHtml(missing: string[]): string {
@@ -266,7 +277,7 @@ function renderButton(label: string, url: string, primary: boolean): string {
   const colors = primary
     ? 'background: #175cd3; color: #ffffff; border: 1px solid #175cd3;'
     : 'background: #ffffff; color: #175cd3; border: 1px solid #175cd3;';
-  return `<a href="${escapeHtml(href)}" target="_blank" style="display: inline-block; margin: 0 8px 8px 0; padding: 10px 18px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; ${colors}">${escapeHtml(label)}</a>`;
+  return `<a href="${escapeHtml(href)}" target="_blank" style="display: inline-block; margin: 0 8px 8px 0; padding: 12px 18px; border-radius: 7px; font-size: 14px; font-weight: 600; text-decoration: none; ${colors}">${escapeHtml(label)}</a>`;
 }
 
 function renderSectionsText(model: NotificationModel): string[] {
@@ -391,7 +402,7 @@ export function renderOperationalNotification(
   const summaryHtml = summary
     .map(
       (entry) => `<tr>
-          <td style="padding: 5px 12px 5px 0; color: #667085; font-size: 13px; vertical-align: top; white-space: nowrap;">${escapeHtml(entry.label)}</td>
+          <td style="padding: 5px 12px 5px 0; color: #667085; font-size: 13px; vertical-align: top; overflow-wrap: anywhere;">${escapeHtml(entry.label)}</td>
           <td style="padding: 5px 0; color: #101828; font-size: 14px; vertical-align: top;">${entry.html}</td>
         </tr>`,
     )
@@ -407,25 +418,38 @@ export function renderOperationalNotification(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
   <title>${escapeHtml(subject)}</title>
 </head>
-<body style="font-family: ${FONT_STACK}; line-height: 1.6; color: #101828; background-color: #f1f5f9; margin: 0; padding: 24px 12px;">
-  <div style="max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 32px;">
-    <div style="margin-bottom: 20px;">
-      <span style="background: #eff8ff; color: #175cd3; font-size: 12px; font-weight: 700; padding: 4px 8px; border-radius: 4px; text-transform: uppercase;">Notificación Operativa</span>
-      <h1 style="color: #101828; font-size: 20px; margin: 12px 0 4px 0;">${escapeHtml(snapshot.targetTitle)}</h1>
-      <p style="color: #475467; margin: 0;">Nueva postulación recibida</p>
-      <p style="color: #98a2b3; font-size: 12px; margin: 4px 0 0;">ID de seguimiento: ${escapeHtml(snapshot.submissionId)}</p>
-    </div>
-
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px 18px; margin-bottom: 20px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse: collapse;"><tbody>${summaryHtml}</tbody></table>
-    </div>
-
-    <div style="margin-bottom: 28px;">${buttons}</div>
-
-    ${renderSectionsHtml(model)}
-  </div>
+<body style="font-family: ${FONT_STACK}; line-height: 1.55; color: #17253d; background-color: #edf2f8; margin: 0; padding: 24px 10px;">
+  <div style="display:none; font-size:1px; color:#edf2f8; max-height:0; max-width:0; opacity:0; overflow:hidden;">Nueva preinscripción de ${escapeHtml(snapshot.applicantName || snapshot.applicantEmail)}. Accedé a la documentación y la planilla.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; max-width:660px; border-collapse:separate; border-spacing:0; background:#ffffff; border:1px solid #dce5f0; border-radius:12px; overflow:hidden;">
+      <tr><td style="background:#123b70; padding:20px 24px; color:#ffffff;">
+        <p style="font-size:18px; line-height:1.2; font-weight:700; margin:0; color:#ffffff;">FLACSO <span style="font-weight:400;">Uruguay</span></p>
+        <p style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#d7e6f8; margin:6px 0 0;">Gestión de preinscripciones</p>
+      </td></tr>
+      <tr><td style="padding:28px 24px 10px;">
+        <p style="font-size:11px; font-weight:700; letter-spacing:0.7px; color:#235b98; margin:0 0 10px; text-transform:uppercase;">Nueva postulación recibida</p>
+        <h1 style="font-size:23px; line-height:1.3; font-weight:700; margin:0 0 10px; color:#142b49;">${escapeHtml(snapshot.targetTitle)}</h1>
+        <p style="font-size:12px; color:#65758a; margin:0 0 20px; overflow-wrap:anywhere;">Seguimiento: ${escapeHtml(snapshot.submissionId)}</p>
+        <div style="background:#f4f7fb; border:1px solid #e2eaf4; border-radius:9px; padding:16px 14px;">
+          <p style="margin:0 0 10px; color:#142b49; font-size:14px; font-weight:700;">Resumen de la postulación</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; table-layout:fixed;"><tbody>${summaryHtml}</tbody></table>
+        </div>
+      </td></tr>
+      <tr><td style="padding:14px 24px 4px;">
+        <p style="font-size:12px; color:#65758a; margin:0 0 10px;">Accesos para gestión interna</p>
+        ${buttons}
+      </td></tr>
+      <tr><td style="padding:12px 24px 22px;">
+        ${renderSectionsHtml(model)}
+      </td></tr>
+      <tr><td style="background:#f4f7fb; border-top:1px solid #e2eaf4; padding:16px 24px;">
+        <p style="font-size:12px; color:#63748a; margin:0;">FLACSO Uruguay · Notificación automática para gestión interna</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
 </body>
 </html>`;
 

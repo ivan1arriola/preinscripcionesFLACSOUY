@@ -205,6 +205,7 @@ export async function retryFailedSubmission(
         ? await dependencies.spreadsheetDependencies.targetSpreadsheetService.ensureForTarget(target) : null;
       await createPreinscriptionNotifications(dependencies.notificationDependencies.repository, {
         submissionId, target, form, values: normalizedValues,
+        storedDocumentKeys: allFiles.filter((file) => file.status === 'success' && !!file.driveFileId).map((file) => file.fieldKey),
         spreadsheetRowUrl: recovery.spreadsheetUrl || spreadsheet?.url || (spreadsheet?.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${spreadsheet.spreadsheetId}/edit` : ''),
         documentsFolderUrl: recovery.documentsFolderUrl || '', masterRecipients: masters,
       });
@@ -393,6 +394,7 @@ export async function retryFailedSubmission(
         target,
         form,
         values: normalizedValues,
+        storedDocumentKeys: allFiles.filter((file) => !!file.driveFileId || newlyStoredFileItems.some((stored) => stored.token === file.token && !!stored.driveFileId)).map((file) => file.fieldKey),
         spreadsheetRowUrl,
         documentsFolderUrl,
         masterRecipients,

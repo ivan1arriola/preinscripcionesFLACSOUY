@@ -75,7 +75,8 @@ export function buildSemanticDriveFileName(input: {
     'image/png': 'png',
     'image/webp': 'webp',
   };
-  const extension = originalExtension || mimeExtension[input.mimeType] || 'bin';
+  const extension = originalExtension && ['pdf', 'jpg', 'jpeg', 'png', 'webp'].includes(originalExtension)
+    ? originalExtension : mimeExtension[input.mimeType] || 'bin';
   const ordinalSuffix = input.ordinal > 1 ? `-${input.ordinal}` : '';
 
   return `apellidos-${surname}__nombres-${givenName}__${documentLabel}__${sanitizeDriveSegment(input.submissionId)}${ordinalSuffix}.${extension}`;

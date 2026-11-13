@@ -249,6 +249,28 @@ describe('Upload HTTP Routes', () => {
     }
   });
 
+  it('accepts PNG and WhatsApp images with a generic content type after checking their signatures', async () => {
+    const { baseUrl, storage, close } = await setupApp();
+    try {
+      for (const [name, bytes, expected] of [
+        ['foto.png', pngBytes(), 'image/png'],
+        ['foto.wspimage', Buffer.from([0xff, 0xd8, 0xff, 0x00]), 'image/jpeg'],
+      ] as const) {
+        const form = new FormData();
+        form.append('targetId', 'diploma-davia');
+        form.append('fieldKey', 'identidad');
+        form.append('file', new Blob([bytes], { type: 'application/octet-stream' }), name);
+        const response = await fetch(baseUrl, { method: 'POST', headers: { 'x-preinscription-session': 'generic-images' }, body: form });
+        expect(response.status).toBe(201);
+        const result = await response.json() as { token: string; mimeType: string };
+        expect(result.mimeType).toBe(expected);
+        expect((await storage.open(result.token, 'generic-images')).mimeType).toBe(expected);
+      }
+    } finally {
+      await close();
+    }
+  });
+
   it('rejects an unaccepted MIME type for any field (e.g. GIF)', async () => {
     const { baseUrl, close } = await setupApp();
     try {

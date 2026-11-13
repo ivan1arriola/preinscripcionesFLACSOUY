@@ -521,6 +521,7 @@ export function createSubmissionRoutes(
             target: result.target,
             form: result.form,
             values: result.normalizedValues,
+            storedDocumentKeys: files.filter((file) => storedDriveFiles.some((stored) => stored.token === file.token && !!stored.driveFileId)).map((file) => file.fieldKey),
             spreadsheetRowUrl,
             documentsFolderUrl,
             masterRecipients,

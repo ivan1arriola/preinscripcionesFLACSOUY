@@ -151,7 +151,7 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
             <input
               id={`file-${document.key}`}
               type="file"
-              accept={document.acceptedMimeTypes?.join(',')}
+              accept={[...(document.acceptedMimeTypes ?? []), '.wspimage'].join(',')}
               disabled={disabled || uploading || full}
               onChange={handleFileChange}
               className="file-input"
