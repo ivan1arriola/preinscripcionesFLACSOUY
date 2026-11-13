@@ -13,7 +13,7 @@ export const CANONICAL_STEPS: FormStepDefinition[] = [
   { id: 'personal', title: 'Datos personales y demográficos', order: 1 },
   { id: 'contacto', title: 'Residencia y contacto', order: 2 },
   { id: 'academico', title: 'Trayectoria académica', order: 3 },
-  { id: 'orientacion', title: 'Orientación y mención', order: 4 },
+  { id: 'orientacion', title: 'Mención', order: 4 },
   { id: 'documentos', title: 'Documentación requerida', order: 5 },
   { id: 'declaracion', title: 'Convenios y declaraciones', order: 6 },
 ];
@@ -195,21 +195,7 @@ export function getCanonicalFormDefinition(
   let position = 1;
 
   for (const base of CANONICAL_BASE_INPUTS) {
-    // Insert orientacion & mencion at the end of academico step if options exist
-    if (base.stepId === 'declaracion' && inputs.every((i) => i.key !== 'orientacion') && targetOrientations.length > 0) {
-      inputs.push({
-        key: 'orientacion',
-        label: 'Orientación',
-        type: 'select',
-        required: true,
-        position: position++,
-        stepId: 'orientacion',
-        optionsSource: 'wordpress.orientaciones',
-        condition: 'has_orientations',
-        spreadsheetColumn: 'Orientación',
-      });
-    }
-
+    // Insert the optional mention when WordPress provides options.
     if (base.stepId === 'declaracion' && inputs.every((i) => i.key !== 'mencion') && targetMentions.length > 0) {
       inputs.push({
         key: 'mencion',
@@ -244,7 +230,7 @@ export function getCanonicalFormDefinition(
     position: idx + 1,
   }));
   const steps = CANONICAL_STEPS.filter(
-    (step) => step.id !== 'orientacion' || targetOrientations.length > 0 || targetMentions.length > 0,
+    (step) => step.id !== 'orientacion' || targetMentions.length > 0,
   );
 
   return {
