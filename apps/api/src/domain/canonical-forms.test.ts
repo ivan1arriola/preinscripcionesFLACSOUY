@@ -150,6 +150,13 @@ describe('Canonical Forms Specification', () => {
     expect(inputKeys).not.toContain('orientacion');
     expect(inputKeys).toContain('mencion');
 
+    const orientationOnly = getCanonicalFormDefinition({ ...baseTarget, orientations: ['Educación'] });
+    expect(orientationOnly.ok).toBe(true);
+    if (orientationOnly.ok) {
+      expect(orientationOnly.value.inputs.map((input) => input.key)).not.toContain('orientacion');
+      expect(orientationOnly.value.steps.map((step) => step.id)).not.toContain('orientacion');
+    }
+
     const resultWithout = getCanonicalFormDefinition(baseTarget);
     if (!resultWithout.ok) return;
     const inputKeysWithout = resultWithout.value.inputs.map((i) => i.key);
