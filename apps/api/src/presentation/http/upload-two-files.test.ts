@@ -27,9 +27,9 @@ const catalog: AcademicCatalog = {
 function memoryStorage(): TemporaryFileStoragePort {
   const records: TemporaryFileRecord[] = [];
   return {
-    save: async (sessionId, fieldKey, upload) => {
+    save: async (sessionId, fieldKey, upload, meta) => {
       const record: TemporaryFileRecord = {
-        token: randomBytes(16).toString('hex'), sessionId, fieldKey,
+        token: randomBytes(16).toString('hex'), sessionId, fieldKey, targetId: meta?.targetId,
         originalName: upload.originalName, mimeType: upload.mimeType, size: upload.data.byteLength, createdAt: new Date(),
       };
       records.push(record);
