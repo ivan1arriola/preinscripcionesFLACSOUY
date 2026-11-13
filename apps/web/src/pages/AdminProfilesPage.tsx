@@ -220,7 +220,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
                 <ul className="list-disc list-inside space-y-1 text-blue-800">
                   <li>Base obligatoria: Cédula/documento, CV, Título y Carta de motivación.</li>
                   <li>Maestrías: solicitan dos cartas de recomendación adicionales (obligatorias).</li>
-                  <li>Orientaciones, menciones y convenios se obtienen automáticamente desde WordPress.</li>
+                  <li>Las menciones y los convenios se obtienen automáticamente desde WordPress.</li>
                 </ul>
               </div>
             </div>

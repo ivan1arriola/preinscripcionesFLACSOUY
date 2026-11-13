@@ -52,10 +52,10 @@ const fallbackGroups: Array<{
   {
     id: 'opciones-preinscripcion',
     title: 'Sobre esta preinscripción',
-    description: 'Elegí la orientación o mención correspondiente a esta propuesta.',
+    description: 'Elegí la mención correspondiente a esta propuesta.',
     category: 'preinscription-options',
     stepIds: ['orientacion'],
-    keys: ['orientacion', 'mencion'],
+    keys: ['mencion'],
   },
   {
     id: 'declaracion',
@@ -73,14 +73,13 @@ export function getMobileFormSections(form: FormDefinition): MobileFormSection[]
 
   for (const group of fallbackGroups) {
     const inputKeys = inputs
-      .filter((input) => group.stepIds.includes(input.stepId ?? '') || group.keys.includes(input.key))
+      .filter((input) => input.key !== 'orientacion' && (group.stepIds.includes(input.stepId ?? '') || group.keys.includes(input.key)))
       .map((input) => input.key)
       .filter((key, index, all) => all.indexOf(key) === index);
 
     if (
       group.category === 'preinscription-options' &&
-      (form.orientations?.length ?? 0) === 0 &&
-      (form.mentions?.length ?? 0) === 0
+      (inputKeys.length === 0 || (form.mentions?.length ?? 0) === 0)
     ) continue;
 
     sections.push({

@@ -7,12 +7,10 @@ test.describe('Document Flow End-to-End', () => {
     buffer: Buffer.from('%PDF-1.4 dummy test document content'),
   };
 
-  const advancePastOptionalOrientation = async (page: import('@playwright/test').Page, orientation?: string, mention?: string) => {
-    const orientationSelect = page.locator('#input-orientacion');
-    if (await orientationSelect.count()) {
-      if (orientation) await orientationSelect.selectOption({ label: orientation });
-      const mentionSelect = page.locator('#input-mencion');
-      if (mention && await mentionSelect.count()) await mentionSelect.selectOption({ label: mention });
+  const advancePastOptionalOrientation = async (page: import('@playwright/test').Page, _orientation?: string, mention?: string) => {
+    const mentionSelect = page.locator('#input-mencion');
+    if (await mentionSelect.count()) {
+      if (mention) await mentionSelect.selectOption({ label: mention });
       await page.getByRole('button', { name: /Siguiente/i }).click();
     }
   };

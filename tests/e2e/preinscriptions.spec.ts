@@ -48,7 +48,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await expect(incompatibleCard.getByText(/unsupported_offer_type: doctorado/i)).toBeVisible();
   });
 
-  test('completes 5-step wizard for maestría with only orientations', async ({ page }) => {
+  test('completes wizard without orientations for maestría', async ({ page }) => {
     await page.goto('/');
 
     await page.getByTestId('offer-group-maestria').locator('summary').click();
@@ -96,12 +96,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
 
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
-    // Step 4: Orientación
-    const orientacionSelect = page.locator('#input-orientacion');
-    await expect(orientacionSelect).toBeVisible();
-    await orientacionSelect.selectOption({ label: 'Género y Políticas Públicas' });
-    await expect(page.locator('#input-mencion')).toHaveCount(0);
-    await page.getByRole('button', { name: /Siguiente/i }).click();
+    await expect(page.locator('#input-orientacion')).toHaveCount(0);
 
     // Step 4: Documentación requerida
     await expect(page.locator('legend').filter({ hasText: 'Documentación requerida' })).toBeVisible();
@@ -133,7 +128,6 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await expect(page.getByRole('heading', { name: 'Revisión de datos antes de enviar' })).toBeVisible();
     await expect(page.getByText('Laura', { exact: true })).toBeVisible();
     await expect(page.getByText('Gómez', { exact: true })).toBeVisible();
-    await expect(page.getByText('Género y Políticas Públicas').first()).toBeVisible();
 
     await page.getByRole('button', { name: /Confirmar y enviar/i }).click({ noWaitAfter: true });
 

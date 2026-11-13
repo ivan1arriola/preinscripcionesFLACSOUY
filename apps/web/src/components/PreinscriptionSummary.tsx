@@ -139,7 +139,7 @@ export function buildSummarySections(
           }
           return stepIndex === 0;
         })
-        .filter((i) => isInputVisible(i, values));
+        .filter((i) => i.key !== 'orientacion' && isInputVisible(i, values));
 
       const fields: SummaryFieldItem[] = stepInputs.map((input) => {
         const isUruguayanCedula = values.tipoDocumento === 'cedula_uruguaya';
@@ -188,11 +188,11 @@ export function buildSummarySections(
     })
     .filter((s) => s.fields.length > 0 || s.documents.length > 0);
 
-  const optionValues = ['orientacion', 'mencion']
+  const optionValues = ['mencion']
     .filter((key) => values[key])
     .map((key) => ({
       key,
-      label: key === 'orientacion' ? 'Orientación' : 'Mención',
+      label: 'Mención',
       value: formatFieldValue(key, values[key]),
     }));
   if (optionValues.length > 0) {

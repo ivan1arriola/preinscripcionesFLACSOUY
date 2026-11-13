@@ -62,7 +62,7 @@ const SECTIONS: Section[] = [
     title: 'Formación',
     keys: [
       'estudios', 'posgradoFlacso', 'posgradoCual', 'tituloDenominacion', 'sinTituloActual',
-      'orientacion', 'mencion',
+      'mencion',
     ],
   },
   {
@@ -73,7 +73,7 @@ const SECTIONS: Section[] = [
 ];
 
 /** Campos que solo se solicitan si se cumple su condición. */
-const OPTIONAL_KEYS = new Set(['nombre2', 'apellido2', 'generoOtra', 'posgradoCual', 'orientacion', 'mencion', 'convenioWordpressId']);
+const OPTIONAL_KEYS = new Set(['nombre2', 'apellido2', 'generoOtra', 'posgradoCual', 'mencion', 'convenioWordpressId']);
 
 function isApplicable(key: string, snapshot: SubmissionNotificationSnapshot): boolean {
   const answer = (field: string) => snapshot.values[field]?.value?.trim().toLowerCase() ?? '';
@@ -136,6 +136,7 @@ function buildModel(snapshot: SubmissionNotificationSnapshot): NotificationModel
   const missing: string[] = [];
 
   for (const key of orderedKeys) {
+    if (key === 'orientacion') continue;
     const item = snapshot.values[key];
     if (!item) continue;
 

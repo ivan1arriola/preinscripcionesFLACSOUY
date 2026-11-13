@@ -162,7 +162,7 @@ export const PreinscriptionWizard: React.FC<PreinscriptionWizardProps> = ({
     }
 
     if (stepToValidate.id === 'orientacion') {
-      const hasOrientations = (form.orientations ?? []).length > 0;
+      const hasOrientations = form.inputs.some((input) => input.key === 'orientacion') && (form.orientations ?? []).length > 0;
       const orientacionVal = values.orientacion?.trim();
       if (hasOrientations) {
         if (!orientacionVal) {

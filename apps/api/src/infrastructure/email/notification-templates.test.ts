@@ -29,6 +29,24 @@ describe('Notification Templates', () => {
     templateVersion: 'preinscription-notification-v1',
   };
 
+  it('omits orientation in applicant and operational emails, including old snapshots', () => {
+    const snapshot: SubmissionNotificationSnapshot = {
+      ...sampleSnapshot,
+      orderedFieldKeys: [...sampleSnapshot.orderedFieldKeys!, 'orientacion', 'mencion'],
+      values: {
+        ...sampleSnapshot.values,
+        orientacion: { key: 'orientacion', label: 'Orientación', value: 'Orientación anterior' },
+        mencion: { key: 'mencion', label: 'Mención', value: 'Mención actual' },
+      },
+    };
+    for (const message of [renderApplicantNotification(snapshot), renderOperationalNotification(snapshot, 'target', 'test@example.com')]) {
+      for (const body of [message.text, message.html]) {
+        expect(body).not.toContain('Orientación');
+        expect(body).toContain('Mención actual');
+      }
+    }
+  });
+
   describe('Applicant notification', () => {
     it('renders applicant confirmation with user data and target title', () => {
       const rendered = renderApplicantNotification(sampleSnapshot);

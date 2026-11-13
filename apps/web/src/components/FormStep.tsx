@@ -67,12 +67,6 @@ export const FormStep: React.FC<FormStepProps> = ({
                   </div>
                 );
               })}
-            {values.orientacion && (
-              <div className="summary-field">
-                <dt>Orientación</dt>
-                <dd>{values.orientacion}</dd>
-              </div>
-            )}
             {values.mencion && (
               <div className="summary-field">
                 <dt>Mención</dt>
@@ -143,7 +137,7 @@ export const FormStep: React.FC<FormStepProps> = ({
       {(hasOrientationInput || hasMentionInput) &&
         (orientations.length > 0 || mentions.length > 0) && (
           <OrientationMentionFields
-            orientations={orientations}
+            orientations={hasOrientationInput ? orientations : []}
             mentions={mentions}
             selectedOrientation={values.orientacion || ''}
             selectedMention={values.mencion || ''}
