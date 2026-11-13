@@ -67,12 +67,6 @@ export const FormStep: React.FC<FormStepProps> = ({
                   </div>
                 );
               })}
-            {values.orientacion && (
-              <div className="summary-field">
-                <dt>Orientación</dt>
-                <dd>{values.orientacion}</dd>
-              </div>
-            )}
             {values.mencion && (
               <div className="summary-field">
                 <dt>Mención</dt>
