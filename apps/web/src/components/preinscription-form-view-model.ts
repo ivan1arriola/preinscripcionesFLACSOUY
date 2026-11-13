@@ -52,7 +52,7 @@ const fallbackGroups: Array<{
   {
     id: 'opciones-preinscripcion',
     title: 'Sobre esta preinscripción',
-    description: 'Elegí la orientación o mención correspondiente a esta propuesta.',
+    description: 'Elegí la mención correspondiente a esta propuesta.',
     category: 'preinscription-options',
     stepIds: ['orientacion'],
     keys: ['orientacion', 'mencion'],
@@ -79,8 +79,7 @@ export function getMobileFormSections(form: FormDefinition): MobileFormSection[]
 
     if (
       group.category === 'preinscription-options' &&
-      (form.orientations?.length ?? 0) === 0 &&
-      (form.mentions?.length ?? 0) === 0
+      inputKeys.length === 0
     ) continue;
 
     sections.push({
