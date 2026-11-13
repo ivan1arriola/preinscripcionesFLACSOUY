@@ -93,7 +93,7 @@ describe('PreinscriptionWizard Component', () => {
     expect(screen.getAllByText('Datos personales y demográficos')).toHaveLength(3);
     expect(screen.getByText('Residencia y contacto')).toBeInTheDocument();
     expect(screen.getByText('Trayectoria académica')).toBeInTheDocument();
-    expect(screen.getByText('Orientación y mención')).toBeInTheDocument();
+    expect(screen.getByText('Mención')).toBeInTheDocument();
     expect(screen.getByText('Documentación requerida')).toBeInTheDocument();
     expect(screen.getByText('Convenios y declaraciones')).toBeInTheDocument();
 
@@ -166,7 +166,7 @@ describe('PreinscriptionWizard Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 4: Orientación y mención
-    fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
+    expect(screen.queryByLabelText(/Orientación/i)).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Mención/i), { target: { value: 'Tecnología Educativa' } });
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
@@ -222,7 +222,7 @@ describe('PreinscriptionWizard Component', () => {
       expect(handleSubmit).toHaveBeenCalledTimes(1);
       const [submittedValues, submittedFiles] = handleSubmit.mock.calls[0] as [Record<string, unknown>, unknown[]];
       expect(submittedValues.nombre1).toBe('Lucía');
-      expect(submittedValues.orientacion).toBe('Educación');
+      expect(submittedValues.orientacion).toBeUndefined();
       expect(submittedValues.ciudadResidencia).toBe('Montevideo');
       expect(submittedValues.tituloDenominacion).toBe('Licenciada');
       expect(submittedFiles).toHaveLength(4);
@@ -388,7 +388,7 @@ describe('PreinscriptionWizard Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 4: Orientación y mención
-    fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
+    expect(screen.queryByLabelText(/Orientación/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 5: Documentos
@@ -465,7 +465,7 @@ describe('PreinscriptionWizard Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 4: Orientación y mención
-    fireEvent.change(screen.getByLabelText(/Orientación/i), { target: { value: 'Educación' } });
+    expect(screen.queryByLabelText(/Orientación/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Siguiente/i }));
 
     // Step 5: Documentos
