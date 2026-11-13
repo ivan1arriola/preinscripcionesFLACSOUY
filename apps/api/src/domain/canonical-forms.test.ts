@@ -32,7 +32,7 @@ describe('Canonical Forms Specification', () => {
       'Datos personales y demográficos',
       'Residencia y contacto',
       'Trayectoria académica',
-      'Orientación y mención',
+      'Mención',
       'Documentación requerida',
       'Convenios y declaraciones',
     ]);
@@ -135,7 +135,7 @@ describe('Canonical Forms Specification', () => {
     expect(form.recommendationLettersCount).toBe(0);
   });
 
-  it('includes orientations and mentions only when present in WordPress target', () => {
+  it('omits orientations while retaining available mentions', () => {
     const targetWithOptions: AcademicTarget = {
       ...baseTarget,
       orientations: ['Educación', 'Políticas'],
@@ -147,7 +147,7 @@ describe('Canonical Forms Specification', () => {
     if (!result.ok) return;
 
     const inputKeys = result.value.inputs.map((i) => i.key);
-    expect(inputKeys).toContain('orientacion');
+    expect(inputKeys).not.toContain('orientacion');
     expect(inputKeys).toContain('mencion');
 
     const resultWithout = getCanonicalFormDefinition(baseTarget);
