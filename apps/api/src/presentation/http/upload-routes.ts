@@ -111,7 +111,12 @@ export function createUploadRoutes(
           return;
         }
 
-        // El tipo declarado por el navegador no es de fiar: se comprueba la firma real del contenido.
+        // Algunos dispositivos envían fotos con un tipo genérico. Solo se aceptan si la firma corresponde a un formato admitido.
+        if (mimeType === 'application/octet-stream' || !mimeType) {
+          mimeType = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+            .find((candidate) => matchesDeclaredType(buffer, candidate)) ?? mimeType;
+        }
+        // Los tipos específicos deben coincidir con el contenido real.
         if (!matchesDeclaredType(buffer, mimeType)) {
           res.status(400).json({
             error: {
