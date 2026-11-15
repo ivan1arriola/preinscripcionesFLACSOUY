@@ -31,6 +31,8 @@ services:
       # Debe coincidir con FLACSO_PREINSCRIPCIONES_CATALOG_TOKEN de wp-config.php; sin él WordPress
       # entrega el catálogo sin los correos de notificación de cada oferta.
       WORDPRESS_CATALOG_TOKEN: ${WORDPRESS_CATALOG_TOKEN:?WORDPRESS_CATALOG_TOKEN es obligatorio}
+      META_PIXEL_ID: ${META_PIXEL_ID:-}
+      META_CAPI_ACCESS_TOKEN: ${META_CAPI_ACCESS_TOKEN:-}
       GOOGLE_OIDC_CLIENT_ID: ${GOOGLE_OIDC_CLIENT_ID:-}
       GOOGLE_OIDC_CLIENT_SECRET: ${GOOGLE_OIDC_CLIENT_SECRET:-}
       GOOGLE_OIDC_REDIRECT_URI: ${GOOGLE_OIDC_REDIRECT_URI:-}

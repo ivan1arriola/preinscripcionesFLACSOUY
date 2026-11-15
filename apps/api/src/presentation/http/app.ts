@@ -7,6 +7,7 @@ import type { SubmissionRepository } from '../../ports/submission-repository.js'
 import { healthResponse, type CatalogHealthResponse } from './health.js';
 import { createTargetRoutes } from './target-routes.js';
 import { createSubmissionRoutes, type LeaseOptions } from './submission-routes.js';
+import { createMetaCapiTrackerFromEnv, type MetaCapiTracker } from '../../infrastructure/meta/meta-capi.js';
 import { errorHandler } from './error-handler.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import { createUploadRoutes } from './upload-routes.js';
@@ -102,6 +103,8 @@ export interface AppDependencies {
   submissionRecoveryRepository?: SubmissionRecoveryRepository;
   /** Mantiene vivo el lease de cada envío mientras se procesa (P4). */
   submissionLease?: LeaseOptions;
+  /** Conversions API de Meta (SubmitApplication). Por defecto se arma con META_PIXEL_ID y META_CAPI_ACCESS_TOKEN. */
+  metaTracker?: MetaCapiTracker;
   telegramAlertRepository?: TelegramAlertRepository;
   getTelegramChatIds?: () => Promise<string[]> | string[];
   getTelegramPreinscriptionChatIds?: () => Promise<string[]> | string[];
@@ -171,6 +174,8 @@ export function createApp(dependencies: AppDependencies): Express {
     dependencies.encryptedSettingsService ??
     new EncryptedSettingsService(settingsRepo, process.env.APP_SETTINGS_ENCRYPTION_KEY);
 
+  const metaTracker = dependencies.metaTracker ?? createMetaCapiTrackerFromEnv();
+
   // Configuración pública que necesita el navegador: sólo la clave del sitio de reCAPTCHA (no es secreta).
   app.get('/api/config', async (_req, res) => {
     let recaptcha: { enabled: boolean; siteKey?: string; action?: string } = { enabled: false };
@@ -183,7 +188,7 @@ export function createApp(dependencies: AppDependencies): Express {
       // Sin configuración legible el formulario sigue funcionando sin reCAPTCHA.
     }
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ recaptcha });
+    res.json({ recaptcha, meta: metaTracker ? { pixelId: metaTracker.pixelId } : { pixelId: null } });
   });
 
   // Antes de las rutas de destinos: primero el límite de frecuencia, después el reCAPTCHA.
@@ -303,6 +308,7 @@ export function createApp(dependencies: AppDependencies): Express {
       : undefined,
     rateLimits ? { perEmail: rateLimits.submissionsPerEmail } : undefined,
     dependencies.submissionLease,
+    metaTracker,
   );
 
   targetRoutes.use('/:id/submissions', submissionRoutes);

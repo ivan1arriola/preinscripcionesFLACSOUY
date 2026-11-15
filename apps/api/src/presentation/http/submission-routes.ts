@@ -19,6 +19,7 @@ import {
 } from '../../application/preinscription-telegram-notification.js';
 import { buildSpreadsheetValues } from '../../domain/spreadsheet-schema.js';
 import { RateLimiter, rateLimitedResponse, type RateLimitOptions } from './rate-limit.js';
+import { readMetaCookies, type MetaCapiTracker } from '../../infrastructure/meta/meta-capi.js';
 
 export function sanitizeSafeError(error: unknown, fallback: string = 'Error de procesamiento técnico.'): string {
   if (!error) return fallback;
@@ -167,6 +168,7 @@ export function createSubmissionRoutes(
   mauticDependencies?: { isContactSyncEnabled: () => Promise<boolean>; isEnrollmentNotifyEnabled?: () => Promise<boolean> },
   limits?: { perEmail?: RateLimitOptions },
   lease?: LeaseOptions,
+  metaTracker?: MetaCapiTracker,
 ): Router {
   const router = Router({ mergeParams: true });
   const emailLimiter = limits?.perEmail ? new RateLimiter(limits.perEmail) : undefined;
@@ -339,6 +341,20 @@ export function createSubmissionRoutes(
       }
 
       if (emailLimiter && emailKey) emailLimiter.hit(emailKey);
+
+      // SubmitApplication por CAPI: el event_id es el del envío, igual al que usa el navegador para deduplicar.
+      // Es auxiliar y nunca espera ni afecta a la respuesta.
+      if (metaTracker) {
+        void metaTracker.sendSubmitApplication({
+          eventId: result.submissionId,
+          eventSourceUrl: typeof req.headers.referer === 'string' ? req.headers.referer : undefined,
+          clientIp: req.ip,
+          userAgent: req.get('user-agent') ?? undefined,
+          ...readMetaCookies(req.headers.cookie),
+          contentName: result.target.title,
+          contentId: `oferta-${result.target.id}`,
+        });
+      }
 
       // Desde aquí el envío es nuestro: se mantiene vivo su lease hasta terminar, sea cual sea la salida.
       if (lease && result.leaseOwner) {
