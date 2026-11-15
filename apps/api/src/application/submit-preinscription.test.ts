@@ -84,7 +84,7 @@ describe('submitPreinscription Use Case', () => {
     expect(repo.submissions[0]?.values.nombre1).toBe('Valeria');
     expect(repo.submissions[0]?.values.documento).toBe('3.456.789-4');
     expect(repo.submissions[0]?.values.celular).toBe('+59899123456');
-    expect(repo.submissions[0]?.values.orientacion).toBe('Educación');
+    expect(repo.submissions[0]?.values.orientacion).toBeUndefined();
     expect(repo.submissions[0]?.values.mencion).toBe('Tecnología Educativa');
     expect(result.catalogValidation).toBe('live');
   });

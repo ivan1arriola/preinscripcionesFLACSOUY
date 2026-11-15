@@ -29,6 +29,24 @@ describe('Notification Templates', () => {
     templateVersion: 'preinscription-notification-v1',
   };
 
+  it('omits orientation in applicant and operational emails, including old snapshots', () => {
+    const snapshot: SubmissionNotificationSnapshot = {
+      ...sampleSnapshot,
+      orderedFieldKeys: [...sampleSnapshot.orderedFieldKeys!, 'orientacion', 'mencion'],
+      values: {
+        ...sampleSnapshot.values,
+        orientacion: { key: 'orientacion', label: 'Orientación', value: 'Orientación anterior' },
+        mencion: { key: 'mencion', label: 'Mención', value: 'Mención actual' },
+      },
+    };
+    for (const message of [renderApplicantNotification(snapshot), renderOperationalNotification(snapshot, 'target', 'test@example.com')]) {
+      for (const body of [message.text, message.html]) {
+        expect(body).not.toContain('Orientación');
+        expect(body).toContain('Mención actual');
+      }
+    }
+  });
+
   describe('Applicant notification', () => {
     it('renders applicant confirmation with user data and target title', () => {
       const rendered = renderApplicantNotification(sampleSnapshot);
@@ -142,8 +160,8 @@ describe('Notification Templates', () => {
     it('junta los campos sin respuesta y muestra el estado de cada documento', () => {
       const { html, text } = renderOperationalNotification(canonical, 'master', 'master@flacso.edu.uy');
 
-      expect(html).toContain('No completados:</strong> Segundo nombre, ¿Cuál convenio te corresponde?');
-      expect(text).toContain('No completados: Segundo nombre, ¿Cuál convenio te corresponde?');
+      expect(html).not.toContain('No completados:');
+      expect(text).not.toContain('No completados:');
       expect(html).not.toContain('>-</td>');
       expect(html).toContain('&#10003; Adjunto');
       expect(html).toContain('&#10007; No adjunto');
@@ -170,7 +188,7 @@ describe('Notification Templates', () => {
       expect(html).toContain('¿Qué sigue?');
       expect(html).toContain('Datos personales');
       expect(html).toContain('Cédula uruguaya');
-      expect(html).toContain('No completados:</strong> Segundo nombre');
+      expect(html).not.toContain('No completados:');
       expect(text).toContain('inscripciones@flacso.edu.uy');
       expect(html).not.toContain('sub_xyz_789');
       expect(text).not.toContain('sub_xyz_789');

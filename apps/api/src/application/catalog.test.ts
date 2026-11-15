@@ -41,7 +41,7 @@ describe('Catalog Application Use Cases & Fixture Adapter', () => {
     expect(result.form.configRevision).toBe('davia-c11-v1');
     expect(result.form.effectiveRevision).toBe('davia-c11-v1:canonical-v2');
     expect(result.form.inputs.map((i) => i.key)).toEqual(
-      expect.arrayContaining(['nombre1', 'apellido1', 'email', 'documento', 'orientacion'])
+      expect.arrayContaining(['nombre1', 'apellido1', 'email', 'documento', 'mencion'])
     );
     expect(result.form.orientations).toEqual(['Educación', 'Políticas Públicas']);
     expect(result.form.mentions).toEqual(['Tecnología Educativa', 'Gestión de Entornos Digitales']);

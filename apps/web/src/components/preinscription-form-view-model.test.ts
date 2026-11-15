@@ -46,7 +46,7 @@ describe('mobile preinscription form view model', () => {
     ]);
     expect(sections.find((section) => section.category === 'academic-history')?.inputKeys).toContain('estudios');
     expect(sections.find((section) => section.category === 'academic-history')?.inputKeys).not.toContain('orientacion');
-    expect(sections.find((section) => section.category === 'preinscription-options')?.inputKeys).toEqual(['orientacion', 'mencion']);
+    expect(sections.find((section) => section.category === 'preinscription-options')?.inputKeys).toEqual(['mencion']);
   });
 
   it('omits preinscription options when the target has no options', () => {
@@ -61,7 +61,7 @@ describe('mobile preinscription form view model', () => {
 
   it('maps the first field error to its section', () => {
     const sections = getMobileFormSections(form());
-    expect(getFirstErrorSectionIndex(sections, { orientacion: 'Obligatoria' })).toBe(3);
+    expect(getFirstErrorSectionIndex(sections, { mencion: 'Obligatoria' })).toBe(3);
     expect(getFirstErrorSectionIndex(sections, { desconocido: 'Error' })).toBe(-1);
   });
 });

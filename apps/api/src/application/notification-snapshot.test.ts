@@ -93,6 +93,24 @@ describe('SubmissionNotificationSnapshot', () => {
     expect(snapshot.documentsFolderUrl).toBe('https://drive.google.com/drive/folders/folder-abc');
   });
 
+  it('uses confirmed Drive storage rather than normalized form values for documents', () => {
+    const fields = [
+      ...sampleFields,
+      { key: 'cv', label: 'Currículum', type: 'file', required: true },
+    ];
+    const snapshot = buildSubmissionNotificationSnapshot({
+      submissionId: 'sub_stored_docs',
+      target: sampleTarget,
+      fields,
+      payload: { ...samplePayload, titulo_grado: '', cv: 'upload-token-not-stored' },
+      storedDocumentKeys: ['titulo_grado'],
+      spreadsheetRowUrl: '',
+      documentsFolderUrl: 'https://drive.google.com/drive/folders/folder-abc',
+    });
+    expect(snapshot.values['titulo_grado']?.value).toBe('Archivo adjunto');
+    expect(snapshot.values['cv']?.value).toBe('-');
+  });
+
   it('handles target without notification emails returning an empty list', () => {
     const targetWithoutEmail: AcademicTarget = {
       ...sampleTarget,
