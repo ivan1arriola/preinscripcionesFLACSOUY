@@ -206,6 +206,15 @@ export function validateSubmission(
     }
   }
 
+  // El límite también se exige al enviar: en la subida se cuenta antes de guardar, y subidas en paralelo lo superan.
+  for (const doc of form.documents ?? []) {
+    const max = doc.maxFiles ?? 1;
+    const sent = (files ?? []).filter((file) => (typeof file === 'string' ? file : file.fieldKey) === doc.key).length;
+    if (sent > max) {
+      addError(doc.key, `Adjuntá como máximo ${max} ${max === 1 ? 'archivo' : 'archivos'} en ${doc.label}.`);
+    }
+  }
+
   const valid = Object.keys(fieldErrors).length === 0;
 
   return {

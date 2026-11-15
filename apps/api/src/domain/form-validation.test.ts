@@ -214,4 +214,21 @@ describe('validateSubmission', () => {
     const resultMismatch = validateSubmission(form, validValues, 'stale-rev');
     expect(resultMismatch.fieldErrors._form).toBeDefined();
   });
+
+  it('rejects more files in a document than its limit, even if each upload passed alone', () => {
+    const withDocs: FormDefinition = {
+      ...form,
+      documents: [
+        { key: 'cedula', label: 'Cédula', required: false, maxFiles: 2 },
+        { key: 'cv', label: 'CV', required: false },
+      ],
+    };
+    const ok = validateSubmission(withDocs, validValues, form.effectiveRevision, ['cedula', 'cedula', 'cv']);
+    expect(ok.fieldErrors.cedula).toBeUndefined();
+    expect(ok.fieldErrors.cv).toBeUndefined();
+
+    const tooMany = validateSubmission(withDocs, validValues, form.effectiveRevision, ['cedula', 'cedula', 'cedula', 'cv', 'cv']);
+    expect(tooMany.fieldErrors.cedula).toHaveLength(1);
+    expect(tooMany.fieldErrors.cv).toHaveLength(1);
+  });
 });

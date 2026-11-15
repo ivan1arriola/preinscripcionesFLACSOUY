@@ -18,6 +18,8 @@ export class ApiError extends Error {
   }
 }
 
+let publicConfig: Promise<PublicConfig> | undefined;
+
 export const apiClient = {
   sessionId(): string {
     const key = 'flacso-preinscription-session';
@@ -462,10 +464,17 @@ export const apiClient = {
     return res.json();
   },
 
-  async getPublicConfig(): Promise<PublicConfig> {
-    const res = await fetch('/api/config');
-    if (!res.ok) throw new ApiError(res.status, 'PUBLIC_CONFIG_ERROR', 'No se pudo obtener la configuración pública.');
-    return res.json();
+  /** reCAPTCHA y Meta la piden en cada envío y no cambia durante la sesión: una sola petición; si falla, se reintenta. */
+  getPublicConfig(): Promise<PublicConfig> {
+    publicConfig ??= (async () => {
+      const res = await fetch('/api/config');
+      if (!res.ok) throw new ApiError(res.status, 'PUBLIC_CONFIG_ERROR', 'No se pudo obtener la configuración pública.');
+      return res.json() as Promise<PublicConfig>;
+    })().catch((error) => {
+      publicConfig = undefined;
+      throw error;
+    });
+    return publicConfig;
   },
 
   async getRecaptchaSettings(): Promise<{ recaptcha: AdminRecaptchaSettings }> {
