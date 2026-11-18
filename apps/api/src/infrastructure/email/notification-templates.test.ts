@@ -47,6 +47,41 @@ describe('Notification Templates', () => {
     }
   });
 
+  it.each(['-', '', 'No'])('does not report an unchecked no-degree checkbox as missing (%s)', (value) => {
+    const snapshot: SubmissionNotificationSnapshot = {
+      ...sampleSnapshot,
+      orderedFieldKeys: [...sampleSnapshot.orderedFieldKeys, 'tituloDenominacion', 'titulo', 'sinTituloActual'],
+      values: {
+        ...sampleSnapshot.values,
+        tituloDenominacion: { key: 'tituloDenominacion', label: 'Denominación del título', value: 'Licenciatura' },
+        titulo: { key: 'titulo', label: 'Título de grado o terciario', value: 'Archivo adjunto' },
+        sinTituloActual: { key: 'sinTituloActual', label: 'No poseo actualmente título', value },
+      },
+    };
+    for (const message of renderAllNotifications(snapshot, ['master@flacso.edu.uy'])) {
+      for (const body of [message.text, message.html]) {
+        expect(body).not.toContain('No completados:');
+        expect(body).toContain('Licenciatura');
+        expect(body).toContain('Adjunto');
+      }
+    }
+  });
+
+  it('preserves an explicitly checked no-degree declaration', () => {
+    const snapshot: SubmissionNotificationSnapshot = {
+      ...sampleSnapshot,
+      orderedFieldKeys: [...sampleSnapshot.orderedFieldKeys, 'sinTituloActual'],
+      values: {
+        ...sampleSnapshot.values,
+        sinTituloActual: { key: 'sinTituloActual', label: 'No poseo actualmente título', value: 'Sí' },
+      },
+    };
+    for (const message of renderAllNotifications(snapshot, ['master@flacso.edu.uy'])) {
+      expect(message.text).toContain('No poseo actualmente título: Sí');
+      expect(message.html).toContain('No poseo actualmente título');
+    }
+  });
+
   describe('Applicant notification', () => {
     it('renders applicant confirmation with user data and target title', () => {
       const rendered = renderApplicantNotification(sampleSnapshot);
@@ -238,3 +273,4 @@ describe('Notification Templates', () => {
     });
   });
 });
+
