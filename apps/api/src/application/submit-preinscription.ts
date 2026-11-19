@@ -8,6 +8,7 @@ import { driveTargetDescriptor } from '../domain/google-drive-naming.js';
 import type { AcademicTarget, FormDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { buildSpreadsheetSchema, buildSpreadsheetValues } from '../domain/spreadsheet-schema.js';
 import { buildMauticContactSync } from '../domain/mautic-contact.js';
+import { buildCampaignTracking } from '../domain/campaign-tracking.js';
 import { buildMauticEnrollmentNotice } from '../domain/mautic-enrollment.js';
 
 /** Antigüedad máxima del catálogo guardado para aceptar preinscripciones con WordPress caído. */
@@ -190,7 +191,7 @@ export async function submitPreinscription(
     targetKind: target.kind,
     values: normalizedValues,
     files: command.files,
-    utm: command.utm,
+    campaignTracking: buildCampaignTracking(target, normalizedValues, command.utm),
     profileVersionId: CANONICAL_SCHEMA_VERSION,
     profileSnapshot: form as any,
     catalogValidation,

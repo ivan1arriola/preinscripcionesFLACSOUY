@@ -82,6 +82,16 @@ tener permisos de edición en esa carpeta.
 
 Los secretos deben tener permisos restrictivos y nunca se deben copiar al repositorio. La cuenta de servicio debe tener acceso a la carpeta de Drive; las planillas individuales se crean dentro de ella. La carpeta raíz de Drive se configura luego desde `/admin/perfiles`; no se agrega al `.env.production`.
 
+### Seguimiento de campañas (UTM)
+
+Cada preinscripción enviada deja una fila en la tabla `campaign_tracking` (se crea con la migración 029), en la misma transacción
+que la preinscripción. Guarda sólo: nombre, apellido, correo, oferta (o seminario), edición (o cohorte), los cinco parámetros
+`utm_*` y la fecha y hora. También se registran los envíos sin UTM, para poder comparar con el tráfico orgánico.
+
+**Contiene datos personales.** Se descarga desde el panel de administración, pestaña Seguridad, tarjeta "Seguimiento de campañas"
+(rango de fechas opcional), o con `GET /api/admin/settings/campaign-tracking.csv?from=AAAA-MM-DD&to=AAAA-MM-DD`, que exige sesión
+de administrador. El CSV usa UTF-8 con BOM (Excel) y hora de Montevideo; manéjelo con el cuidado correspondiente.
+
 ## Validación sin tocar el servidor
 
 ```bash

@@ -4,6 +4,7 @@ import type {
   ValidatedSubmissionRecord,
   SavedSubmissionResult,
 } from '../../ports/submission-repository.js';
+import { CAMPAIGN_TRACKING_MAX_ROWS, nextMontevideoMidnight, type CampaignTrackingRow } from '../../domain/campaign-tracking.js';
 import type { SubmissionRecoveryRepository } from '../../ports/submission-recovery-repository.js';
 
 export class InMemorySubmissionRepository implements SubmissionRepository {
@@ -42,6 +43,15 @@ export class InMemorySubmissionRepository implements SubmissionRepository {
       this.fileStatuses.set(file.token, { status: 'pending' });
     }
     return { id, existing: false, leaseOwner: `req_${crypto.randomUUID().replace(/-/g, '')}` };
+  }
+
+  async listCampaignTracking(range: { from?: Date; to?: Date }): Promise<CampaignTrackingRow[]> {
+    const to = range.to ? nextMontevideoMidnight(range.to) : undefined;
+    return this.submissions
+      .filter((s) => s.campaignTracking && (!range.from || s.submittedAt >= range.from) && (!to || s.submittedAt < to))
+      .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime())
+      .slice(0, CAMPAIGN_TRACKING_MAX_ROWS)
+      .map((s) => ({ ...s.campaignTracking!, id: `ct_${s.id}`, submissionId: s.id, createdAt: s.submittedAt }));
   }
 
   async markProcessing(id: string, status: 'pending' | 'success' | 'failed' | 'unknown', errorMessage?: string): Promise<void> {

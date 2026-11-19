@@ -6,6 +6,7 @@ import { AdminNotificationsSettingsCard } from '../components/AdminNotifications
 import { AdminMauticSettingsCard } from '../components/AdminMauticSettingsCard.js';
 import { AdminRecaptchaSettingsCard } from '../components/AdminRecaptchaSettingsCard.js';
 import { AdminRecoverySettingsCard } from '../components/AdminRecoverySettingsCard.js';
+import { AdminCampaignTrackingCard } from '../components/AdminCampaignTrackingCard.js';
 import { AdminFailedSubmissionsCard } from '../components/AdminFailedSubmissionsCard.js';
 import './admin-responsive.css';
 
@@ -189,6 +190,7 @@ export const AdminProfilesPage: React.FC<AdminProfilesPageProps> = ({
       ) : activeSection === 'security' ? (
         <div className="space-y-8">
           <AdminRecaptchaSettingsCard csrfToken={csrfToken} />
+          <AdminCampaignTrackingCard />
         </div>
       ) : activeSection === 'recovery' ? (
         <div className="space-y-8">

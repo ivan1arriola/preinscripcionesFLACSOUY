@@ -51,7 +51,7 @@ export function buildMauticContactTags(target: AcademicTarget): string[] {
   return tags;
 }
 
-function joinNames(...parts: Array<string | undefined>): string {
+export function joinNames(...parts: Array<string | undefined>): string {
   return parts.map((part) => part?.trim() ?? '').filter(Boolean).join(' ');
 }
 

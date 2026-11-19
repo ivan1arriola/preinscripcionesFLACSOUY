@@ -50,7 +50,23 @@ export interface SubmissionsTable {
   profile_version_id: string | null;
   profile_snapshot: unknown | null;
   catalog_validation: Generated<'live' | 'cached'>;
-  utm?: unknown | null;
+}
+
+export interface CampaignTrackingTable {
+  id: string;
+  submission_id: string;
+  nombre: string;
+  apellido: string;
+  correo: string;
+  oferta: string;
+  oferta_tipo: string;
+  edicion: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
+  created_at: Generated<Date>;
 }
 
 export interface SubmissionProcessingTable {
@@ -311,6 +327,7 @@ export interface DatabaseSchema {
   mentions: MentionsTable;
   orientation_mentions: OrientationMentionsTable;
   submissions: SubmissionsTable;
+  campaign_tracking: CampaignTrackingTable;
   submission_processing: SubmissionProcessingTable;
   submission_tasks: SubmissionTasksTable;
   drive_folders: DriveFoldersTable;

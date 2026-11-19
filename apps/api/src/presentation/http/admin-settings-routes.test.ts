@@ -146,6 +146,67 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
     await new Promise<void>((resolve) => temporaryServer.close(() => resolve()));
   });
 
+  describe('GET /campaign-tracking.csv', () => {
+    const tracking = (correo: string, nombre = 'Ana') => ({
+      nombre, apellido: 'Pérez', correo, oferta: 'Maestría X', ofertaTipo: 'academic_offer', edicion: 'Cohorte 1',
+      utm: { utm_source: 'ig', utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null },
+    });
+    let csvUrl: string;
+    let csvServer: Server;
+    let csvRepository: InMemorySubmissionRepository;
+
+    beforeAll(async () => {
+      csvRepository = new InMemorySubmissionRepository();
+      const base = { targetId: 't', configRevision: 'v', targetTitle: 'T', targetKind: 'academic_offer', values: {} };
+      await csvRepository.saveOrGet({ ...base, campaignTracking: tracking('a@x.com', '=cmd') });
+      await csvRepository.saveOrGet({ ...base, campaignTracking: tracking('b@x.com') });
+      csvRepository.submissions[0]!.submittedAt = new Date('2026-03-10T12:00:00Z');
+      csvRepository.submissions[1]!.submittedAt = new Date('2026-03-12T01:30:00Z'); // 11/03 22:30 en Montevideo
+      csvServer = createApp({
+        catalog: new FixtureAcademicCatalog(),
+        repository: csvRepository,
+        adminSessionStore: sessionStore,
+        googleIdentityVerifier: mockVerifier,
+        systemSettingsRepository: settingsRepository,
+      }).listen(0);
+      await new Promise<void>((resolve) => csvServer.once('listening', () => resolve()));
+      csvUrl = `http://localhost:${(csvServer.address() as { port: number }).port}/api/admin/settings/campaign-tracking.csv`;
+    });
+
+    afterAll(async () => {
+      await new Promise<void>((resolve) => csvServer.close(() => resolve()));
+    });
+
+    it('rechaza sin sesión de admin (401)', async () => {
+      expect((await fetch(csvUrl)).status).toBe(401);
+    });
+
+    it('descarga el CSV con cabeceras, BOM y fecha en hora de Montevideo', async () => {
+      const res = await fetch(csvUrl, { headers: { Cookie: validCookie } });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+      expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename="seguimiento-campanias-\d{4}-\d{2}-\d{2}\.csv"$/);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      const text = Buffer.from(await res.arrayBuffer()).toString('utf8'); // res.text() descartaría el BOM
+      expect(text.startsWith('﻿fecha_hora,nombre,apellido,correo,oferta,tipo,edicion,utm_source,utm_medium,utm_campaign,utm_term,utm_content\r\n')).toBe(true);
+      const lines = text.trim().split('\r\n');
+      expect(lines[1]).toBe('2026-03-11 22:30:00,Ana,Pérez,b@x.com,Maestría X,academic_offer,Cohorte 1,ig,,,,');
+      expect(lines[2]).toContain("'=cmd");
+    });
+
+    it('filtra por fechas, con "hasta" inclusivo', async () => {
+      const only10 = await (await fetch(`${csvUrl}?from=2026-03-10&to=2026-03-10`, { headers: { Cookie: validCookie } })).text();
+      expect(only10.trim().split('\r\n')).toHaveLength(2);
+      expect(only10).toContain('a@x.com');
+      const none = await (await fetch(`${csvUrl}?from=2026-03-13`, { headers: { Cookie: validCookie } })).text();
+      expect(none.trim().split('\r\n')).toHaveLength(1);
+    });
+
+    it.each(['from=2026-3-1', 'to=hoy', 'from=2026-03-12&to=2026-03-10', 'from=2026-13-45'])('responde 400 con fechas inválidas (%s)', async (qs) => {
+      expect((await fetch(`${csvUrl}?${qs}`, { headers: { Cookie: validCookie } })).status).toBe(400);
+    });
+  });
+
   it('rejects PUT /api/admin/settings/google-drive without CSRF token (403)', async () => {
     const res = await fetch(`${baseUrl}/api/admin/settings/google-drive`, {
       method: 'PUT',

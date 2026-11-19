@@ -261,6 +261,20 @@ export const apiClient = {
     return res.json();
   },
 
+  /** CSV de seguimiento de campañas (datos personales): la sesión viaja por cookie, sin CSRF porque es un GET. */
+  async downloadCampaignTracking(from?: string, to?: string): Promise<{ blob: Blob; filename: string }> {
+    const query = new URLSearchParams();
+    if (from) query.set('from', from);
+    if (to) query.set('to', to);
+    const res = await fetch(`/api/admin/settings/campaign-tracking.csv?${query}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, err.error?.code || 'CAMPAIGN_TRACKING_ERROR', err.error?.message || 'No se pudo descargar el archivo de seguimiento.');
+    }
+    const filename = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? 'seguimiento-campanias.csv';
+    return { blob: await res.blob(), filename };
+  },
+
   async updateGoogleDriveFolder(folderId: string, csrfToken: string): Promise<{
     ok: boolean;
     googleDriveFolderId: string;

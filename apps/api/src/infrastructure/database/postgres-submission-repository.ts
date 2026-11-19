@@ -5,6 +5,7 @@ import type {
   ValidatedSubmissionRecord,
   SavedSubmissionResult,
 } from '../../ports/submission-repository.js';
+import { CAMPAIGN_TRACKING_MAX_ROWS, nextMontevideoMidnight, type CampaignTrackingRow } from '../../domain/campaign-tracking.js';
 import type { KyselyDb } from './kysely.js';
 
 /** Duración del lease del procesador; se renueva mientras el envío sigue trabajando. */
@@ -24,6 +25,31 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
       .where('client_submission_id', '=', clientSubmissionId)
       .executeTakeFirst();
     return existing ? { id: existing.id } : null;
+  }
+
+  async listCampaignTracking(range: { from?: Date; to?: Date }): Promise<CampaignTrackingRow[]> {
+    let query = this.db.selectFrom('campaign_tracking').selectAll().orderBy('created_at', 'desc').limit(CAMPAIGN_TRACKING_MAX_ROWS);
+    if (range.from) query = query.where('created_at', '>=', range.from);
+    if (range.to) query = query.where('created_at', '<', nextMontevideoMidnight(range.to));
+    const rows = await query.execute();
+    return rows.map((row) => ({
+      id: row.id,
+      submissionId: row.submission_id,
+      nombre: row.nombre,
+      apellido: row.apellido,
+      correo: row.correo,
+      oferta: row.oferta,
+      ofertaTipo: row.oferta_tipo,
+      edicion: row.edicion,
+      utm: {
+        utm_source: row.utm_source,
+        utm_medium: row.utm_medium,
+        utm_campaign: row.utm_campaign,
+        utm_term: row.utm_term,
+        utm_content: row.utm_content,
+      },
+      createdAt: row.created_at,
+    }));
   }
 
   async saveOrGet(record: ValidatedSubmissionRecord): Promise<SavedSubmissionResult> {
@@ -101,9 +127,30 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
             profile_version_id: record.profileVersionId ?? null,
             profile_snapshot: record.profileSnapshot ? JSON.stringify(record.profileSnapshot) : null,
             catalog_validation: record.catalogValidation ?? 'live',
-            utm: record.utm && Object.keys(record.utm).length > 0 ? JSON.stringify(record.utm) : null,
           })
           .execute();
+
+        if (record.campaignTracking) {
+          const tracking = record.campaignTracking;
+          await trx
+            .insertInto('campaign_tracking')
+            .values({
+              id: `ct_${crypto.randomUUID().replace(/-/g, '')}`,
+              submission_id: submissionId,
+              nombre: tracking.nombre,
+              apellido: tracking.apellido,
+              correo: tracking.correo,
+              oferta: tracking.oferta,
+              oferta_tipo: tracking.ofertaTipo,
+              edicion: tracking.edicion,
+              utm_source: tracking.utm.utm_source,
+              utm_medium: tracking.utm.utm_medium,
+              utm_campaign: tracking.utm.utm_campaign,
+              utm_term: tracking.utm.utm_term,
+              utm_content: tracking.utm.utm_content,
+            })
+            .execute();
+        }
 
         if (record.mauticContact) {
           await trx

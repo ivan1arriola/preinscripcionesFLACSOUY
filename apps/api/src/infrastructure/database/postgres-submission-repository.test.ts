@@ -18,6 +18,17 @@ integrationDescribe('PostgresSubmissionRepository (Integration with PostgreSQL)'
     await db.destroy();
   });
 
+  it('guarda el seguimiento de campaña junto con la preinscripción y lo lista por fecha', async () => {
+    const campaignTracking = {
+      nombre: 'Ana', apellido: 'Pérez', correo: 'ana@example.com', oferta: 'Maestría X', ofertaTipo: 'academic_offer', edicion: 'Cohorte 1',
+      utm: { utm_source: 'ig', utm_medium: null, utm_campaign: 'c1', utm_term: null, utm_content: null },
+    };
+    const saved = await repository.save({ clientSubmissionId: `ct-${Date.now()}`, targetId: 'davia-c11', configRevision: 'v1', targetTitle: 'DAVIA', targetKind: 'academic_offer', values: {}, campaignTracking });
+    const rows = await repository.listCampaignTracking({ from: new Date(Date.now() - 60_000) });
+    expect(rows.find((row) => row.submissionId === saved.id)).toMatchObject(campaignTracking);
+    expect(await repository.listCampaignTracking({ to: new Date('2000-01-01T00:00:00-03:00') })).toEqual([]);
+  });
+
   it('atomically marks completion and leaves a recoverable notification intent with the original links', async () => {
     const saved = await repository.save({ targetId: 'davia-c11', configRevision: 'v1', targetTitle: 'DAVIA', targetKind: 'academic_offer', values: { email: 'test@example.com' } });
     await repository.markSuccessWithNotificationIntent(saved.id, { targetId: 'davia-c11', spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/test/edit', documentsFolderUrl: 'https://drive.google.com/drive/folders/test' });

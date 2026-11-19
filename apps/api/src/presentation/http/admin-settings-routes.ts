@@ -46,6 +46,8 @@ import type {
   RecoveryStage,
   RecoveryStatus,
 } from '../../ports/submission-recovery-repository.js';
+import { montevideoDayStart } from '../../domain/campaign-tracking.js';
+import { toCsv } from '../../domain/csv.js';
 import type { SubmissionRepository } from '../../ports/submission-repository.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
@@ -332,6 +334,43 @@ export function createAdminSettingsRoutes(
       googleDriveCanAddChildren: folder.canAddChildren,
       ...(reconciliationResult ? { reconciliation: reconciliationResult } : {}),
     });
+  });
+
+  // Datos personales (nombre, apellido, correo): sólo con sesión de admin (router.use(requireAdmin)).
+  const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => !Number.isNaN(montevideoDayStart(value).getTime()));
+  const campaignTrackingQuery = z.object({ from: day.optional(), to: day.optional() })
+    .refine((q) => !q.from || !q.to || q.from <= q.to);
+  const montevideoTime = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Montevideo', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  });
+
+  router.get('/campaign-tracking.csv', async (req, res) => {
+    const query = campaignTrackingQuery.safeParse(req.query);
+    if (!query.success) {
+      res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'Las fechas deben tener formato AAAA-MM-DD y "desde" no puede ser posterior a "hasta".' } });
+      return;
+    }
+    if (!submissionRepository?.listCampaignTracking) {
+      res.status(503).json({ error: { code: 'CAMPAIGN_TRACKING_UNAVAILABLE', message: 'El seguimiento de campañas no está disponible.' } });
+      return;
+    }
+    const { from, to } = query.data;
+    const rows = await submissionRepository.listCampaignTracking({
+      from: from ? montevideoDayStart(from) : undefined,
+      to: to ? montevideoDayStart(to) : undefined,
+    });
+    const csv = toCsv(
+      ['fecha_hora', 'nombre', 'apellido', 'correo', 'oferta', 'tipo', 'edicion', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'],
+      rows.map((row) => [
+        montevideoTime.format(row.createdAt), row.nombre, row.apellido, row.correo, row.oferta, row.ofertaTipo, row.edicion,
+        row.utm.utm_source, row.utm.utm_medium, row.utm.utm_campaign, row.utm.utm_term, row.utm.utm_content,
+      ]),
+    );
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="seguimiento-campanias-${montevideoTime.format(new Date()).slice(0, 10)}.csv"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(csv);
   });
 
   router.get('/spreadsheets', async (_req, res) => {
