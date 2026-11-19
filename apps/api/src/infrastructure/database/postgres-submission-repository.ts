@@ -101,6 +101,7 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
             profile_version_id: record.profileVersionId ?? null,
             profile_snapshot: record.profileSnapshot ? JSON.stringify(record.profileSnapshot) : null,
             catalog_validation: record.catalogValidation ?? 'live',
+            utm: record.utm && Object.keys(record.utm).length > 0 ? JSON.stringify(record.utm) : null,
           })
           .execute();
 

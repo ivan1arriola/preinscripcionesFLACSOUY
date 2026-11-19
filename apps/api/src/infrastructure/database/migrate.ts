@@ -25,6 +25,7 @@ import * as recoveryNotificationLinksSchema from './migrations/025_recovery_noti
 import * as offerRegistrationLinksSchema from './migrations/026_offer_registration_links.js';
 import * as submissionProtocolSchema from './migrations/027_submission_protocol.js';
 import * as sheetPayloadSchema from './migrations/028_sheet_payload.js';
+import * as submissionUtmSchema from './migrations/029_submission_utm.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -54,6 +55,7 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await offerRegistrationLinksSchema.up(db);
   await submissionProtocolSchema.up(db);
   await sheetPayloadSchema.up(db);
+  await submissionUtmSchema.up(db);
   console.log('Migrations complete.');
 }
 

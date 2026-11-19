@@ -43,6 +43,7 @@ export interface SubmitPreinscriptionCommand {
   configRevision: string;
   values: Record<string, string>;
   files?: SubmissionFileToken[];
+  utm?: Record<string, string>;
 }
 
 export type SubmitPreinscriptionResult =
@@ -189,6 +190,7 @@ export async function submitPreinscription(
     targetKind: target.kind,
     values: normalizedValues,
     files: command.files,
+    utm: command.utm,
     profileVersionId: CANONICAL_SCHEMA_VERSION,
     profileSnapshot: form as any,
     catalogValidation,

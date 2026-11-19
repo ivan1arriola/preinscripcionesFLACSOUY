@@ -10,6 +10,8 @@ export interface ValidatedSubmissionRecord {
   targetKind: string;
   values: Record<string, string>;
   files?: SubmissionFileToken[];
+  /** Parámetros utm_* con los que llegó la persona. */
+  utm?: Record<string, string>;
   profileVersionId?: string | null;
   profileSnapshot?: unknown | null;
   /** 'cached' cuando WordPress no respondió y se validó contra el catálogo guardado. */

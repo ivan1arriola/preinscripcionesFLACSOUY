@@ -84,6 +84,14 @@ const submissionSchema = z.object({
   values: z.record(z.string().max(5000), {
     required_error: 'Los valores del formulario son obligatorios.',
   }),
+  // Sólo claves utm_* conocidas; lo demás se descarta para no guardar basura enviada por el cliente.
+  utm: z.object({
+    utm_source: z.string().max(200).optional(),
+    utm_medium: z.string().max(200).optional(),
+    utm_campaign: z.string().max(200).optional(),
+    utm_term: z.string().max(200).optional(),
+    utm_content: z.string().max(200).optional(),
+  }).optional(),
   files: z.array(z.object({
     token: z.string(), fieldKey: z.string(), originalName: z.string(), size: z.number(), mimeType: z.string(),
   })).max(MAX_SUBMISSION_FILES).default([]).refine(
@@ -258,6 +266,7 @@ export function createSubmissionRoutes(
           configRevision: parsed.data.configRevision,
           values: parsed.data.values,
           files: parsed.data.files,
+          utm: parsed.data.utm as Record<string, string> | undefined,
         }, {
           isMauticContactSyncEnabled: mauticDependencies?.isContactSyncEnabled,
           isMauticEnrollmentNotifyEnabled: mauticDependencies?.isEnrollmentNotifyEnabled,

@@ -146,6 +146,22 @@ describe('Submission HTTP Routes', () => {
     expect(applicantNotif?.payload.documentsFolderUrl).toBe('https://drive.google.com/drive/folders/folder-1');
   });
 
+  it('keeps known utm_* values on the saved record and strips unknown keys', async () => {
+    const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 'session-test' },
+      body: JSON.stringify({
+        ...validPayload,
+        clientSubmissionId: 'utm-test-1',
+        utm: { utm_source: 'instagram', utm_campaign: 'diploma-2027', utm_evil: 'x' },
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const saved = repository.submissions.find((s) => s.clientSubmissionId === 'utm-test-1');
+    expect(saved?.utm).toEqual({ utm_source: 'instagram', utm_campaign: 'diploma-2027' });
+  });
+
   it('rejects a submission that omits `files` instead of skipping the mandatory documents', async () => {
     const { files: _omitted, ...withoutFiles } = validPayload;
     const res = await fetch(`${baseUrl}/api/targets/davia-c11/submissions`, {
