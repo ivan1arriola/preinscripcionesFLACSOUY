@@ -1,10 +1,59 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TemporaryFileStorage } from './temporary-file-storage.js';
 
 describe('TemporaryFileStorage', () => {
+  it('continues a partial upload only from its confirmed offset and finalizes it as a normal file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'flacso-upload-'));
+    const storage = new TemporaryFileStorage({ rootDir: root, maxBytes: 1024, allowedMimeTypes: ['application/pdf'] });
+
+    const partial = await storage.beginResumable('session-a', 'cv', {
+      originalName: 'cv.pdf', mimeType: 'application/pdf', size: 12,
+    });
+    expect(await storage.getResumableOffset(partial.uploadId, 'session-a')).toBe(0);
+    await storage.appendResumable(partial.uploadId, 'session-a', 0, Buffer.from('%PDF-'));
+    expect(await storage.getResumableOffset(partial.uploadId, 'session-a')).toBe(5);
+    await expect(storage.appendResumable(partial.uploadId, 'session-a', 0, Buffer.from('duplicado'))).rejects.toThrow(/offset/i);
+    await storage.appendResumable(partial.uploadId, 'session-a', 5, Buffer.from('datos!!'));
+
+    const saved = await storage.finishResumable(partial.uploadId, 'session-a');
+    expect((await storage.open(saved.token, 'session-a')).data.toString()).toBe('%PDF-datos!!');
+
+    const abandoned = await storage.beginResumable('session-a', 'cv', { originalName: 'otro.pdf', mimeType: 'application/pdf', size: 10 });
+    await storage.cleanup(Date.now() + 60 * 60 * 1000);
+    await expect(storage.getResumableOffset(abandoned.uploadId, 'session-a')).rejects.toThrow();
+  });
+  it('does not duplicate bytes when two PATCHes arrive at the same offset', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'flacso-upload-'));
+    const storage = new TemporaryFileStorage({ rootDir: root, maxBytes: 1024, allowedMimeTypes: ['application/pdf'] });
+    const { uploadId } = await storage.beginResumable('session-a', 'cv', { originalName: 'cv.pdf', mimeType: 'application/pdf', size: 10 });
+    const chunk = Buffer.from('%PDF-datos');
+
+    // El segundo puede fallar por offset si llega tarde; lo que importa es que el payload quede con el fragmento una sola vez.
+    await Promise.allSettled([
+      storage.appendResumable(uploadId, 'session-a', 0, chunk),
+      storage.appendResumable(uploadId, 'session-a', 0, chunk),
+    ]);
+
+    expect(await readFile(join(root, 'resumable', uploadId, 'payload'))).toEqual(chunk);
+  });
+
+  it('cleans every stale resumable upload even when one has unreadable metadata', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'flacso-upload-'));
+    const storage = new TemporaryFileStorage({ rootDir: root, maxBytes: 1024, allowedMimeTypes: ['application/pdf'] });
+    const corrupt = 'a'.repeat(32);
+    await mkdir(join(root, 'resumable', corrupt), { recursive: true });
+    await writeFile(join(root, 'resumable', corrupt, 'metadata.json'), '{no es json');
+    const { uploadId } = await storage.beginResumable('session-a', 'cv', { originalName: 'cv.pdf', mimeType: 'application/pdf', size: 10 });
+
+    await storage.cleanup(Date.now() + 60 * 60 * 1000);
+
+    await expect(stat(join(root, 'resumable', corrupt))).rejects.toThrow();
+    await expect(stat(join(root, 'resumable', uploadId))).rejects.toThrow();
+  });
+
   it('stores a private file and opens it only for its owner', async () => {
     const root = await mkdtemp(join(tmpdir(), 'flacso-upload-'));
     const storage = new TemporaryFileStorage({ rootDir: root, maxBytes: 1024, allowedMimeTypes: ['application/pdf'], ttlMs: 0 });

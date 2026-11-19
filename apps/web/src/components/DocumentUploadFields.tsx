@@ -1,14 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { DocumentDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { TitleDocumentFields } from './TitleDocumentFields.js';
 import { DocumentUploadCard } from './DocumentUploadCard.js';
 import { apiClient } from '../api/client.js';
-import { rememberPreview } from '../domain/file-previews.js';
-import { usePendingUploads } from '../domain/pending-upload.js';
-import { UploadingFileRow } from './UploadingFileRow.js';
 import { UploadedFileChip } from './UploadedFileChip.js';
 import { getDocumentProgress } from './preinscription-form-view-model.js';
 import { fileLimitInfo } from './file-limits.js';
+import { ResumableFileUploader } from './ResumableFileUploader.js';
 
 export interface DocumentUploadFieldsProps {
   documents: DocumentDefinition[];
@@ -17,7 +15,7 @@ export interface DocumentUploadFieldsProps {
   disabled: boolean;
   errors: Record<string, string | undefined>;
   onChange: (key: string, value: string) => void;
-  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number) => void) => Promise<SubmissionFileToken>;
+  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number, remainingSeconds?: number) => void) => Promise<SubmissionFileToken>;
   onFileToken: (file: SubmissionFileToken) => void;
   onRemoveToken: (file: SubmissionFileToken) => void;
 }
@@ -33,9 +31,6 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
   onFileToken,
   onRemoveToken,
 }) => {
-  const [uploading, setUploading] = useState<Record<string, boolean>>({});
-  const [uploadErrors, setUploadErrors] = useState<Record<string, string | undefined>>({});
-  const pendingUploads = usePendingUploads();
 
   if (documents.length === 0) return null;
 
@@ -128,36 +123,9 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                   <label htmlFor={`file-${document.key}`} className="field-label">
                     Archivo de {document.label.toLowerCase()}
                   </label>
-                  <input
-                    id={`file-${document.key}`}
-                    type="file"
-                    accept={[...(document.acceptedMimeTypes ?? []), '.wspimage'].join(',')}
-                    disabled={disabled || uploading[document.key] || fileLimitInfo(document, uploaded.length).full}
-                    onChange={async (event) => {
-                      const input = event.target;
-                      const file = input.files?.[0];
-                      if (!file) return;
-                      setUploading((current) => ({ ...current, [document.key]: true }));
-                      const report = pendingUploads.begin(document.key, file);
-                      try {
-                        const token = await onUpload(document.key, file, report);
-                        rememberPreview(token.token, file);
-                        onFileToken(token);
-                        setUploadErrors((current) => ({ ...current, [document.key]: undefined }));
-                      } catch (uploadError) {
-                        setUploadErrors((current) => ({
-                          ...current,
-                          [document.key]: uploadError instanceof Error ? uploadError.message : 'No se pudo cargar el archivo.',
-                        }));
-                      } finally {
-                        pendingUploads.finish(document.key);
-                        setUploading((current) => ({ ...current, [document.key]: false }));
-                        // Permite volver a elegir el mismo archivo después de quitarlo o de un error.
-                        input.value = '';
-                      }
-                    }}
-                    className="file-input"
-                  />
+                  <ResumableFileUploader document={document} disabled={disabled || fileLimitInfo(document, uploaded.length).full}
+                    availableSlots={fileLimitInfo(document, uploaded.length).max - uploaded.length} onUpload={onUpload}
+                    onUploaded={onFileToken} className="dropzone" />
                   <p className="field-hint">
                     {fileLimitInfo(document, uploaded.length).multi
                       ? `Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB cada uno). Hasta ${document.maxFiles} archivos: podés combinar PDF e imágenes.`
@@ -170,16 +138,12 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
                         : `${uploaded.length} archivo cargado`}
                     </p>
                   )}
-                  {pendingUploads.pending[document.key] && <UploadingFileRow upload={pendingUploads.pending[document.key]} />}
                   {uploaded.length > 0 && (
                     <ul className="file-list">
                       {uploaded.map((file) => (
                         <UploadedFileChip key={file.token} file={file} disabled={disabled} onRemove={handleRemoveFile} />
                       ))}
                     </ul>
-                  )}
-                  {uploadErrors[document.key] && (
-                    <p className="field-error">{uploadErrors[document.key]}</p>
                   )}
                   {error && <p className="field-error">{error}</p>}
                 </div>
@@ -201,22 +165,11 @@ export const DocumentUploadFields: React.FC<DocumentUploadFieldsProps> = ({
             key={document.key}
             document={document}
             files={uploaded}
-            uploading={Boolean(uploading[document.key])}
-            error={uploadErrors[document.key] ?? error}
+            error={error}
             disabled={disabled}
-            onUpload={async (fieldKey, file, onProgress) => {
-              setUploading((current) => ({ ...current, [fieldKey]: true }));
-              try {
-                const token = await onUpload(fieldKey, file, onProgress);
-                setUploadErrors((current) => ({ ...current, [fieldKey]: undefined }));
-                return token;
-              } finally {
-                setUploading((current) => ({ ...current, [fieldKey]: false }));
-              }
-            }}
+            onUpload={onUpload}
             onFileToken={onFileToken}
             onRemove={handleRemoveFile}
-            onError={(message) => setUploadErrors((current) => ({ ...current, [document.key]: message }))}
           />
         );
       })}

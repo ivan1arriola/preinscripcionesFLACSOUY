@@ -37,7 +37,7 @@ function card(maxFiles: number, files: SubmissionFileToken[]) {
       onRemove={vi.fn()}
     />,
   );
-  return screen.getByLabelText(/Agregar archivo.*Curriculum/i);
+  return screen.getByLabelText(/Agregar o arrastrar archivos.*Curriculum/i);
 }
 
 describe('Tarjeta de documento con hasta 2 archivos', () => {

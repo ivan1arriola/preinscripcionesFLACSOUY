@@ -96,6 +96,14 @@ describe('HTTP rate limits', () => {
     });
   });
 
+  it('also rate limits the start of a resumable upload (not only POST /api/uploads)', async () => {
+    await withApp({ uploads: { windowMs: 60_000, max: 1 } }, async (baseUrl) => {
+      const start = () => fetch(`${baseUrl}/api/uploads/resumable`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      expect((await start()).status).not.toBe(429);
+      expect((await start()).status).toBe(429);
+    });
+  });
+
   it('can be disabled', async () => {
     await withApp(false, async (baseUrl) => {
       for (let i = 0; i < 5; i += 1) expect((await post(baseUrl)).status).toBe(400);

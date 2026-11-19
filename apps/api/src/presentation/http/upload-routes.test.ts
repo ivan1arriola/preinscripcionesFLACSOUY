@@ -111,6 +111,80 @@ describe('Upload HTTP Routes', () => {
     }
   });
 
+  it('reports the confirmed resumable offset and completes the same upload', async () => {
+    const { baseUrl, storage, close } = await setupApp();
+    try {
+      const bytes = pdfBytes('por partes');
+      const started = await fetch(`${baseUrl}/resumable`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-resume' },
+        body: JSON.stringify({ targetId: 'diploma-davia', fieldKey: 'cv', originalName: 'cv.pdf', mimeType: 'application/pdf', size: bytes.length }),
+      });
+      const { uploadId } = await started.json() as { uploadId: string };
+      const first = bytes.subarray(0, 5);
+      expect((await fetch(`${baseUrl}/resumable/${uploadId}`, {
+        method: 'PATCH', headers: { 'content-type': 'application/octet-stream', 'content-range': `bytes 0-4/${bytes.length}`, 'x-preinscription-session': 'session-resume' }, body: first,
+      })).status).toBe(204);
+      const status = await fetch(`${baseUrl}/resumable/${uploadId}`, { method: 'HEAD', headers: { 'x-preinscription-session': 'session-resume' } });
+      expect(status.headers.get('upload-offset')).toBe('5');
+      expect((await fetch(`${baseUrl}/resumable/${uploadId}`, {
+        method: 'PATCH', headers: { 'content-type': 'application/octet-stream', 'content-range': `bytes 5-${bytes.length - 1}/${bytes.length}`, 'x-preinscription-session': 'session-resume' }, body: bytes.subarray(5),
+      })).status).toBe(204);
+      const completed = await fetch(`${baseUrl}/resumable/${uploadId}/complete`, { method: 'POST', headers: { 'x-preinscription-session': 'session-resume' } });
+      expect(completed.status).toBe(201);
+      const token = ((await completed.json()) as { token: string }).token;
+      expect((await storage.open(token, 'session-resume')).data).toEqual(bytes);
+    } finally { await close(); }
+  });
+
+  it('re-checks maxFiles at complete when several resumable uploads were started in parallel', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      const headers = { 'content-type': 'application/json', 'x-preinscription-session': 'session-parallel' };
+      const bytes = pdfBytes('paralelo');
+      // El campo "cv" admite 2 archivos: se empiezan 3 cargas antes de terminar ninguna.
+      const ids: string[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const started = await fetch(`${baseUrl}/resumable`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ targetId: 'diploma-davia', fieldKey: 'cv', originalName: `cv${i}.pdf`, mimeType: 'application/pdf', size: bytes.length }),
+        });
+        expect(started.status).toBe(201);
+        ids.push(((await started.json()) as { uploadId: string }).uploadId);
+      }
+      for (const id of ids) {
+        await fetch(`${baseUrl}/resumable/${id}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/octet-stream', 'content-range': `bytes 0-${bytes.length - 1}/${bytes.length}`, 'x-preinscription-session': 'session-parallel' },
+          body: bytes,
+        });
+      }
+      const complete = (id: string) => fetch(`${baseUrl}/resumable/${id}/complete`, { method: 'POST', headers: { 'x-preinscription-session': 'session-parallel' } });
+      expect((await complete(ids[0]!)).status).toBe(201);
+      expect((await complete(ids[1]!)).status).toBe(201);
+      const third = await complete(ids[2]!);
+      expect(third.status).toBe(400);
+      expect(((await third.json()) as { error: { code: string } }).error.code).toBe('MAX_FILES_EXCEEDED');
+      // La carga rechazada se descartó y una sesión ajena recibe el mismo 404 que un id inexistente.
+      expect((await fetch(`${baseUrl}/resumable/${ids[2]!}`, { method: 'HEAD', headers: { 'x-preinscription-session': 'session-parallel' } })).status).toBe(404);
+      expect((await fetch(`${baseUrl}/resumable/${ids[0]!}`, { method: 'HEAD', headers: { 'x-preinscription-session': 'otra' } })).status).toBe(404);
+    } finally { await close(); }
+  });
+
+  it('rejects malformed resumable start bodies with INVALID_REQUEST', async () => {
+    const { baseUrl, close } = await setupApp();
+    try {
+      const start = (body: unknown) => fetch(`${baseUrl}/resumable`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': 's' }, body: JSON.stringify(body),
+      });
+      const ok = { targetId: 'diploma-davia', fieldKey: 'cv', originalName: 'cv.pdf', mimeType: 'application/pdf', size: 10 };
+      for (const bad of [{ ...ok, size: '10' }, { ...ok, size: 0 }, { ...ok, size: 1.5 }, { ...ok, targetId: { $ne: 1 } }, { ...ok, originalName: 'x'.repeat(256) }]) {
+        const res = await start(bad);
+        expect(res.status).toBe(400);
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe('INVALID_REQUEST');
+      }
+    } finally { await close(); }
+  });
+
   it('rejects a file whose content does not match the declared type', async () => {
     const { baseUrl, close } = await setupApp();
     try {

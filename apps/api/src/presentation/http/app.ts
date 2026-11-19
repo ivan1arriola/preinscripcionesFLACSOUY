@@ -136,7 +136,7 @@ export function createApp(dependencies: AppDependencies): Express {
   app.use(cookieParser());
 
   if (rateLimits) {
-    app.post('/api/uploads', createIpRateLimit(rateLimits.uploads));
+    app.post(['/api/uploads', '/api/uploads/resumable'], createIpRateLimit(rateLimits.uploads));
   }
 
   if (dependencies.temporaryFileStorage) {

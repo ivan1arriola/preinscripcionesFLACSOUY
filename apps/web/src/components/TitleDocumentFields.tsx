@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { DocumentDefinition, SubmissionFileToken } from '@flacso/contracts';
 import { apiClient } from '../api/client.js';
-import { rememberPreview } from '../domain/file-previews.js';
-import { usePendingUploads } from '../domain/pending-upload.js';
-import { UploadingFileRow } from './UploadingFileRow.js';
 import { UploadedFileChip } from './UploadedFileChip.js';
 import { fileLimitInfo } from './file-limits.js';
+import { ResumableFileUploader } from './ResumableFileUploader.js';
 
 export interface TitleDocumentFieldsProps {
   document: DocumentDefinition;
@@ -14,7 +12,7 @@ export interface TitleDocumentFieldsProps {
   files: SubmissionFileToken[];
   disabled: boolean;
   onChange: (key: string, value: string) => void;
-  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number) => void) => Promise<SubmissionFileToken>;
+  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number, remainingSeconds?: number) => void) => Promise<SubmissionFileToken>;
   onFileToken: (file: SubmissionFileToken) => void;
   onRemoveToken: (file: SubmissionFileToken) => void;
 }
@@ -30,10 +28,6 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
   onFileToken,
   onRemoveToken,
 }) => {
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | undefined>();
-  const pendingUploads = usePendingUploads();
-
   const isAbsent = values.sinTituloActual === 'Si';
   const denomination = values.tituloDenominacion ?? '';
   const uploadedFiles = files.filter((f) => f.fieldKey === document.key);
@@ -56,27 +50,6 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
       }
     } else {
       onChange('sinTituloActual', 'No');
-    }
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const input = event.target;
-    const file = input.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    const report = pendingUploads.begin(document.key, file);
-    try {
-      const token = await onUpload(document.key, file, report);
-      rememberPreview(token.token, file);
-      onFileToken(token);
-      setUploadError(undefined);
-    } catch (err: any) {
-      setUploadError(err instanceof Error ? err.message : 'No se pudo cargar el archivo.');
-    } finally {
-      pendingUploads.finish(document.key);
-      setUploading(false);
-      // Sin esto el navegador no vuelve a disparar `change` si se elige de nuevo el mismo archivo.
-      input.value = '';
     }
   };
 
@@ -148,14 +121,8 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
             <label htmlFor={`file-${document.key}`} className="field-label">
               Archivo del título <span className="field-required">*</span>
             </label>
-            <input
-              id={`file-${document.key}`}
-              type="file"
-              accept={[...(document.acceptedMimeTypes ?? []), '.wspimage'].join(',')}
-              disabled={disabled || uploading || full}
-              onChange={handleFileChange}
-              className="file-input"
-            />
+            <ResumableFileUploader document={document} disabled={disabled || full} availableSlots={max - uploadedFiles.length}
+              onUpload={onUpload} onUploaded={onFileToken} className="dropzone" />
             <p className="field-hint">
               {multi
                 ? `Formatos admitidos: PDF, JPG, PNG o WebP (máx. 10 MiB cada uno). Hasta ${max} archivos: podés combinar PDF e imágenes.`
@@ -166,7 +133,6 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
                 {multi ? `${uploadedFiles.length} de ${max} archivos cargados` : `${uploadedFiles.length} archivo cargado`}
               </p>
             )}
-            {pendingUploads.pending[document.key] && <UploadingFileRow upload={pendingUploads.pending[document.key]} />}
             {uploadedFiles.length > 0 && (
               <ul className="file-list">
                 {uploadedFiles.map((file) => (
@@ -174,7 +140,6 @@ export const TitleDocumentFields: React.FC<TitleDocumentFieldsProps> = ({
                 ))}
               </ul>
             )}
-            {uploadError && <p className="field-error">{uploadError}</p>}
             {fileError && <p className="field-error">{fileError}</p>}
           </div>
         </div>

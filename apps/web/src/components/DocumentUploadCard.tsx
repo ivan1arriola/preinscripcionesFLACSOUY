@@ -1,18 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { DocumentDefinition, SubmissionFileToken } from '@flacso/contracts';
-import { rememberPreview } from '../domain/file-previews.js';
-import { usePendingUploads } from '../domain/pending-upload.js';
 import { UploadedFileChip } from './UploadedFileChip.js';
-import { UploadingFileRow } from './UploadingFileRow.js';
 import { fileLimitInfo } from './file-limits.js';
+import { ResumableFileUploader } from './ResumableFileUploader.js';
 
 export interface DocumentUploadCardProps {
   document: DocumentDefinition;
   files: SubmissionFileToken[];
-  uploading: boolean;
+  uploading?: boolean;
   error?: string;
   disabled: boolean;
-  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number) => void) => Promise<SubmissionFileToken>;
+  onUpload: (fieldKey: string, file: File, onProgress?: (percent: number, remainingSeconds?: number) => void) => Promise<SubmissionFileToken>;
   onFileToken: (file: SubmissionFileToken) => void;
   onRemove: (file: SubmissionFileToken) => void;
   onError?: (message: string) => void;
@@ -29,11 +27,9 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
   onRemove,
   onError,
 }) => {
-  const inputId = `file-${document.key}`;
+  const [hasPendingUploads, setHasPendingUploads] = useState(false);
   const formatLabel = document.acceptedMimeTypes?.map((mime) => (mime === 'image/jpeg' ? 'JPG' : mime.split('/')[1]?.toUpperCase())).join(', ') || 'PDF';
-  const { pending, begin, finish } = usePendingUploads();
-  const current = pending[document.key];
-  const busy = uploading || Boolean(current);
+  const busy = uploading || hasPendingUploads;
   const state = busy ? 'uploading' : files.length > 0 ? 'done' : 'pending';
   const { max, multi, full } = fileLimitInfo(document, files.length);
 
@@ -55,40 +51,13 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
         </span>
       </div>
 
-      <label htmlFor={inputId} className={`dropzone${busy ? ' is-busy' : ''}`}>
-        Agregar archivo
-        <span className="sr-only"> para {document.label}</span>
-        <input
-          id={inputId}
-          type="file"
-          accept={[...(document.acceptedMimeTypes ?? []), '.wspimage'].join(',')}
-          disabled={disabled || busy || full}
-          onChange={async (event) => {
-            const input = event.target;
-            const file = input.files?.[0];
-            if (!file) return;
-            const report = begin(document.key, file);
-            try {
-              const token = await onUpload(document.key, file, report);
-              rememberPreview(token.token, file);
-              onFileToken(token);
-            } catch (uploadError) {
-              onError?.(uploadError instanceof Error ? uploadError.message : 'No se pudo cargar el archivo.');
-            } finally {
-              finish(document.key);
-              input.value = '';
-            }
-          }}
-          className="sr-only"
-        />
-      </label>
+      <ResumableFileUploader document={document} disabled={disabled || full} availableSlots={max - files.length} onUpload={onUpload} onUploaded={onFileToken} onError={onError} onActiveChange={setHasPendingUploads} />
 
-      {(files.length > 0 || busy) && (
+      {files.length > 0 && (
         <ul className="file-list">
           {files.map((file) => (
             <UploadedFileChip key={file.token} file={file} disabled={disabled} onRemove={onRemove} removeLabel={`Quitar ${file.originalName}`} />
           ))}
-          {busy && <li className="file-list__item"><UploadingFileRow upload={current} /></li>}
         </ul>
       )}
       {multi && files.length > 0 && <p className="document-upload-card__count">{files.length} de {max} archivos</p>}

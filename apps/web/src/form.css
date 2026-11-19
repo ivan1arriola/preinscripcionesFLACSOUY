@@ -160,6 +160,8 @@ body { background: var(--page); color: var(--ink); }
 .dropzone { display: flex; align-items: center; justify-content: center; gap: .6rem; min-height: 3.4rem; margin-top: 1rem; padding: .8rem 1rem; border: 2px dashed #9db5da; border-radius: .75rem; background: var(--flacso-blue-soft); color: var(--flacso-blue); font-size: .95rem; font-weight: 800; text-align: center; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
 .dropzone::before { content: '⇪'; font-size: 1.25rem; line-height: 1; }
 .dropzone:hover, .dropzone:focus-within { border-color: var(--flacso-blue); background: #dfeafa; }
+.dropzone.is-dragging { border-color: var(--flacso-blue); background: #d7e7ff; box-shadow: 0 0 0 4px rgba(20, 91, 166, .18); }
+.dropzone.is-dragging-invalid { border-color: var(--danger); background: #fff1f1; box-shadow: 0 0 0 4px rgba(180, 35, 35, .12); }
 .dropzone:focus-within { box-shadow: var(--focus-ring); }
 .file-list { display: grid; gap: .5rem; margin: .85rem 0 0; padding: 0; list-style: none; }
 .file-chip { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .6rem .85rem; border: 1px solid var(--line); border-radius: .65rem; background: #f7f9fd; color: var(--ink); font-size: .9rem; word-break: break-word; }
@@ -323,6 +325,7 @@ input[type="file"].file-input::file-selector-button:hover { background: var(--fl
 .progress__bar { height: 100%; border-radius: 999px; background: var(--flacso-blue); transition: width .2s ease; }
 .progress--busy .progress__bar { background: linear-gradient(90deg, var(--flacso-blue) 0%, #3f6fc0 50%, var(--flacso-blue) 100%); background-size: 200% 100%; animation: flacso-slide 1.1s linear infinite; }
 @keyframes flacso-slide { to { background-position: -200% 0; } }
+.uploading-row__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .uploading-row .file-chip__meta { gap: .35rem; }
 
 /* ---------- Archivos en la revisión final ---------- */

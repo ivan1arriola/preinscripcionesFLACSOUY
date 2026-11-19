@@ -1,4 +1,34 @@
 import type { DiagnosticTarget, FormDefinition, SubmissionFileToken } from '@flacso/contracts';
+import { UploadProgressEstimator } from '../domain/upload-progress.js';
+import { getUtm } from './utm.js';
+
+const resumableUploads = new WeakMap<File, string>();
+const UPLOAD_CHUNK_BYTES = 1024 * 1024;
+
+async function apiError(response: Response, fallback: string): Promise<ApiError> {
+  const body = await response.json().catch(() => ({}));
+  return new ApiError(response.status, body.error?.code || 'UPLOAD_ERROR', body.error?.message || fallback);
+}
+
+function sendUploadChunk(uploadId: string, file: File, offset: number, onBytes: (bytes: number) => void): Promise<void> {
+  const end = Math.min(file.size, offset + UPLOAD_CHUNK_BYTES);
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open('PATCH', `/api/uploads/resumable/${encodeURIComponent(uploadId)}`);
+    request.setRequestHeader('x-preinscription-session', apiClient.sessionId());
+    request.setRequestHeader('Content-Range', `bytes ${offset}-${end - 1}/${file.size}`);
+    request.setRequestHeader('Content-Type', 'application/octet-stream');
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onBytes(offset + event.loaded);
+    };
+    request.onload = () => request.status === 204
+      ? resolve()
+      : reject(new ApiError(request.status, 'UPLOAD_ERROR', 'No se pudo continuar la carga del archivo.'));
+    request.onerror = () => reject(new ApiError(0, 'UPLOAD_ERROR', 'No se pudo cargar el archivo. Revisá tu conexión e intentá de nuevo.'));
+    request.onabort = () => reject(new ApiError(0, 'UPLOAD_ABORTED', 'La carga del archivo se canceló.'));
+    request.send(file.slice(offset, end));
+  });
+}
 
 export class ApiError extends Error {
   constructor(
@@ -36,41 +66,53 @@ export const apiClient = {
     targetId: string,
     fieldKey: string,
     file: File,
-    onProgress?: (percent: number) => void
+    onProgress?: (percent: number, remainingSeconds?: number) => void
   ): Promise<SubmissionFileToken> {
+    if (onProgress && typeof XMLHttpRequest !== 'undefined') {
+      let uploadId = resumableUploads.get(file);
+      let offset = 0;
+      if (!uploadId) {
+        const response = await fetch('/api/uploads/resumable', {
+          method: 'POST', headers: { 'content-type': 'application/json', 'x-preinscription-session': apiClient.sessionId() },
+          body: JSON.stringify({ targetId, fieldKey, originalName: file.name, mimeType: file.type, size: file.size }),
+        });
+        if (!response.ok) throw await apiError(response, 'No se pudo iniciar la carga del archivo.');
+        const started = await response.json();
+        uploadId = started.uploadId as string;
+        offset = started.offset;
+        resumableUploads.set(file, uploadId);
+      } else {
+        const response = await fetch(`/api/uploads/resumable/${encodeURIComponent(uploadId)}`, {
+          method: 'HEAD', headers: { 'x-preinscription-session': apiClient.sessionId() },
+        });
+        if (!response.ok) throw await apiError(response, 'No se pudo consultar el avance de la carga.');
+        const header = response.headers.get('Upload-Offset');
+        offset = header !== null && /^\d+$/.test(header) ? Number(header) : NaN;
+        if (!Number.isSafeInteger(offset) || offset > file.size) throw new ApiError(response.status, 'UPLOAD_ERROR', 'No se pudo consultar el avance de la carga.');
+      }
+      const estimator = new UploadProgressEstimator(file.size);
+      const report = (bytes: number) => {
+        const progress = estimator.sample(bytes);
+        onProgress(progress.percent, progress.remainingSeconds);
+      };
+      report(offset);
+      while (offset < file.size) {
+        await sendUploadChunk(uploadId, file, offset, report);
+        offset = Math.min(file.size, offset + UPLOAD_CHUNK_BYTES);
+        report(offset);
+      }
+      const completed = await fetch(`/api/uploads/resumable/${encodeURIComponent(uploadId)}/complete`, {
+        method: 'POST', headers: { 'x-preinscription-session': apiClient.sessionId() },
+      });
+      if (!completed.ok) throw await apiError(completed, 'No se pudo completar la carga del archivo.');
+      resumableUploads.delete(file);
+      onProgress(100, 0);
+      return completed.json();
+    }
     const body = new FormData();
     body.append('targetId', targetId);
     body.append('fieldKey', fieldKey);
     body.append('file', file);
-    // Con un callback de avance se usa XMLHttpRequest, que informa los bytes enviados; fetch no lo hace.
-    if (onProgress && typeof XMLHttpRequest !== 'undefined') {
-      return new Promise<SubmissionFileToken>((resolve, reject) => {
-        const request = new XMLHttpRequest();
-        request.open('POST', '/api/uploads');
-        request.setRequestHeader('x-preinscription-session', apiClient.sessionId());
-        request.upload.onprogress = (event) => {
-          if (event.lengthComputable && event.total > 0) onProgress((event.loaded / event.total) * 100);
-        };
-        request.onload = () => {
-          let data: any = {};
-          try {
-            data = JSON.parse(request.responseText || '{}');
-          } catch {
-            // respuesta sin cuerpo JSON
-          }
-          if (request.status >= 200 && request.status < 300) {
-            onProgress(100);
-            resolve(data as SubmissionFileToken);
-          } else {
-            reject(new ApiError(request.status, data.error?.code || 'UPLOAD_ERROR', data.error?.message || 'No se pudo cargar el archivo.'));
-          }
-        };
-        request.onerror = () =>
-          reject(new ApiError(0, 'UPLOAD_ERROR', 'No se pudo cargar el archivo. Revisá tu conexión e intentá de nuevo.'));
-        request.onabort = () => reject(new ApiError(0, 'UPLOAD_ABORTED', 'La carga del archivo se canceló.'));
-        request.send(body);
-      });
-    }
     const res = await fetch('/api/uploads', {
       method: 'POST',
       headers: { 'x-preinscription-session': apiClient.sessionId() },
@@ -138,7 +180,7 @@ export const apiClient = {
         'x-preinscription-session': apiClient.sessionId(),
         ...(recaptchaToken ? { 'x-recaptcha-token': recaptchaToken } : {}),
       },
-      body: JSON.stringify({ configRevision, values, files, clientSubmissionId }),
+      body: JSON.stringify({ configRevision, values, files, clientSubmissionId, utm: getUtm() }),
     });
 
     if (!res.ok) {

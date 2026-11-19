@@ -1,15 +1,24 @@
 import crypto from 'node:crypto';
-import { chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type {
   FileUpload,
   SaveFileMetadata,
+  ResumableUploadMetadata,
   TemporaryFileRecord,
   TemporaryFileStoragePort,
 } from '../../ports/file-storage.js';
 import type { TemporaryUploadRepository } from '../../ports/temporary-upload-repository.js';
 
-export type FileStorageErrorCode = 'FORBIDDEN' | 'FILE_EXPIRED' | 'FILE_ALREADY_SUBMITTED';
+export type FileStorageErrorCode =
+  | 'FORBIDDEN'
+  | 'FILE_EXPIRED'
+  | 'FILE_ALREADY_SUBMITTED'
+  | 'NOT_FOUND'
+  | 'OFFSET_MISMATCH'
+  | 'UPLOAD_INCOMPLETE'
+  | 'INVALID_MIME_TYPE'
+  | 'FILE_TOO_LARGE';
 
 /** Error de dominio del almacenamiento: el código permite mapear a HTTP sin comparar mensajes. */
 export class FileStorageError extends Error {
@@ -22,6 +31,7 @@ export class FileStorageError extends Error {
 const UNAUTHORIZED = 'Acceso no autorizado al archivo temporal';
 const RETAINED_DIR = 'retained';
 const DELETING_DIR = 'deleting';
+const RESUMABLE_DIR = 'resumable';
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const TOKEN_PATTERN = /^[a-f0-9]{32}$/;
 
@@ -46,6 +56,12 @@ interface StoredMetadata {
   pinnedFor?: string;
 }
 
+interface ResumableMetadata extends ResumableUploadMetadata {
+  sessionId: string;
+  fieldKey: string;
+  createdAt: string;
+}
+
 /**
  * Los archivos viven en tres sitios dentro de `rootDir`, todos en el mismo volumen:
  *   <root>/<token>/            subida reciente ("pendiente", vence por TTL)
@@ -60,6 +76,91 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
   constructor(private readonly options: TemporaryFileStorageOptions) {
     this.ttlMs = options.ttlMs ?? 30 * 60 * 1000;
     this.repository = options.repository;
+  }
+
+  async beginResumable(sessionId: string, fieldKey: string, upload: ResumableUploadMetadata): Promise<{ uploadId: string; offset: number }> {
+    if (!this.options.allowedMimeTypes.includes(upload.mimeType)) throw new FileStorageError('INVALID_MIME_TYPE', `El tipo de archivo no está permitido: ${upload.mimeType}`);
+    if (upload.size > this.options.maxBytes) throw new FileStorageError('FILE_TOO_LARGE', `El tamaño del archivo supera el máximo de ${this.options.maxBytes} bytes`);
+    const uploadId = crypto.randomBytes(16).toString('hex');
+    const directory = join(this.options.rootDir, RESUMABLE_DIR, uploadId);
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    await writeFile(join(directory, 'payload'), Buffer.alloc(0), { mode: 0o600 });
+    await writeFile(join(directory, 'metadata.json'), JSON.stringify({ ...upload, sessionId, fieldKey, createdAt: new Date().toISOString() }), { mode: 0o600 });
+    return { uploadId, offset: 0 };
+  }
+
+  async getResumableOffset(uploadId: string, sessionId: string): Promise<number> {
+    const { directory } = await this.readResumable(uploadId, sessionId);
+    return (await stat(join(directory, 'payload'))).size;
+  }
+
+  async appendResumable(uploadId: string, sessionId: string, offset: number, chunk: Buffer): Promise<number> {
+    const { directory, metadata } = await this.readResumable(uploadId, sessionId);
+    const payload = join(directory, 'payload');
+    const current = (await stat(payload)).size;
+    if (current !== offset) throw new FileStorageError('OFFSET_MISMATCH', `Offset inválido: el servidor confirmó ${current} bytes.`);
+    if (current + chunk.byteLength > metadata.size) throw new FileStorageError('FILE_TOO_LARGE', 'El fragmento supera el tamaño declarado.');
+    // Escritura en posición explícita: un reintento concurrente en el mismo offset pisa los mismos bytes en vez de duplicarlos.
+    const handle = await open(payload, 'r+');
+    try {
+      await handle.write(chunk, 0, chunk.byteLength, offset);
+    } finally {
+      await handle.close();
+    }
+    return current + chunk.byteLength;
+  }
+
+  /** Cantidad de cargas reanudables en curso de la sesión para el campo (acota el disco usado). */
+  async countResumable(sessionId: string, fieldKey: string): Promise<number> {
+    const root = join(this.options.rootDir, RESUMABLE_DIR);
+    let count = 0;
+    for (const uploadId of await readdir(root).catch(() => [] as string[])) {
+      if (!TOKEN_PATTERN.test(uploadId)) continue;
+      try {
+        const metadata = JSON.parse(await readFile(join(root, uploadId, 'metadata.json'), 'utf8')) as ResumableMetadata;
+        if (metadata.sessionId === sessionId && metadata.fieldKey === fieldKey) count++;
+      } catch {}
+    }
+    return count;
+  }
+
+  /** `check` corre con los datos declarados antes de guardar; si lanza, la carga en curso se descarta. */
+  async finishResumable(
+    uploadId: string,
+    sessionId: string,
+    check?: (upload: { targetId?: string; fieldKey: string; size: number }) => Promise<void>,
+  ): Promise<TemporaryFileRecord> {
+    const { directory, metadata } = await this.readResumable(uploadId, sessionId);
+    const data = await readFile(join(directory, 'payload'));
+    if (data.byteLength !== metadata.size) throw new FileStorageError('UPLOAD_INCOMPLETE', `La carga está incompleta: ${data.byteLength} de ${metadata.size} bytes.`);
+    if (check) {
+      try {
+        await check(metadata);
+      } catch (error) {
+        await rm(directory, { recursive: true, force: true });
+        throw error;
+      }
+    }
+    const saved = await this.save(sessionId, metadata.fieldKey, {
+      originalName: metadata.originalName, mimeType: metadata.mimeType, data,
+    }, { targetId: metadata.targetId });
+    await rm(directory, { recursive: true, force: true });
+    return saved;
+  }
+
+  private async readResumable(uploadId: string, sessionId: string): Promise<{ directory: string; metadata: ResumableMetadata }> {
+    // Id desconocido y sesión ajena responden igual: no se revela si la carga existe.
+    const notFound = () => new FileStorageError('NOT_FOUND', 'Carga no encontrada.');
+    if (!TOKEN_PATTERN.test(uploadId)) throw notFound();
+    const directory = join(this.options.rootDir, RESUMABLE_DIR, uploadId);
+    let metadata: ResumableMetadata;
+    try {
+      metadata = JSON.parse(await readFile(join(directory, 'metadata.json'), 'utf8')) as ResumableMetadata;
+    } catch (error) {
+      throw isFsError(error, ['ENOENT', 'ENOTDIR']) ? notFound() : error;
+    }
+    if (metadata.sessionId !== sessionId) throw notFound();
+    return { directory, metadata };
   }
 
   async save(
@@ -400,6 +501,7 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
   /** Limpia solo archivos pendientes vencidos. Nunca toca `retained/`. */
   async cleanup(before: number): Promise<number> {
     await this.purgeDeleting();
+    await this.cleanupResumable(before);
     let removed = 0;
 
     if (this.repository) {
@@ -438,6 +540,22 @@ export class TemporaryFileStorage implements TemporaryFileStoragePort {
       } catch {}
     }
     return removed;
+  }
+
+  private async cleanupResumable(before: number): Promise<void> {
+    const root = join(this.options.rootDir, RESUMABLE_DIR);
+    for (const uploadId of await readdir(root).catch(() => [] as string[])) {
+      if (!TOKEN_PATTERN.test(uploadId)) continue;
+      const directory = join(root, uploadId);
+      try {
+        // Sin metadatos legibles la edad sale del mtime del directorio, para que nunca quede huérfano.
+        const createdAt = await readFile(join(directory, 'metadata.json'), 'utf8')
+          .then((raw) => new Date((JSON.parse(raw) as ResumableMetadata).createdAt).getTime())
+          .catch(() => NaN);
+        const age = Number.isNaN(createdAt) ? (await stat(directory)).mtimeMs : createdAt;
+        if (age + this.ttlMs < before) await rm(directory, { recursive: true, force: true });
+      } catch {}
+    }
   }
 
   /**
