@@ -35,8 +35,20 @@ describe('UniversalFields identity and contact controls', () => {
     fireEvent.change(screen.getByLabelText(/País del teléfono/i), { target: { value: 'UY' } });
     fireEvent.change(screen.getByLabelText(/^Celular/), { target: { value: '099 123 456' } });
 
+    expect(onChange).toHaveBeenLastCalledWith('celular', '099 123 456');
+    fireEvent.blur(screen.getByLabelText(/^Celular/));
     expect(onChange).toHaveBeenLastCalledWith('celular', '+59899123456');
     expect(screen.getByText('Se guardará como +59899123456.')).toBeInTheDocument();
+  });
+
+  it('does not replace the Salvadoran number while typing', () => {
+    const onChange = vi.fn();
+    render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText(/País del teléfono/i), { target: { value: 'SV' } });
+    fireEvent.change(screen.getByLabelText(/^Celular/), { target: { value: '70123456' } });
+    expect(screen.getByLabelText(/^Celular/)).toHaveValue('70123456');
+    fireEvent.blur(screen.getByLabelText(/^Celular/));
+    expect(onChange).toHaveBeenLastCalledWith('celular', '+50370123456');
   });
 
   it('keeps El Salvador and +503 after unmounting and remounting the contact step', () => {
