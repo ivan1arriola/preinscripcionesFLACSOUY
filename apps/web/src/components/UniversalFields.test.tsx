@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { InputDefinition } from '@flacso/contracts';
+import { getCountryCallingCode, parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
 import { UniversalFields } from './UniversalFields.js';
 
 const inputs: InputDefinition[] = [
@@ -184,3 +185,53 @@ describe('UniversalFields stable layout, autocomplete and blur', () => {
     expect(field.getAttribute('aria-describedby')).toContain('error-nombre1');
   });
 });
+
+// Números de ejemplo para pruebas: no representan datos personales de postulantes.
+const internationalPhoneCases: Array<{ country: CountryCode; national: string; e164: string }> = [
+  { country: 'UY', national: '099 123 456', e164: '+59899123456' },
+  { country: 'SV', national: '7012 3456', e164: '+50370123456' },
+  { country: 'AR', national: '11 2345 6789', e164: '+541123456789' },
+  { country: 'BR', national: '11 91234 5678', e164: '+5511912345678' },
+  { country: 'CL', national: '9 6123 4567', e164: '+56961234567' },
+  { country: 'CO', national: '321 1234567', e164: '+573211234567' },
+  { country: 'MX', national: '55 1234 5678', e164: '+525512345678' },
+  { country: 'PE', national: '912 345 678', e164: '+51912345678' },
+  { country: 'ES', national: '612 345 678', e164: '+34612345678' },
+  { country: 'US', national: '202 555 0123', e164: '+12025550123' },
+];
+
+describe('International phone regression matrix', () => {
+  it.each(internationalPhoneCases)('accepts and restores a valid number for $country', ({ country, national, e164 }) => {
+    const parsed = parsePhoneNumberFromString(national, country);
+    expect(parsed?.isValid()).toBe(true);
+    expect(parsed?.number).toBe(e164);
+
+    const onChange = vi.fn();
+    const { unmount } = render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText(/País del teléfono/i), { target: { value: country } });
+    expect(screen.getByText(`+${getCountryCallingCode(country)}`)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/^Celular/), { target: { value: national } });
+    expect(screen.getByLabelText(/^Celular/)).toHaveValue(national);
+    fireEvent.blur(screen.getByLabelText(/^Celular/));
+    expect(onChange).toHaveBeenLastCalledWith('celular', e164);
+    unmount();
+
+    render(<UniversalFields inputs={inputs} values={{ celular: e164 }} errors={{}} disabled={false} onChange={vi.fn()} />);
+    expect(screen.getByLabelText(/País del teléfono/i)).toHaveValue(country);
+    expect(screen.getByText(`+${getCountryCallingCode(country)}`)).toBeInTheDocument();
+  });
+
+  it.each([
+    { country: 'SV' as CountryCode, national: '123', expected: 'El número no es válido para el país seleccionado.' },
+    { country: 'UY' as CountryCode, national: '123', expected: 'El número no es válido para el país seleccionado.' },
+  ])('rejects incomplete numbers for $country', ({ country, national, expected }) => {
+    const onChange = vi.fn();
+    render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText(/País del teléfono/i), { target: { value: country } });
+    fireEvent.change(screen.getByLabelText(/^Celular/), { target: { value: national } });
+    fireEvent.blur(screen.getByLabelText(/^Celular/));
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalledWith('celular', expect.stringMatching(/^\\+/));
+  });
+});
+
