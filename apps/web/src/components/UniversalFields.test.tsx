@@ -39,6 +39,27 @@ describe('UniversalFields identity and contact controls', () => {
     expect(screen.getByText('Se guardará como +59899123456.')).toBeInTheDocument();
   });
 
+  it('keeps El Salvador and +503 after unmounting and remounting the contact step', () => {
+    const onChange = vi.fn();
+    const { unmount } = render(<UniversalFields inputs={inputs} values={{ celular: '' }} errors={{}} disabled={false} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText(/País del teléfono/i), { target: { value: 'SV' } });
+    expect(screen.getByText('+503')).toBeInTheDocument();
+    unmount();
+
+    render(<UniversalFields inputs={inputs} values={{ celular: '+50370123456' }} errors={{}} disabled={false} onChange={onChange} />);
+    expect(screen.getByLabelText(/País del teléfono/i)).toHaveValue('SV');
+    expect(screen.getByText('+503')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Celular/)).toHaveValue('7012 3456');
+  });
+
+  it('clears an old international number when switching its country', () => {
+    const onChange = vi.fn();
+    render(<UniversalFields inputs={inputs} values={{ celular: '+59899123456' }} errors={{}} disabled={false} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText(/País del teléfono/i), { target: { value: 'SV' } });
+    expect(onChange).toHaveBeenCalledWith('celular', '');
+    expect(screen.getByLabelText(/País del teléfono/i)).toHaveValue('SV');
+  });
+
   it('presents yes-or-no answers as radio buttons', () => {
     render(<UniversalFields inputs={inputs} values={{}} errors={{}} disabled={false} onChange={vi.fn()} />);
 
