@@ -72,8 +72,8 @@ const SECTIONS: Section[] = [
   },
 ];
 
-/** Campos que solo se solicitan si se cumple su condición. */
-const OPTIONAL_KEYS = new Set(['nombre2', 'apellido2', 'generoOtra', 'posgradoCual', 'mencion', 'convenioWordpressId']);
+/** Campos opcionales o que solo se solicitan si se cumple su condición. */
+const OPTIONAL_KEYS = new Set(['nombre2', 'apellido2', 'generoOtra', 'posgradoCual', 'mencion', 'convenioWordpressId', 'sinTituloActual']);
 
 function isApplicable(key: string, snapshot: SubmissionNotificationSnapshot): boolean {
   const answer = (field: string) => snapshot.values[field]?.value?.trim().toLowerCase() ?? '';
@@ -499,3 +499,4 @@ export function renderAllNotifications(
 
   return notifications;
 }
+
