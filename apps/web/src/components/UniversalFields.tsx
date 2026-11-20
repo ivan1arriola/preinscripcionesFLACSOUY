@@ -76,8 +76,15 @@ const documentHint = (type: string | undefined) => {
 };
 
 export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values, errors, disabled, onChange, onBlurField, agreements = [] }) => {
-  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('UY');
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(() =>
+    parsePhoneNumberFromString(values.celular ?? '')?.country ?? 'UY'
+  );
   const [phoneStatus, setPhoneStatus] = useState('');
+  // El asistente desmonta pasos: recuperar el país desde el valor internacional persistido.
+  useEffect(() => {
+    const storedCountry = parsePhoneNumberFromString(values.celular ?? '')?.country;
+    if (storedCountry && storedCountry !== phoneCountry) setPhoneCountry(storedCountry);
+  }, [values.celular]); // eslint-disable-line react-hooks/exhaustive-deps
   const [cedulaStatus, setCedulaStatus] = useState('');
   const FlagComponent = Flags[phoneCountry as keyof typeof Flags] as React.ComponentType<{ className?: string; title?: string }> | undefined;
   const isUruguayanCedula = values.tipoDocumento === 'cedula_uruguaya';
@@ -144,7 +151,13 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
               className="phone-country-select"
               value={phoneCountry}
               disabled={disabled}
-              onChange={(event) => setPhoneCountry(event.target.value as CountryCode)}
+              onChange={(event) => {
+                const country = event.target.value as CountryCode;
+                setPhoneCountry(country);
+                setPhoneStatus('');
+                // Un número anterior no debe seguir guardado bajo un prefijo distinto.
+                if (values.celular) onChange('celular', '');
+              }}
             >
               {getCountries().map((country) => (
                 <option key={country} value={country}>
