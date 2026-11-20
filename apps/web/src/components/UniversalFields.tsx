@@ -76,8 +76,22 @@ const documentHint = (type: string | undefined) => {
 };
 
 export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values, errors, disabled, onChange, onBlurField, agreements = [] }) => {
-  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('UY');
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>(() =>
+    parsePhoneNumberFromString(values.celular ?? '')?.country ?? 'UY'
+  );
   const [phoneStatus, setPhoneStatus] = useState('');
+  const [phoneDraft, setPhoneDraft] = useState(() => {
+    const saved = values.celular ?? '';
+    return saved.startsWith('+') ? parsePhoneNumberFromString(saved)?.formatNational() ?? saved : saved;
+  });
+  // El asistente desmonta pasos: recuperar el país desde el valor internacional persistido.
+  useEffect(() => {
+    const storedCountry = parsePhoneNumberFromString(values.celular ?? '')?.country;
+    if (storedCountry && storedCountry !== phoneCountry) setPhoneCountry(storedCountry);
+    const saved = values.celular ?? '';
+    const displayed = saved.startsWith('+') ? parsePhoneNumberFromString(saved)?.formatNational() ?? saved : saved;
+    setPhoneDraft(displayed);
+  }, [values.celular]); // eslint-disable-line react-hooks/exhaustive-deps
   const [cedulaStatus, setCedulaStatus] = useState('');
   const FlagComponent = Flags[phoneCountry as keyof typeof Flags] as React.ComponentType<{ className?: string; title?: string }> | undefined;
   const isUruguayanCedula = values.tipoDocumento === 'cedula_uruguaya';
@@ -103,23 +117,29 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
   };
 
   const updatePhone = (raw: string) => {
+    setPhoneDraft(raw);
+    // Conservar lo escrito sin reformatearlo durante la edición.
+    onChange('celular', raw);
+    setPhoneStatus('');
+  };
+
+  const finishPhone = () => {
+    const raw = phoneDraft.trim();
     const phone = parsePhoneNumberFromString(raw, phoneCountry);
-    if (!phone?.isValid()) {
-      setPhoneStatus(raw.trim() ? 'El número no es válido para el país seleccionado.' : 'Seleccioná el país e ingresá el número.');
-      onChange('celular', raw);
-      return;
+    if (!phone?.isValid() || phone.country !== phoneCountry) {
+      setPhoneStatus(raw ? 'El número no es válido para el país seleccionado.' : 'Seleccioná el país e ingresá el número.');
+    } else {
+      setPhoneStatus(`Se guardará como ${phone.number}.`);
+      onChange('celular', phone.number);
     }
-    setPhoneStatus(`Se guardará como ${phone.number}.`);
-    onChange('celular', phone.number);
+    onBlurField?.('celular');
   };
 
   return <div className="fields-grid">{inputs.filter(visible).map((input) => {
     const issuerLocked = input.key === 'paisEmisorDocumento' && isUruguayanCedula;
     const value = issuerLocked ? 'Uruguay' : values[input.key] || ''; const error = errors[input.key]; const options = choices[input.key];
     const label = input.key === 'documento' && isUruguayanCedula ? 'Cédula de identidad uruguaya' : input.label;
-    const phoneInputValue = input.key === 'celular' && value.startsWith('+')
-      ? parsePhoneNumberFromString(value)?.formatNational() ?? value
-      : value;
+    const phoneInputValue = input.key === 'celular' ? phoneDraft : value;
     const errorId = `error-${input.key}`;
     const describedBy = (...ids: Array<string | false | undefined>) => ids.filter(Boolean).join(' ') || undefined;
     const invalid = error ? true : undefined;
@@ -144,7 +164,14 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
               className="phone-country-select"
               value={phoneCountry}
               disabled={disabled}
-              onChange={(event) => setPhoneCountry(event.target.value as CountryCode)}
+              onChange={(event) => {
+                const country = event.target.value as CountryCode;
+                setPhoneCountry(country);
+                setPhoneStatus('');
+                // Un número anterior no debe seguir guardado bajo un prefijo distinto.
+                setPhoneDraft('');
+                if (values.celular) onChange('celular', '');
+              }}
             >
               {getCountries().map((country) => (
                 <option key={country} value={country}>
@@ -159,7 +186,7 @@ export const UniversalFields: React.FC<UniversalFieldsProps> = ({ inputs, values
             type="tel"
             value={phoneInputValue}
             onChange={(event) => updatePhone(event.target.value)}
-            onBlur={blur}
+            onBlur={finishPhone}
             disabled={disabled}
             placeholder={phonePlaceholderFor(phoneCountry)}
             autoComplete={autoComplete}
