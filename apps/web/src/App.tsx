@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { DiagnosticTarget } from '@flacso/contracts';
 import { apiClient } from './api/client';
+import { initTracking } from './api/meta-pixel';
 import { HomePage } from './pages/HomePage';
 import { TargetPage } from './pages/TargetPage';
 import { AdminLoginPage } from './pages/AdminLoginPage';
@@ -25,6 +26,11 @@ export function App() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAdminChecking, setIsAdminChecking] = useState(() => isAdminPath(path) && path !== ADMIN_CALLBACK_PATH);
+
+  useEffect(() => {
+    if (isAdminPath(path)) return;
+    apiClient.getPublicConfig().then(initTracking).catch(() => {});
+  }, [path]);
 
   useEffect(() => {
     const onPopState = () => setPath(normalizePath(window.location.pathname));

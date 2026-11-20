@@ -134,12 +134,12 @@ describe('reCAPTCHA in the HTTP app', () => {
   it('publishes only the public site key at /api/config', async () => {
     await withApp(async () => ({ status: 'passed', score: 1 }), enable, async ({ baseUrl }) => {
       const body = await (await fetch(`${baseUrl}/api/config`)).json();
-      expect(body).toEqual({ meta: { pixelId: null }, recaptcha: { enabled: true, siteKey: 'sitio-publico', action: RECAPTCHA_ACTION } });
+      expect(body).toEqual({ meta: { pixelId: null }, ga4: { measurementId: null }, recaptcha: { enabled: true, siteKey: 'sitio-publico', action: RECAPTCHA_ACTION } });
       expect(JSON.stringify(body)).not.toContain('clave-secreta');
     });
 
     await withApp(async () => ({ status: 'passed', score: 1 }), async () => undefined, async ({ baseUrl }) => {
-      expect(await (await fetch(`${baseUrl}/api/config`)).json()).toEqual({ meta: { pixelId: null }, recaptcha: { enabled: false } });
+      expect(await (await fetch(`${baseUrl}/api/config`)).json()).toEqual({ meta: { pixelId: null }, ga4: { measurementId: null }, recaptcha: { enabled: false } });
     });
   });
 

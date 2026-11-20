@@ -26,6 +26,7 @@ import * as offerRegistrationLinksSchema from './migrations/026_offer_registrati
 import * as submissionProtocolSchema from './migrations/027_submission_protocol.js';
 import * as sheetPayloadSchema from './migrations/028_sheet_payload.js';
 import * as campaignTrackingSchema from './migrations/029_campaign_tracking.js';
+import * as campaignTrackingCountryIdsSchema from './migrations/030_campaign_tracking_country_ids.js';
 
 export async function runMigrations(db = createKyselyDb()): Promise<void> {
   console.log('Running migrations...');
@@ -56,6 +57,7 @@ export async function runMigrations(db = createKyselyDb()): Promise<void> {
   await submissionProtocolSchema.up(db);
   await sheetPayloadSchema.up(db);
   await campaignTrackingSchema.up(db);
+  await campaignTrackingCountryIdsSchema.up(db);
   console.log('Migrations complete.');
 }
 

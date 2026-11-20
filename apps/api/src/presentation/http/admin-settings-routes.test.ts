@@ -148,8 +148,8 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
 
   describe('GET /campaign-tracking.csv', () => {
     const tracking = (correo: string, nombre = 'Ana') => ({
-      nombre, apellido: 'Pérez', correo, oferta: 'Maestría X', ofertaTipo: 'academic_offer', edicion: 'Cohorte 1',
-      utm: { utm_source: 'ig', utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null },
+      nombre, apellido: 'Pérez', correo, oferta: 'Maestría X', ofertaTipo: 'academic_offer', edicion: 'Cohorte 1', pais: null,
+      utm: { utm_source: 'ig', utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null, fbclid: null },
     });
     let csvUrl: string;
     let csvServer: Server;
@@ -188,9 +188,9 @@ describe('Admin Settings Routes (/api/admin/settings)', () => {
       expect(res.headers.get('content-disposition')).toMatch(/^attachment; filename="seguimiento-campanias-\d{4}-\d{2}-\d{2}\.csv"$/);
       expect(res.headers.get('cache-control')).toBe('no-store');
       const text = Buffer.from(await res.arrayBuffer()).toString('utf8'); // res.text() descartaría el BOM
-      expect(text.startsWith('﻿fecha_hora,nombre,apellido,correo,oferta,tipo,edicion,utm_source,utm_medium,utm_campaign,utm_term,utm_content\r\n')).toBe(true);
+      expect(text.startsWith('﻿fecha_hora,nombre,apellido,correo,oferta,tipo,edicion,pais,utm_source,utm_medium,utm_campaign,utm_term,utm_content,utm_id,fbclid\r\n')).toBe(true);
       const lines = text.trim().split('\r\n');
-      expect(lines[1]).toBe('2026-03-11 22:30:00,Ana,Pérez,b@x.com,Maestría X,academic_offer,Cohorte 1,ig,,,,');
+      expect(lines[1]).toBe('2026-03-11 22:30:00,Ana,Pérez,b@x.com,Maestría X,academic_offer,Cohorte 1,,ig,,,,,,');
       expect(lines[2]).toContain("'=cmd");
     });
 

@@ -91,6 +91,8 @@ const submissionSchema = z.object({
     utm_campaign: z.string().max(200).optional(),
     utm_term: z.string().max(200).optional(),
     utm_content: z.string().max(200).optional(),
+    utm_id: z.string().max(200).optional(),
+    fbclid: z.string().max(200).optional(),
   }).optional(),
   files: z.array(z.object({
     token: z.string(), fieldKey: z.string(), originalName: z.string(), size: z.number(), mimeType: z.string(),
@@ -362,6 +364,11 @@ export function createSubmissionRoutes(
           ...readMetaCookies(req.headers.cookie),
           contentName: result.target.title,
           contentId: `oferta-${result.target.id}`,
+          email: result.normalizedValues.email,
+          phone: result.normalizedValues.celular,
+          firstName: result.normalizedValues.nombre1,
+          lastName: result.normalizedValues.apellido1,
+          country: result.normalizedValues.paisResidencia,
         });
       }
 

@@ -1,7 +1,7 @@
 import type { AcademicTarget } from '@flacso/contracts';
 import { joinNames } from './mautic-contact.js';
 
-export const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'] as const;
+export const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'fbclid'] as const;
 export type UtmKey = (typeof UTM_KEYS)[number];
 
 /** Único dato que se guarda para el análisis de campañas (tabla campaign_tracking). */
@@ -12,6 +12,7 @@ export interface CampaignTrackingRecord {
   oferta: string;
   ofertaTipo: string;
   edicion: string | null;
+  pais: string | null;
   utm: Record<UtmKey, string | null>;
 }
 
@@ -38,6 +39,7 @@ export function buildCampaignTracking(
     oferta: target.offer?.name ?? target.seminar?.name ?? target.title,
     ofertaTipo: target.kind,
     edicion: nameOrNumber(target.kind === 'seminar' ? target.edition : target.cohort),
+    pais: values.paisResidencia?.trim() || null,
     utm: Object.fromEntries(UTM_KEYS.map((key) => [key, utm[key]?.trim() || null])) as Record<UtmKey, string | null>,
   };
 }

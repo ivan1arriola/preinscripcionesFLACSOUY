@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { getCountries } from 'libphonenumber-js';
 
 const GRAPH_API_VERSION = 'v25.0';
 
@@ -12,6 +13,13 @@ export interface SubmitApplicationEvent {
   fbc?: string;
   contentName?: string;
   contentId?: string;
+  /** Datos personales crudos: se normalizan y hashean aquí antes de salir hacia Meta. */
+  email?: string;
+  phone?: string;
+  firstName?: string;
+  lastName?: string;
+  /** Nombre del país en español, tal como se guarda en paisResidencia. */
+  country?: string;
 }
 
 export interface MetaCapiTracker {
@@ -46,6 +54,19 @@ function hashed(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+const plain = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const plainName = (text: string) => plain(text).replace(/[^a-z ]/g, '').trim();
+
+// Nombre en español -> ISO-2; misma lista y nombres que apps/web/src/domain/countries.ts.
+const regionNames = typeof Intl.DisplayNames === 'function' ? new Intl.DisplayNames(['es'], { type: 'region' }) : undefined;
+const ISO_BY_NAME = new Map(getCountries().map((code) => [plain(regionNames?.of(code) ?? code), code.toLowerCase()]));
+
+/** Valor normalizado según Meta y hasheado; vacío tras normalizar -> se omite. */
+function addHashed(target: Record<string, string>, key: string, value: string | undefined, normalize: (v: string) => string) {
+  const normalized = normalize(value ?? '');
+  if (normalized) target[key] = hashed(normalized);
+}
+
 /**
  * Envía SubmitApplication por Conversions API. El seguimiento es auxiliar: `sendSubmitApplication`
  * nunca lanza, para que un fallo de Meta no afecte la preinscripción.
@@ -63,6 +84,11 @@ export function createMetaCapiTracker(options: MetaCapiOptions): MetaCapiTracker
         if (event.userAgent) userData.client_user_agent = event.userAgent;
         if (event.fbp) userData.fbp = event.fbp;
         if (event.fbc) userData.fbc = event.fbc;
+        addHashed(userData, 'em', event.email, (v) => v.trim().toLowerCase());
+        addHashed(userData, 'ph', event.phone, (v) => v.replace(/\D/g, ''));
+        addHashed(userData, 'fn', event.firstName, plainName);
+        addHashed(userData, 'ln', event.lastName, plainName);
+        addHashed(userData, 'country', event.country, (v) => ISO_BY_NAME.get(plain(v)) ?? '');
 
         const body: Record<string, unknown> = {
           data: [

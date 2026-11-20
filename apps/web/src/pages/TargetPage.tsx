@@ -74,7 +74,7 @@ export const TargetPage: React.FC<TargetPageProps> = ({ targetId, onBack }) => {
       const res = await apiClient.submit(targetId, form.effectiveRevision, values, files, clientSubmissionIdRef.current, recaptchaToken);
       setPendingProcessing(res.status === 'pending_processing');
       setSubmissionId(res.submissionId);
-      if (!res.existing) void trackSubmitApplication(res.submissionId, form.title);
+      if (!res.existing) void trackSubmitApplication(res.submissionId, form.title, values);
     } catch (err) {
       const expired = expiredFileFields(err);
       if (expired.length > 0) {

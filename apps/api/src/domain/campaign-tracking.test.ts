@@ -24,8 +24,16 @@ describe('buildCampaignTracking', () => {
       oferta: 'Maestría en Género',
       ofertaTipo: 'academic_offer',
       edicion: 'Cohorte VI',
-      utm: { utm_source: 'ig', utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null },
+      pais: null,
+      utm: { utm_source: 'ig', utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null, utm_id: null, fbclid: null },
     });
+  });
+
+  it('guarda el país de residencia, utm_id y fbclid', () => {
+    const row = buildCampaignTracking(offerTarget, { ...values, paisResidencia: ' Uruguay ' }, { utm_id: '123', fbclid: 'abc' });
+    expect(row.pais).toBe('Uruguay');
+    expect(row.utm.utm_id).toBe('123');
+    expect(row.utm.fbclid).toBe('abc');
   });
 
   it('usa la edición del seminario, o su número si no tiene nombre', () => {

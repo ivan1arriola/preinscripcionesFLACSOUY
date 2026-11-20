@@ -361,10 +361,10 @@ export function createAdminSettingsRoutes(
       to: to ? montevideoDayStart(to) : undefined,
     });
     const csv = toCsv(
-      ['fecha_hora', 'nombre', 'apellido', 'correo', 'oferta', 'tipo', 'edicion', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'],
+      ['fecha_hora', 'nombre', 'apellido', 'correo', 'oferta', 'tipo', 'edicion', 'pais', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'fbclid'],
       rows.map((row) => [
-        montevideoTime.format(row.createdAt), row.nombre, row.apellido, row.correo, row.oferta, row.ofertaTipo, row.edicion,
-        row.utm.utm_source, row.utm.utm_medium, row.utm.utm_campaign, row.utm.utm_term, row.utm.utm_content,
+        montevideoTime.format(row.createdAt), row.nombre, row.apellido, row.correo, row.oferta, row.ofertaTipo, row.edicion, row.pais,
+        row.utm.utm_source, row.utm.utm_medium, row.utm.utm_campaign, row.utm.utm_term, row.utm.utm_content, row.utm.utm_id, row.utm.fbclid,
       ]),
     );
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

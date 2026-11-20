@@ -84,9 +84,8 @@ Los secretos deben tener permisos restrictivos y nunca se deben copiar al reposi
 
 ### Seguimiento de campañas (UTM)
 
-Cada preinscripción enviada deja una fila en la tabla `campaign_tracking` (se crea con la migración 029), en la misma transacción
-que la preinscripción. Guarda sólo: nombre, apellido, correo, oferta (o seminario), edición (o cohorte), los cinco parámetros
-`utm_*` y la fecha y hora. También se registran los envíos sin UTM, para poder comparar con el tráfico orgánico.
+Cada preinscripción enviada deja una fila en la tabla `campaign_tracking` (se crea con la migración 029; la 030 suma país, `utm_id` y `fbclid`), en la misma transacción
+que la preinscripción. Guarda sólo: nombre, apellido, correo, oferta (o seminario), edición (o cohorte), `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`, `utm_id` y `fbclid`, más `pais`, y la fecha y hora. También se registran los envíos sin UTM, para poder comparar con el tráfico orgánico.
 
 **Contiene datos personales.** Se descarga desde el panel de administración, pestaña Seguridad, tarjeta "Seguimiento de campañas"
 (rango de fechas opcional), o con `GET /api/admin/settings/campaign-tracking.csv?from=AAAA-MM-DD&to=AAAA-MM-DD`, que exige sesión

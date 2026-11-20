@@ -188,7 +188,9 @@ export function createApp(dependencies: AppDependencies): Express {
       // Sin configuración legible el formulario sigue funcionando sin reCAPTCHA.
     }
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ recaptcha, meta: metaTracker ? { pixelId: metaTracker.pixelId } : { pixelId: null } });
+    res.json({ recaptcha, meta: metaTracker ? { pixelId: metaTracker.pixelId } : { pixelId: null },
+      ga4: { measurementId: process.env.GA4_MEASUREMENT_ID?.trim() || null },
+    });
   });
 
   // Antes de las rutas de destinos: primero el límite de frecuencia, después el reCAPTCHA.

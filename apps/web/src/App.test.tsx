@@ -13,6 +13,7 @@ vi.mock('./api/client.js', async () => {
       getTarget: vi.fn(),
       submit: vi.fn(),
       getAdminMe: vi.fn(),
+      getPublicConfig: vi.fn(),
       adminLogin: vi.fn(),
       adminLogout: vi.fn(),
     },
@@ -51,6 +52,7 @@ describe('App legacy registration routes', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(apiClient.getPublicConfig).mockResolvedValue({ recaptcha: { enabled: false } });
     vi.mocked(apiClient.getAdminMe).mockRejectedValue(new Error('Unauthorized'));
     window.history.replaceState({}, '', '/oferta/maestria-en-genero/');
   });
@@ -117,6 +119,21 @@ describe('App legacy registration routes', () => {
 
     expect(await screen.findByRole('heading', { name: 'Acceso Administrativo' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Iniciar sesión con Google (FLACSO)' })).toBeInTheDocument();
+  });
+
+  it('does not initialize tracking on admin routes or OAuth callback', async () => {
+    window.history.replaceState({}, '', '/admin/perfiles');
+    const { unmount } = render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Acceso Administrativo' })).toBeInTheDocument();
+    expect(apiClient.getPublicConfig).not.toHaveBeenCalled();
+    unmount();
+
+    window.history.replaceState({}, '', '/accounts/google/login/callback');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Acceso Administrativo' })).toBeInTheDocument();
+    expect(apiClient.getPublicConfig).not.toHaveBeenCalled();
   });
 
   describe('seminar permalink resolution in App', () => {

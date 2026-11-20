@@ -1,7 +1,8 @@
-const KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'] as const;
+const KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_id', 'fbclid'] as const;
 const STORE_KEY = 'flacso:utm';
+const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** Una URL con UTM reemplaza lo guardado; sin UTM se conserva la última campaña con la que llegó. */
+/** Una URL con UTM reemplaza lo guardado (30 días en localStorage); sin UTM se conserva la última fuente vigente. */
 function capture(): Record<string, string> {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -10,10 +11,15 @@ function capture(): Record<string, string> {
       const value = params.get(key)?.trim().slice(0, 200);
       if (value) found[key] = value;
     }
-    if (Object.keys(found).length > 0) sessionStorage.setItem(STORE_KEY, JSON.stringify(found));
-    return JSON.parse(sessionStorage.getItem(STORE_KEY) ?? '{}');
+    if (Object.keys(found).length > 0) {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ utm: found, exp: Date.now() + TTL_MS }));
+      return found;
+    }
+    const stored = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null');
+    if (stored && typeof stored.exp === 'number' && stored.exp > Date.now()) return stored.utm ?? {};
+    return {};
   } catch {
-    return {}; // sessionStorage bloqueado: se pierde el UTM, nunca se rompe el envío
+    return {}; // storage bloqueado: se pierde el UTM, nunca se rompe el envío
   }
 }
 

@@ -61,6 +61,9 @@ export interface CampaignTrackingTable {
   oferta: string;
   oferta_tipo: string;
   edicion: string | null;
+  pais: string | null;
+  utm_id: string | null;
+  fbclid: string | null;
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;

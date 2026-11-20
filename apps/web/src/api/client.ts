@@ -692,6 +692,7 @@ export const apiClient = {
 export interface PublicConfig {
   recaptcha: { enabled: boolean; siteKey?: string; action?: string };
   meta?: { pixelId: string | null };
+  ga4?: { measurementId: string | null };
 }
 
 export interface AdminRecaptchaSettings {
