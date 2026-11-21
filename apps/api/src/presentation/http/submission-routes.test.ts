@@ -137,6 +137,8 @@ describe('Submission HTTP Routes', () => {
       fbc: 'fb.1.1700000000.abc',
       eventSourceUrl: 'https://preinscripciones.flacso.edu.uy/diploma-en-genero',
     });
+    expect(data.offerCode).toBeTruthy();
+    expect(metaEvents[0]!.offerCode).toBe(data.offerCode);
 
     const queuedNotifications = await notificationRepository.listNotifications({ submissionId: data.submissionId });
     expect(queuedNotifications.length).toBeGreaterThan(0);

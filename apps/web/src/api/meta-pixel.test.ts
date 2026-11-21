@@ -40,6 +40,12 @@ describe('trackSubmitApplication', () => {
     expect(calls.at(-1)).toEqual(['track', 'SubmitApplication', { content_category: 'preinscripcion', content_name: 'Diploma en Género' }, { eventID: 'sub_1' }]);
   });
 
+  it('suma offer_code y content_ids al evento del píxel', async () => {
+    const { trackSubmitApplication } = await load({ recaptcha: { enabled: false }, meta: { pixelId: '945523174290178' } });
+    await trackSubmitApplication('sub_1', 'Diploma en Género', {}, 'dgen');
+    expect(fbqCalls().at(-1)).toEqual(['track', 'SubmitApplication', { content_category: 'preinscripcion', content_name: 'Diploma en Género', offer_code: 'dgen', content_ids: ['dgen'] }, { eventID: 'sub_1' }]);
+  });
+
   it('dispara submit_application en GA4 e instala gtag una sola vez', async () => {
     const cfg = { recaptcha: { enabled: false }, ga4: { measurementId: 'G-TEST' } };
     const { initTracking, trackSubmitApplication } = await load(cfg);

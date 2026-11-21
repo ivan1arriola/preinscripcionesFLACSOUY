@@ -172,7 +172,7 @@ export const apiClient = {
     files: SubmissionFileToken[] = [],
     clientSubmissionId?: string,
     recaptchaToken?: string
-  ): Promise<{ submissionId: string; status?: string; existing?: boolean }> {
+  ): Promise<{ submissionId: string; status?: string; existing?: boolean; offerCode?: string }> {
     const res = await fetch(`/api/targets/${encodeURIComponent(id)}/submissions`, {
       method: 'POST',
       headers: {

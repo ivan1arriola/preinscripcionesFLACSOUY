@@ -13,6 +13,8 @@ export interface SubmitApplicationEvent {
   fbc?: string;
   contentName?: string;
   contentId?: string;
+  /** Abreviación de la oferta; si existe, content_ids la usa en lugar de contentId. */
+  offerCode?: string;
   /** Datos personales crudos: se normalizan y hashean aquí antes de salir hacia Meta. */
   email?: string;
   phone?: string;
@@ -102,7 +104,9 @@ export function createMetaCapiTracker(options: MetaCapiOptions): MetaCapiTracker
               custom_data: {
                 content_category: 'preinscripcion',
                 ...(event.contentName ? { content_name: event.contentName } : {}),
-                ...(event.contentId ? { content_ids: [event.contentId] } : {}),
+                ...(event.offerCode
+                  ? { offer_code: event.offerCode, content_ids: [event.offerCode] }
+                  : event.contentId ? { content_ids: [event.contentId] } : {}),
               },
             },
           ],

@@ -18,6 +18,7 @@ import {
   enqueuePreinscriptionTelegramNotifications,
 } from '../../application/preinscription-telegram-notification.js';
 import { buildSpreadsheetValues } from '../../domain/spreadsheet-schema.js';
+import { mauticTargetCode } from '../../domain/mautic-contact.js';
 import { RateLimiter, rateLimitedResponse, type RateLimitOptions } from './rate-limit.js';
 import { readMetaCookies, type MetaCapiTracker } from '../../infrastructure/meta/meta-capi.js';
 
@@ -355,6 +356,7 @@ export function createSubmissionRoutes(
 
       // SubmitApplication por CAPI: el event_id es el del envío, igual al que usa el navegador para deduplicar.
       // Es auxiliar y nunca espera ni afecta a la respuesta.
+      const offerCode = mauticTargetCode(result.target);
       if (metaTracker) {
         void metaTracker.sendSubmitApplication({
           eventId: result.submissionId,
@@ -363,6 +365,7 @@ export function createSubmissionRoutes(
           userAgent: req.get('user-agent') ?? undefined,
           ...readMetaCookies(req.headers.cookie),
           contentName: result.target.title,
+          offerCode,
           contentId: `oferta-${result.target.id}`,
           email: result.normalizedValues.email,
           phone: result.normalizedValues.celular,
@@ -447,6 +450,7 @@ export function createSubmissionRoutes(
           res.status(202).json({
             submissionId: result.submissionId,
             status: 'pending_processing',
+            ...(offerCode ? { offerCode } : {}),
             message: 'La preinscripción fue recibida y se encuentra pendiente de procesamiento técnico.',
           });
           return;
@@ -520,6 +524,7 @@ export function createSubmissionRoutes(
           res.status(202).json({
             submissionId: result.submissionId,
             status: 'pending_processing',
+            ...(offerCode ? { offerCode } : {}),
             message: 'La preinscripción fue recibida y se encuentra pendiente de procesamiento técnico.',
           });
           return;
@@ -621,7 +626,7 @@ export function createSubmissionRoutes(
         }
       }
 
-      res.status(201).json({ submissionId: result.submissionId });
+      res.status(201).json({ submissionId: result.submissionId, ...(offerCode ? { offerCode } : {}) });
     } catch (err) {
       next(err);
     } finally {

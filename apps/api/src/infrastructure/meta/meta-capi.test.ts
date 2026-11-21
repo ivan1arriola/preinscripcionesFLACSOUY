@@ -18,6 +18,17 @@ describe('meta-capi', () => {
     expect(payload.test_event_code).toBeUndefined();
   });
 
+  it('custom_data lleva offer_code y content_ids solo si hay offerCode', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    const tracker = createMetaCapiTracker({ pixelId: '1', accessToken: 't', fetch: fetchMock as never });
+    await tracker.sendSubmitApplication({ eventId: 'a', contentName: 'Diploma', offerCode: 'dgen' });
+    await tracker.sendSubmitApplication({ eventId: 'b', contentName: 'Diploma' });
+    const custom = (i: number) => JSON.parse(String((fetchMock.mock.calls[i] as unknown as [string, RequestInit])[1].body)).data[0].custom_data;
+    expect(custom(0)).toMatchObject({ content_name: 'Diploma', offer_code: 'dgen', content_ids: ['dgen'] });
+    expect(custom(1)).not.toHaveProperty('offer_code');
+    expect(custom(1)).not.toHaveProperty('content_ids');
+  });
+
   it('nunca lanza si Meta falla', async () => {
     const tracker = createMetaCapiTracker({ pixelId: '1', accessToken: 't', fetch: (async () => { throw new Error('red'); }) as never });
     vi.spyOn(console, 'warn').mockImplementation(() => {});

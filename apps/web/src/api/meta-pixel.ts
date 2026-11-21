@@ -73,7 +73,7 @@ export function initTracking(config: PublicConfig): void {
  * evento por Conversions API con ese id y Meta deduplica. Nunca lanza ni retrasa la pantalla de éxito.
  * `values` son los datos del formulario sin hash: el SDK del píxel los hashea antes de enviarlos.
  */
-export async function trackSubmitApplication(eventId: string, contentName?: string, values: Record<string, string> = {}): Promise<void> {
+export async function trackSubmitApplication(eventId: string, contentName?: string, values: Record<string, string> = {}, offerCode?: string): Promise<void> {
   try {
     const config = await apiClient.getPublicConfig();
     initTracking(config);
@@ -86,10 +86,10 @@ export async function trackSubmitApplication(eventId: string, contentName?: stri
           .filter(([, value]) => value && value !== '-')
       );
       window.fbq!('init', config.meta.pixelId, userData);
-      window.fbq!('track', 'SubmitApplication', { content_category: 'preinscripcion', ...(contentName ? { content_name: contentName } : {}) }, { eventID: eventId });
+      window.fbq!('track', 'SubmitApplication', { content_category: 'preinscripcion', ...(contentName ? { content_name: contentName } : {}), ...(offerCode ? { offer_code: offerCode, content_ids: [offerCode] } : {}) }, { eventID: eventId });
     }
     if (config.ga4?.measurementId) {
-      window.gtag!('event', 'submit_application', { ...(contentName ? { content_name: contentName } : {}), ...(country ? { country } : {}) });
+      window.gtag!('event', 'submit_application', { ...(contentName ? { content_name: contentName } : {}), ...(offerCode ? { offer_code: offerCode } : {}), ...(country ? { country } : {}) });
     }
   } catch {
     // El seguimiento es auxiliar: un fallo no afecta la preinscripción.

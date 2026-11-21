@@ -21,4 +21,5 @@ export interface ValidationResult {
 
 export interface SubmissionConfirmation {
   submissionId: string;
+  offerCode?: string;
 }
