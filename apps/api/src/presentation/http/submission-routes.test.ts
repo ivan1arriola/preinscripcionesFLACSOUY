@@ -153,7 +153,7 @@ describe('Submission HTTP Routes', () => {
       body: JSON.stringify({
         ...validPayload,
         clientSubmissionId: 'utm-test-1',
-        utm: { utm_source: 'instagram', utm_campaign: 'diploma-2027', utm_evil: 'x' },
+        utm: { utm_source: 'instagram', utm_campaign: 'diploma-2027', utm_id: 'cmp-1', fbclid: 'IwAR-test', utm_evil: 'x' },
       }),
     });
 
@@ -165,7 +165,7 @@ describe('Submission HTTP Routes', () => {
       correo: 'lucia@example.com',
       oferta: expect.any(String),
       edicion: null, // el destino de prueba no tiene cohorte
-      utm: { utm_source: 'instagram', utm_medium: null, utm_campaign: 'diploma-2027', utm_term: null, utm_content: null },
+      utm: { utm_source: 'instagram', utm_medium: null, utm_campaign: 'diploma-2027', utm_term: null, utm_content: null, utm_id: 'cmp-1', fbclid: 'IwAR-test' },
     });
   });
 
