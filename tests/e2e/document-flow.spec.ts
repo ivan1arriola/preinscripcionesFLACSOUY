@@ -65,7 +65,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('input[name="posgradoFlacso"][value="No"]').check();
     await page.locator('#titulo-denominacion').fill('Licenciada en Educación');
     await page.locator('#file-titulo').setInputFiles(dummyPdf);
-    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('1 de 2 archivos cargados', { exact: true })).toHaveCount(1);
 
     await page.getByRole('button', { name: /Siguiente/i }).click();
     await advancePastOptionalOrientation(page, 'Educación', 'Tecnología Educativa');
@@ -87,6 +87,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('input[name="tieneConvenio"][value="No"]').check();
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
+    await page.locator('input[name="aceptaComunicaciones"][value="Si"]').check();
 
     await page.getByRole('button', { name: /Revisar datos/i }).click();
     await page.getByRole('button', { name: /Confirmar y enviar/i }).click();
@@ -127,7 +128,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('input[name="posgradoFlacso"][value="No"]').check();
     await page.locator('#titulo-denominacion').fill('Licenciatura en Sociología');
     await page.locator('#file-titulo').setInputFiles(dummyPdf);
-    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('1 de 2 archivos cargados', { exact: true })).toHaveCount(1);
     await page.getByRole('button', { name: /Siguiente/i }).click();
     await advancePastOptionalOrientation(page, 'Género y Políticas Públicas');
 
@@ -147,6 +148,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('input[name="tieneConvenio"][value="No"]').check();
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
+    await page.locator('input[name="aceptaComunicaciones"][value="Si"]').check();
 
     await page.getByRole('button', { name: /Revisar datos/i }).click();
     await page.getByRole('button', { name: /Confirmar y enviar/i }).click();
@@ -185,7 +187,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('input[name="posgradoFlacso"][value="No"]').check();
     await page.locator('#titulo-denominacion').fill('Licenciatura en Psicología');
     await page.locator('#file-titulo').setInputFiles(dummyPdf);
-    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('1 de 2 archivos cargados', { exact: true })).toHaveCount(1);
     await page.getByRole('button', { name: /Siguiente/i }).click();
     await advancePastOptionalOrientation(page, 'Género y Políticas Públicas');
 
@@ -205,6 +207,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('input[name="tieneConvenio"][value="No"]').check();
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
+    await page.locator('input[name="aceptaComunicaciones"][value="Si"]').check();
 
     await page.getByRole('button', { name: /Revisar datos/i }).click();
     await page.getByRole('button', { name: /Confirmar y enviar/i }).click();
@@ -261,6 +264,7 @@ test.describe('Document Flow End-to-End', () => {
     await page.locator('input[name="tieneConvenio"][value="No"]').check();
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
+    await page.locator('input[name="aceptaComunicaciones"][value="Si"]').check();
 
     await page.getByRole('button', { name: /Revisar datos/i }).click();
     await page.getByRole('button', { name: /Confirmar y enviar/i }).click();

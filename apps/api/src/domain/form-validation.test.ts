@@ -54,7 +54,7 @@ describe('validateSubmission', () => {
     orientations: ['educacion', 'politicas'],
     mentions: ['tec-edu', 'gestion-edu', 'gestion-pub'],
     offerType: 'diploma',
-    profileVersionId: 'ver_diploma_v1',
+    profileVersionId: 'canonical-v2',
     effectiveRevision: 'sha256:effective_rev_test',
     steps: [],
     documents: [],
