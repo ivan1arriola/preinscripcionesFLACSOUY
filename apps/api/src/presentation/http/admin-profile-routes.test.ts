@@ -7,29 +7,28 @@ import type { GoogleIdentityVerifierPort } from '../../infrastructure/auth/googl
 
 const removedProfileDefinition = { steps: [], fields: [], documents: [] };
 
-describe('Admin Profile HTTP Routes', () => {
+describe('Removed Admin Profile HTTP Routes', () => {
   let server: Server;
   let baseUrl: string;
   let sessionCookie: string;
   let csrfToken: string;
+  const previousAllowedEmails = process.env.ADMIN_ALLOWED_EMAILS;
 
   const mockVerifier: GoogleIdentityVerifierPort = {
     generateAuthUrl: (_redirectUri, state) => `https://accounts.example.test/auth?state=${state}`,
     verify: async () => ({
-      sub: 'sub-webmaster-1',
-      email: 'web@flacso.edu.uy',
+      sub: 'sub-admin-test-1',
+      email: 'admin@example.test',
       emailVerified: true,
-      name: 'Webmaster FLACSO',
+      name: 'Admin Test',
     }),
   };
 
   beforeAll(async () => {
-    const catalog = new FixtureAcademicCatalog();
-    const repository = new InMemorySubmissionRepository();
-
+    process.env.ADMIN_ALLOWED_EMAILS = 'admin@example.test';
     const app = createApp({
-      catalog,
-      repository,
+      catalog: new FixtureAcademicCatalog(),
+      repository: new InMemorySubmissionRepository(),
       googleIdentityVerifier: mockVerifier,
     });
 
@@ -43,7 +42,6 @@ describe('Admin Profile HTTP Routes', () => {
       });
     });
 
-    // Authenticate as web@flacso.edu.uy to obtain session
     const urlRes = await fetch(`${baseUrl}/api/admin/auth/google/url?redirectUri=${encodeURIComponent('https://example.com')}`);
     const { state } = await urlRes.json();
     const authRes = await fetch(`${baseUrl}/api/admin/auth/google`, {
@@ -51,81 +49,40 @@ describe('Admin Profile HTTP Routes', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: 'valid-code', redirectUri: 'https://example.com', state }),
     });
-    const setCookie = authRes.headers.get('set-cookie');
-    sessionCookie = (setCookie?.split(';')[0]) ?? '';
-    const data = await authRes.json();
-    csrfToken = data.csrfToken;
+    sessionCookie = (authRes.headers.get('set-cookie')?.split(';')[0]) ?? '';
+    csrfToken = (await authRes.json()).csrfToken;
   });
 
   afterAll(async () => {
+    if (previousAllowedEmails === undefined) {
+      delete process.env.ADMIN_ALLOWED_EMAILS;
+    } else {
+      process.env.ADMIN_ALLOWED_EMAILS = previousAllowedEmails;
+    }
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  it('returns 404 for all removed profile endpoints', async () => {
-    const res = await fetch(`${baseUrl}/api/admin/profiles`);
-    expect(res.status).toBe(404);
+  it('returns 404 across all removed profile endpoints (anonymous and authenticated)', async () => {
+    const anonymousGet = await fetch(`${baseUrl}/api/admin/profiles`);
+    expect(anonymousGet.status).toBe(404);
 
-    const postRes = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
+    const authGetList = await fetch(`${baseUrl}/api/admin/profiles`, { headers: { Cookie: sessionCookie } });
+    expect(authGetList.status).toBe(404);
+
+    const authGetOne = await fetch(`${baseUrl}/api/admin/profiles/diploma`, { headers: { Cookie: sessionCookie } });
+    expect(authGetOne.status).toBe(404);
+
+    const authPostVersion = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Cookie: sessionCookie, 'x-csrf-token': csrfToken },
       body: JSON.stringify({ definition: removedProfileDefinition }),
     });
-    expect(postRes.status).toBe(404);
-  });
+    expect(authPostVersion.status).toBe(404);
 
-  it('does not expose removed profile mutations', async () => {
-    const res = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
+    const authActivate = await fetch(`${baseUrl}/api/admin/profiles/diploma/activate/legacy-v1`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Cookie: sessionCookie,
-        'x-csrf-token': 'wrong-csrf-token',
-      },
-      body: JSON.stringify({ definition: removedProfileDefinition }),
+      headers: { Cookie: sessionCookie, 'x-csrf-token': csrfToken },
     });
-    expect(res.status).toBe(404);
-  });
-
-  it('GET /api/admin/profiles is removed from the operational API', async () => {
-    const res = await fetch(`${baseUrl}/api/admin/profiles`, {
-      headers: { Cookie: sessionCookie },
-    });
-    expect(res.status).toBe(404);
-  });
-
-  it('GET /api/admin/profiles/:type is removed from the operational API', async () => {
-    const res = await fetch(`${baseUrl}/api/admin/profiles/diploma`, {
-      headers: { Cookie: sessionCookie },
-    });
-    expect(res.status).toBe(404);
-  });
-
-  it('POST /api/admin/profiles/:type/versions returns 404', async () => {
-    const res = await fetch(`${baseUrl}/api/admin/profiles/diploma/versions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Cookie: sessionCookie,
-        'x-csrf-token': csrfToken,
-      },
-      body: JSON.stringify({
-        definition: removedProfileDefinition,
-      }),
-    });
-    expect(res.status).toBe(404);
-  });
-
-  it('POST /api/admin/profiles/:type/activate/:versionId returns 404', async () => {
-    const res = await fetch(
-      `${baseUrl}/api/admin/profiles/diploma/activate/ver_diploma_v1`,
-      {
-        method: 'POST',
-        headers: {
-          Cookie: sessionCookie,
-          'x-csrf-token': csrfToken,
-        },
-      }
-    );
-    expect(res.status).toBe(404);
+    expect(authActivate.status).toBe(404);
   });
 });

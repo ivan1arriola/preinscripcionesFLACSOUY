@@ -14,6 +14,13 @@ describe('decodeHtmlEntities', () => {
     expect(decodeHtmlEntities('&quot;Educaci&oacute;n &amp; Sociedad&quot;')).toBe('"Educación & Sociedad"');
   });
 
+  it('decodes extended typographic and Romance named entities common in WordPress titles', () => {
+    expect(decodeHtmlEntities('4&ordm; Edici&oacute;n &laquo;FLACSO&raquo; &middot; 100&euro;')).toBe('4º Edición «FLACSO» · 100€');
+    expect(decodeHtmlEntities('1&ordf; Cohorte &times; Cooperaci&oacute;n &ccedil; / &Ccedil;')).toBe('1ª Cohorte × Cooperación ç / Ç');
+    expect(decodeHtmlEntities('&agrave; &egrave; &acirc; &ecirc; &atilde; &otilde; &divide; &plusmn; &frac12; Marca&trade;'))
+      .toBe('à è â ê ã õ ÷ ± ½ Marca™');
+  });
+
   it('returns text unchanged when there are no entities', () => {
     expect(decodeHtmlEntities('Texto plano sin entidades')).toBe('Texto plano sin entidades');
   });

@@ -17,7 +17,7 @@ const comprehensiveForm: FormDefinition = {
   kind: 'academic_offer',
   title: 'Oferta de prueba',
   offerType: 'maestria',
-  profileVersionId: 'profile-1',
+  profileVersionId: 'canonical-v2',
   effectiveRevision: 'rev-1',
   registrationOpen: true,
   configRevision: 'config-1',

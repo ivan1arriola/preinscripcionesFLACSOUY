@@ -92,7 +92,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
       mimeType: 'application/pdf',
       buffer: Buffer.from('%PDF-1.4 title'),
     });
-    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('1 de 2 archivos cargados', { exact: true })).toHaveCount(1);
 
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
@@ -121,6 +121,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     await page.locator('input[name="tieneConvenio"][value="No"]').check();
     await page.locator('#input-fuente').selectOption('Web');
     await page.locator('input[name="aceptaDifusion"][value="Si"]').check();
+    await page.locator('input[name="aceptaComunicaciones"][value="Si"]').check();
 
     await page.getByRole('button', { name: /Revisar datos/i }).click();
 
@@ -179,7 +180,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
       mimeType: 'application/pdf',
       buffer: Buffer.from('%PDF-1.4 title'),
     });
-    await expect(page.getByText('1 archivo cargado', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('1 de 2 archivos cargados', { exact: true })).toHaveCount(1);
     await page.getByRole('button', { name: /Siguiente/i }).click();
 
     // Orientation must NOT be present
@@ -239,11 +240,11 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
   });
 
   test('rejects incomplete submission before attempting publication', async ({ request }) => {
-    const response = await request.post('http://localhost:3000/api/targets/maestria-genero-c9/submissions', {
+    const response = await request.post('/api/targets/maestria-genero-c9/submissions', {
       data: {
         configRevision: 'mg-c9-v1',
         effectiveRevision: 'sha256:outdated_fake_hash',
-        profileVersionId: 'ver_maestria_v0_outdated',
+        profileVersionId: 'canonical-v0-outdated',
         values: {
           nombre1: 'Test',
           apellido1: 'User',
@@ -260,9 +261,12 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
   });
 
   test('admin routes enforce Google authentication and reject unauthorized access', async ({ page, request }) => {
-    // 1. Direct API call without session cookie is rejected with 401
-    const apiResponse = await request.get('http://localhost:3000/api/admin/profiles');
-    expect(apiResponse.status()).toBe(404);
+    // 1. Removed legacy profile endpoint returns 404; /api/admin/me without session cookie returns 401
+    const legacyResponse = await request.get('/api/admin/profiles');
+    expect(legacyResponse.status()).toBe(404);
+
+    const meResponse = await request.get('/api/admin/me');
+    expect(meResponse.status()).toBe(401);
 
     // 2. Direct browser navigation to /admin/perfiles prompts login
     await page.goto('/admin/perfiles');
@@ -326,7 +330,7 @@ test.describe('Preinscriptions Versioned Profiles & Wizard End-to-End', () => {
     });
 
     await page.goto('/seminario/diseno-de-cursos-virtuales/');
-    await expect(page.getByText(/Las preinscripciones para este seminario no se encuentran abiertas en este momento/i)).toBeVisible();
+    await expect(page.getByText(/Las preinscripciones para esta propuesta no se encuentran abiertas en este momento/i)).toBeVisible();
 
     // 3. Both editions open: displays conflict notice
     await page.route('**/api/targets', async (route) => {

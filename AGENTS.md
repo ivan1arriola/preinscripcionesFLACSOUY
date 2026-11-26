@@ -16,7 +16,7 @@ Registro de entregas y estado actual: [`docs/plans/bitacora.md`](docs/plans/bita
 - `pnpm test`: ejecuta pruebas unitarias y de integración (`PREINSCRIPTIONS_TEST_DATABASE_URL` habilita las suites reales contra PostgreSQL 16).
 - `pnpm test:coverage`: ejecuta Vitest con cobertura V8 y candado mínimo (definido a partir de E1).
 - `pnpm build`: compila `contracts`, `api` y `web`.
-- `pnpm e2e`: corre Playwright (a partir de E1, con `WEB_URL` apunta a un stack ya levantado sin lanzar servidores de desarrollo).
+- `pnpm e2e`: corre Playwright (con `WEB_URL` apunta a un stack ya levantado sin lanzar servidores de desarrollo).
 - `docker compose config --quiet` / `docker compose --env-file .env.production.example -f deploy/docker-compose.production.yml config --quiet`: valida sintaxis y variables requeridas de Compose.
 - En producción **no existe `tsx`** (es `devDependency`): todo script operativo corre con `docker compose run --rm api node apps/api/dist/...`.
 
