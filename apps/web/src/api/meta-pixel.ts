@@ -88,7 +88,8 @@ export async function trackSubmitApplication(eventId: string, contentName?: stri
       window.fbq!('init', config.meta.pixelId, userData);
       window.fbq!('track', 'SubmitApplication', { content_category: 'preinscripcion', ...(contentName ? { content_name: contentName } : {}), ...(offerCode ? { offer_code: offerCode, content_ids: [offerCode] } : {}) }, { eventID: eventId });
     }
-    if (config.ga4?.measurementId) {
+    // Con serverEvents el servidor ya lo envía a GA4: repetirlo desde el navegador lo contaría dos veces.
+    if (config.ga4?.measurementId && !config.ga4.serverEvents) {
       window.gtag!('event', 'submit_application', { ...(contentName ? { content_name: contentName } : {}), ...(offerCode ? { offer_code: offerCode } : {}), ...(country ? { country } : {}) });
     }
   } catch {

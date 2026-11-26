@@ -21,6 +21,7 @@ import { buildSpreadsheetValues } from '../../domain/spreadsheet-schema.js';
 import { mauticTargetCode } from '../../domain/mautic-contact.js';
 import { RateLimiter, rateLimitedResponse, type RateLimitOptions } from './rate-limit.js';
 import { readMetaCookies, type MetaCapiTracker } from '../../infrastructure/meta/meta-capi.js';
+import type { Ga4Tracker } from '../../infrastructure/ga4/ga4-measurement-protocol.js';
 
 export function sanitizeSafeError(error: unknown, fallback: string = 'Error de procesamiento técnico.'): string {
   if (!error) return fallback;
@@ -180,6 +181,7 @@ export function createSubmissionRoutes(
   limits?: { perEmail?: RateLimitOptions },
   lease?: LeaseOptions,
   metaTracker?: MetaCapiTracker,
+  ga4Tracker?: Ga4Tracker,
 ): Router {
   const router = Router({ mergeParams: true });
   const emailLimiter = limits?.perEmail ? new RateLimiter(limits.perEmail) : undefined;
@@ -372,6 +374,17 @@ export function createSubmissionRoutes(
           firstName: result.normalizedValues.nombre1,
           lastName: result.normalizedValues.apellido1,
           country: result.normalizedValues.paisResidencia,
+        });
+      }
+
+      // GA4 por servidor (Measurement Protocol): el navegador puede bloquear gtag; esto no.
+      if (ga4Tracker) {
+        void ga4Tracker.sendSubmitApplication({
+          eventId: result.submissionId,
+          contentName: result.target.title,
+          offerCode,
+          country: result.normalizedValues.paisResidencia,
+          cookieHeader: req.headers.cookie,
         });
       }
 
