@@ -28,8 +28,11 @@ docker compose up -d --build
 # Ejecutar migraciones (si se corre fuera de Docker)
 pnpm --filter api db:migrate
 
-# Ejecutar pruebas unitarias y de integración
+# Ejecutar pruebas unitarias y de integración (PREINSCRIPTIONS_TEST_DATABASE_URL habilita PostgreSQL 16)
 pnpm test
+
+# Ejecutar pruebas con reporte de cobertura V8 y candado mínimo
+pnpm test:coverage
 
 # Construir las aplicaciones
 pnpm build

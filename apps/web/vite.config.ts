@@ -25,5 +25,23 @@ export default defineConfig({
     // The wizard exercises a full multi-step upload flow and can exceed Vitest's
     // 5s default when web and API suites run concurrently in CI.
     testTimeout: 15_000,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'html'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/**/*.test.{ts,tsx}',
+        'src/**/*.spec.{ts,tsx}',
+        'src/test-setup.ts',
+        'src/main.tsx',
+        'dist/**',
+      ],
+      thresholds: {
+        lines: 80,
+        statements: 80,
+        functions: 63,
+        branches: 79,
+      },
+    },
   },
 });

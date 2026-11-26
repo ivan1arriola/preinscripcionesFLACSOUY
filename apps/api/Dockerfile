@@ -1,6 +1,6 @@
 FROM node:24-alpine AS base
 WORKDIR /app
-RUN npm install -g pnpm@12.8.1
+RUN npm install -g pnpm@12.14.0
 
 FROM base AS builder
 WORKDIR /app
