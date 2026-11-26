@@ -14,13 +14,13 @@ concurrency:
 
 jobs:
   verify:
-    name: Typecheck, tests y compose
+    name: Verificar y cobertura
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     services:
       postgres:
-        image: postgres:17
+        image: postgres:16
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
@@ -28,13 +28,13 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U test -d preinscripciones_test"
+          --health-cmd="pg_isready -h 127.0.0.1 -U test -d preinscripciones_test"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
 
     env:
-      # Activa los tests de integración con PostgreSQL, que sin esta variable se saltan.
+      # Activa las suites de integración con PostgreSQL 16 y el candado de cobertura.
       PREINSCRIPTIONS_TEST_DATABASE_URL: postgres://test:test@localhost:5432/preinscripciones_test
 
     steps:
@@ -42,7 +42,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 12.8.1
+          version: 12.14.0
 
       - uses: actions/setup-node@v4
         with:
@@ -52,19 +52,238 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
-      # La API y la web resuelven @flacso/contracts desde dist/, así que se compila primero.
       - name: Compilar contratos
         run: pnpm --filter @flacso/contracts build
 
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Tests
-        run: pnpm test
+      - name: Tests y cobertura (candado mínimo)
+        run: pnpm test:coverage
 
-      # Detecta claves duplicadas, variables obligatorias sin definir y errores de sintaxis en los compose.
+      - name: Guardar resumen de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-summary
+          if-no-files-found: warn
+          path: |
+            apps/api/coverage/coverage-summary.json
+            apps/web/coverage/coverage-summary.json
+
+  build:
+    name: Compilar e imágenes Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Compilar monorepo
+        run: pnpm build
+
+      - name: Verificar dist/ de API sin tests
+        run: |
+          if find apps/api/dist -type f \( -name '*.test.js' -o -name '*.spec.js' \) | grep -q .; then
+            echo "Se encontraron archivos de prueba compilados dentro de apps/api/dist/" >&2
+            exit 1
+          fi
+
+      - name: Construir imagen Docker de API
+        run: docker build -f apps/api/Dockerfile -t preinscripciones-api:ci .
+
+      - name: Construir imagen Docker de Web
+        run: docker build -f apps/web/Dockerfile -t preinscripciones-web:ci .
+
+      - name: Verificar imagen de producción de API
+        run: |
+          docker run --rm --entrypoint sh preinscripciones-api:ci -c '
+            ! find /app/apps/api/dist -type f \( -name "*.test.js" -o -name "*.spec.js" \) | grep -q . &&
+            test -f /app/apps/api/dist/main.js &&
+            ! test -d /app/apps/api/node_modules/tsx
+          '
+
+  migrations:
+    name: Migraciones (aditivas e idempotentes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: preinscripciones_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -h 127.0.0.1 -U test -d preinscripciones_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rechazar DROP/RENAME en migraciones nuevas
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node scripts/ci/check-migrations.mjs
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Compilar contratos y API
+        run: pnpm --filter @flacso/contracts build && pnpm --filter api build
+
+      - name: Aplicar migraciones sobre base vacía y reaplicar (idempotencia)
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/preinscripciones_test
+        run: |
+          node apps/api/dist/infrastructure/database/migrate.js
+          node apps/api/dist/infrastructure/database/migrate.js
+
+  compose:
+    name: Docker Compose config
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Validar docker-compose de producción
         run: docker compose --env-file .env.production.example -f deploy/docker-compose.production.yml config --quiet
 
       - name: Validar docker-compose de desarrollo
         run: docker compose -f docker-compose.yml config --quiet
+
+  e2e:
+    name: Playwright E2E sobre imágenes Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Instalar Chromium de Playwright
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Construir imágenes Docker
+        run: |
+          docker build -f apps/api/Dockerfile -t preinscripciones-api:ci .
+          docker build -f apps/web/Dockerfile -t preinscripciones-web:ci .
+
+      - name: Levantar stack Docker de pruebas (PostgreSQL 16 + API + Web)
+        run: |
+          docker network create ci-e2e
+          docker run -d --name ci-e2e-pg --network ci-e2e --network-alias postgres \
+            -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test -e POSTGRES_DB=preinscripciones_test \
+            -p 127.0.0.1:5433:5432 postgres:16-alpine
+          timeout 60s bash -c 'until docker exec ci-e2e-pg pg_isready -h 127.0.0.1 -U test -d preinscripciones_test; do sleep 1; done'
+          docker run -d --name ci-e2e-api --network ci-e2e --network-alias api \
+            -e PORT=3000 -e NODE_ENV=production \
+            -e DATABASE_URL=postgres://test:test@postgres:5432/preinscripciones_test \
+            -e GOOGLE_DRIVE_MOCK=true \
+            -e GOOGLE_ACCESS_TOKEN=ci-mock-token \
+            -e ADMIN_ALLOWED_EMAILS=admin@example.test \
+            -e WORDPRESS_URL= \
+            -e TRUST_PROXY_HOPS=1 \
+            preinscripciones-api:ci
+          docker run -d --name ci-e2e-web --network ci-e2e --network-alias web \
+            -p 127.0.0.1:5173:80 preinscripciones-web:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/api/health | grep -q '"status":"ok"'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "El stack e2e no respondió a tiempo." >&2
+          exit 1
+
+      - name: Ejecutar Playwright E2E
+        env:
+          WEB_URL: http://127.0.0.1:5173
+          DATABASE_URL: postgres://test:test@127.0.0.1:5433/preinscripciones_test
+          ADMIN_ALLOWED_EMAILS: admin@example.test
+        run: pnpm e2e
+
+      - name: Logs del stack en caso de fallo
+        if: failure()
+        run: |
+          docker logs --tail=120 ci-e2e-api || true
+          docker logs --tail=120 ci-e2e-web || true
+
+      - name: Limpiar contenedores y red e2e
+        if: always()
+        run: |
+          docker rm -f ci-e2e-web ci-e2e-api ci-e2e-pg >/dev/null 2>&1 || true
+          docker network rm ci-e2e >/dev/null 2>&1 || true
+
+  security:
+    name: Seguridad e higiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Guarda de correos reales y secretos
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node scripts/ci/check-hygiene.mjs
+
+      # En E1 y E2 hay vulnerabilidades conocidas que se resuelven recién en las actualizaciones de E2;
+      # pasa a bloqueante al cerrar E2.
+      - name: Auditoría de dependencias (aviso hasta cerrar E2)
+        continue-on-error: true
+        run: pnpm audit --audit-level=high

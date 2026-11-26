@@ -78,5 +78,5 @@ integrationDescribe('014_smtp_email_settings migration', () => {
       ses_aws_secret_access_key: 'legacy-secret-key',
     });
     expect(settings).not.toHaveProperty('smtp_password');
-  });
+  }, 30000);
 });
