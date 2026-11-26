@@ -93,15 +93,11 @@ Para el usuario de servicio o rol que interactúa con SES, crear una política I
 
 ## 3. Operación del Despachador de Notificaciones
 
-### 3.1 Worker en Segundo Plano
+### 3.1 Despachador en Segundo Plano
 
-El worker procesa de manera continua e incremental la bandeja de salida (`email_notifications`):
+Los despachadores corren dentro del proceso principal de la API y procesan de manera continua e incremental la bandeja de salida (`email_notifications`).
 
-```bash
-pnpm --filter api worker:notifications
-```
-
-- **Mecanismo de Concurrencia**: Utiliza `SELECT ... FOR UPDATE SKIP LOCKED` y un sistema de leases temporales (5 minutos). Múltiples instancias del worker pueden correr concurrentemente sin duplicar envíos.
+- **Mecanismo de Concurrencia**: Utiliza `SELECT ... FOR UPDATE SKIP LOCKED` y un sistema de leases temporales (5 minutos), evitando duplicar envíos.
 - **Esquema de Reintentos Exponenciales**:
   - Reintento 1: tras 1 minuto.
   - Reintento 2: tras 5 minutos.

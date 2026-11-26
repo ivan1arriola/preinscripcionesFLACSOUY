@@ -526,7 +526,7 @@ Una sesión temporal expira luego de **30 minutos sin actividad**.
 
 Cada nueva carga válida puede actualizar la última actividad.
 
-Un worker de la aplicación consultará periódicamente PostgreSQL y eliminará las sesiones expiradas junto con sus archivos del volumen temporal.
+Un proceso periódico dentro de la API consultará PostgreSQL y eliminará las sesiones expiradas junto con sus archivos del volumen temporal.
 
 ## 9.5. Matriz canónica de documentos
 
@@ -557,7 +557,7 @@ El envío de preinscripciones sigue un orden estricto para garantizar consistenc
    Antes de subir cada archivo, se verifica si ya existe en Drive para evitar duplicados en reintentos.
 4. **Registro en Google Sheets:** Se agrega la fila correspondiente con columnas específicas para denominación del título, declaración de ausencia de título y estados pendientes de cartas de recomendación.
 5. **Confirmación y limpieza:** Tras confirmar Drive y Sheets con éxito, la preinscripción se marca como `success` y se eliminan los archivos temporales asociados a la sesión. Un fallo en la eliminación de temporales no invalida la respuesta exitosa (201 Created) devuelta al postulante.
-6. **Retención ante fallos:** Si Drive o Sheets falla, los archivos temporales se conservan en disco y en la tabla `temporary_uploads` para posibilitar el reintento idempotente o diagnóstico técnico. Un worker en segundo plano ejecuta limpieza por TTL (30 minutos) cada 15 minutos sin bloquear el ciclo de peticiones.
+6. **Retención ante fallos:** Si Drive o Sheets falla, los archivos temporales se conservan en disco y en la tabla `temporary_uploads` para posibilitar el reintento idempotente o diagnóstico técnico. Un proceso periódico dentro de la API ejecuta limpieza por TTL (30 minutos) cada 15 minutos sin bloquear el ciclo de peticiones.
 
 ---
 
@@ -1399,8 +1399,7 @@ Stack previsto:
 - PostgreSQL para estado técnico interno;
 - Prisma como acceso a PostgreSQL;
 - Docker Compose;
-- un contenedor de aplicación;
-- un contenedor worker basado en la misma imagen;
+- un contenedor de aplicación (incluye los despachadores y limpieza periódica en segundo plano);
 - un contenedor PostgreSQL;
 - volumen persistente para PostgreSQL;
 - volumen persistente para archivos temporales;
@@ -1416,14 +1415,14 @@ Esquema conceptual:
                     ▼
           ┌─────────────────┐
           │ app             │
-          │ Next.js         │
+          │ API + Web       │
           └────────┬────────┘
                    │
           ┌────────┴────────┐
           ▼                 ▼
 ┌─────────────────┐  ┌─────────────────┐
-│ PostgreSQL      │  │ worker          │
-│ estado interno  │  │ limpieza/jobs   │
+│ PostgreSQL      │  │ jobs en proceso │
+│ estado interno  │  │ limpieza/envíos │
 └─────────────────┘  └─────────────────┘
           │
           └──────────────┐

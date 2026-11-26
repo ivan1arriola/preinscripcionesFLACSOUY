@@ -62,25 +62,6 @@ services:
       api:
         condition: service_healthy
 
-  notification-worker:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    container_name: preinscripciones-notification-worker
-    restart: unless-stopped
-    command: ["node", "apps/api/dist/worker-notifications.js"]
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgres://flacso:flacso_password@postgres:5432/flacso_preinscripciones
-      APP_SETTINGS_ENCRYPTION_KEY: ${APP_SETTINGS_ENCRYPTION_KEY:-}
-      UPLOAD_TMP_DIR: /tmp/flacso-preinscripciones
-    volumes:
-      - ./.secrets:/app/.secrets:ro
-      - upload_tmp:/tmp/flacso-preinscripciones
-    depends_on:
-      postgres:
-        condition: service_healthy
-
 volumes:
   postgres_data:
   upload_tmp:

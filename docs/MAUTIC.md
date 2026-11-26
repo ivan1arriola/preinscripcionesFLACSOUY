@@ -50,7 +50,7 @@ comercial: `aceptaDifusion` es sobre difusión de imagen. El aviso de inscripci�
 (ver más abajo) sólo saca a la persona de campañas.
 
 La sincronización usa el outbox `mautic_contact_sync`, escrito en la misma
-transacción que la preinscripción. El worker de notificaciones lo procesa con
+transacción que la preinscripción. El despachador en segundo plano de la API lo procesa con
 reintentos y backoff. Un rechazo de datos (4xx) o 20 intentos fallidos dejan la
 fila en `failed` y generan una alerta de Telegram. Al sincronizar, el payload se
 vacía y queda el ID del contacto.
@@ -61,7 +61,7 @@ Cada oferta académica tiene en Mautic una campaña de seguimiento para quienes 
 
 - Se activa con "Avisar cada inscripción a una oferta" en la tarjeta **Mautic** y requiere el **Secreto del aviso de inscripción**, de al menos 32 caracteres. El secreto debe ser idéntico a `flacso_enrollment_secret` en `config/local.php` de Mautic.
 - Cada preinscripción a una oferta, no a un seminario, escribe en la misma transacción una fila en el outbox `mautic_enrollment_notify`. Se envía **aunque el postulante no acepte comunicaciones**: Mautic sólo agrega el tag `inscripto-oferta-{id}` y saca al contacto de la campaña si ya existe, y nunca crea contactos con este aviso.
-- El worker hace `POST {URL de Mautic}/flacso/enrollments` con `{eventId, email, offerWpId}`, firmado con HMAC-SHA256 en `X-Flacso-Timestamp` y `X-Flacso-Signature`.
+- El despachador en segundo plano de la API hace `POST {URL de Mautic}/flacso/enrollments` con `{eventId, email, offerWpId}`, firmado con HMAC-SHA256 en `X-Flacso-Timestamp` y `X-Flacso-Signature`.
   - Mautic es idempotente por `eventId`.
   - 401, 503, 5xx y los fallos de red se reintentan con backoff.
   - Un 422 o 20 intentos dejan la fila en `failed` con una alerta de Telegram.
