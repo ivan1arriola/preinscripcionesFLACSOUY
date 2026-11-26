@@ -149,4 +149,28 @@ describe('AdminRecoverySettingsCard Component', () => {
       expect(screen.getByText('Mensaje de prueba enviado con éxito.')).toBeInTheDocument();
     });
   });
+
+  it('mantiene visible el error de la prueba de Telegram después de recargar el estado', async () => {
+    vi.mocked(apiClient.getTelegramSettings).mockResolvedValue({
+      telegram: {
+        enabled: true,
+        preinscriptionEnabled: false,
+        hasToken: true,
+        chatIdsCount: 1,
+        maskedChatIds: ['-1****89'],
+        lastTestedAt: null,
+        lastTestStatus: null,
+        lastTestError: null,
+      },
+    });
+    vi.mocked(apiClient.testTelegramSettings).mockRejectedValue(new Error('sin red'));
+
+    render(<AdminRecoverySettingsCard csrfToken="csrf-test-token" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Enviar mensaje de prueba/i }));
+
+    expect(await screen.findByText(/Error al enviar mensaje de prueba por Telegram/i)).toBeInTheDocument();
+    await waitFor(() => expect(apiClient.getTelegramSettings).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/Error al enviar mensaje de prueba por Telegram/i)).toBeInTheDocument();
+  });
 });

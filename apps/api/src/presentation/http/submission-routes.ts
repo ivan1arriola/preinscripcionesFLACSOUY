@@ -217,6 +217,12 @@ export function createSubmissionRoutes(
       // Cada token debe existir en la sesión del postulante y haberse subido para el campo que declara;
       // de lo contrario un mismo archivo podría presentarse como CV, título e identidad a la vez.
       const sessionHeader = req.header('x-preinscription-session')?.trim();
+      // Sin sesión no hay forma de probar la propiedad de los archivos: se rechaza antes de guardar el envío,
+      // de contar el cupo del correo o de avisar a Meta o GA4.
+      if (parsed.data.files.length > 0 && !sessionHeader) {
+        res.status(400).json({ error: { code: 'INVALID_REQUEST', message: 'La sesión de preinscripción es obligatoria para enviar archivos.' } });
+        return;
+      }
       if (parsed.data.files.length > 0 && sessionHeader && fileDependencies?.storage.listBySession) {
         const uploaded = new Map(
           (await fileDependencies.storage.listBySession(sessionHeader)).map((record) => [record.token, record]),

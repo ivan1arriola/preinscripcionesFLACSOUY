@@ -5,6 +5,8 @@ import type { AcademicCatalog } from '../../ports/academic-catalog.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import type { GoogleDriveRepositoryPort } from '../../ports/google-drive-repository.js';
 import { InMemorySubmissionRepository } from '../../infrastructure/database/in-memory-submission-repository.js';
+import type { MetaCapiTracker } from '../../infrastructure/meta/meta-capi.js';
+import type { Ga4Tracker } from '../../infrastructure/ga4/ga4-measurement-protocol.js';
 
 const target = {
   id: 'offer-1',
@@ -68,20 +70,47 @@ function setup(options: { pinFiles?: TemporaryFileStoragePort['pinFiles']; drive
       };
     },
   };
+  const metaTracker: MetaCapiTracker = {
+    pixelId: 'pixel-test',
+    sendSubmitApplication: async () => { events.push('meta:submit'); },
+  };
+  const ga4Tracker: Ga4Tracker = {
+    measurementId: 'G-TEST',
+    sendSubmitApplication: async () => { events.push('ga4:submit'); },
+  };
   const app = express();
   app.use(express.json());
-  app.use('/targets/:id/submissions', createSubmissionRoutes(catalog, repository, { storage, drive }));
+  app.use(
+    '/targets/:id/submissions',
+    createSubmissionRoutes(
+      catalog,
+      repository,
+      { storage, drive },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      metaTracker,
+      ga4Tracker,
+    ),
+  );
   return { app, events };
 }
 
-async function post(app: express.Express, body: Record<string, unknown>) {
+async function post(app: express.Express, body: Record<string, unknown>, sessionId: string | null = 'session-a') {
   const server = app.listen(0);
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('server address missing');
   try {
     const response = await fetch(`http://127.0.0.1:${address.port}/targets/offer-1/submissions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-preinscription-session': 'session-a' },
+      headers: {
+        'content-type': 'application/json',
+        ...(sessionId ? { 'x-preinscription-session': sessionId } : {}),
+      },
       body: JSON.stringify(body),
     });
     return { status: response.status, json: (await response.json()) as Record<string, any> };
@@ -97,6 +126,20 @@ describe('Submission route file pinning (P1)', () => {
     expect(res.status).toBe(201);
     expect(events.indexOf('pin:tmp-1,tmp-2,tmp-3,tmp-4:session-a:c-1')).toBeGreaterThanOrEqual(0);
     expect(events.indexOf('pin:tmp-1,tmp-2,tmp-3,tmp-4:session-a:c-1')).toBeLessThan(events.indexOf('saveOrGet'));
+    expect(events).toContain('meta:submit');
+    expect(events).toContain('ga4:submit');
+  });
+
+  it('rejects a submission with files and no session before saving anything', async () => {
+    const { app, events } = setup();
+    const res = await post(app, { clientSubmissionId: 'c-no-session', configRevision: revision, values, files }, null);
+    expect(res.status).toBe(400);
+    expect(res.json.error.code).toBe('INVALID_REQUEST');
+    // Antes se guardaba el envío (y se avisaba a Meta/GA4) y recién después se rechazaba.
+    expect(events).not.toContain('saveOrGet');
+    expect(events).not.toContain('meta:submit');
+    expect(events).not.toContain('ga4:submit');
+    expect(events.some((e) => e.startsWith('pin:'))).toBe(false);
   });
 
   it('does not pin when the form fails validation', async () => {

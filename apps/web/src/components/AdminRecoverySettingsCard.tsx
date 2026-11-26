@@ -25,9 +25,10 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
   const [chatIdsInput, setChatIdsInput] = useState('');
   const [testChatId, setTestChatId] = useState('');
 
-  const loadSettings = async () => {
+  // keepMessages evita borrar el error o el aviso que acaba de dejar una acción (p. ej. la prueba de Telegram).
+  const loadSettings = async (keepMessages = false) => {
     setLoading(true);
-    setError(null);
+    if (!keepMessages) setError(null);
     try {
       const data = await apiClient.getTelegramSettings();
       setSettings(data.telegram);
@@ -90,10 +91,10 @@ export const AdminRecoverySettingsCard: React.FC<AdminRecoverySettingsCardProps>
         chatId: testChatId.trim() || undefined,
       });
       setSuccess(res.message);
-      await loadSettings();
+      await loadSettings(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al enviar mensaje de prueba por Telegram');
-      await loadSettings();
+      await loadSettings(true);
     } finally {
       setTesting(false);
     }

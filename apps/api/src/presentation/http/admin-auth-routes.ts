@@ -165,14 +165,7 @@ export function createAdminAuthRoutes(
   });
 
   router.post('/logout', async (req: RequestWithAdminSession, res) => {
-    let sessionId: string | undefined = req.cookies?.[ADMIN_SESSION_COOKIE];
-    if (!sessionId && req.headers.cookie) {
-      const match = req.headers.cookie
-        .split(';')
-        .map((c) => c.trim())
-        .find((c) => c.startsWith(`${ADMIN_SESSION_COOKIE}=`));
-      if (match) sessionId = decodeURIComponent(match.split('=')[1] ?? '');
-    }
+    const sessionId: string | undefined = req.cookies?.[ADMIN_SESSION_COOKIE];
 
     if (sessionId) {
       await sessionStore.deleteSession(sessionId);
@@ -195,14 +188,7 @@ export function createAdminMeRoute(sessionStore: AdminSessionStore): Router {
   const router = createAsyncRouter();
 
   router.get('/me', async (req, res) => {
-    let sessionId: string | undefined = req.cookies?.[ADMIN_SESSION_COOKIE];
-    if (!sessionId && req.headers.cookie) {
-      const match = req.headers.cookie
-        .split(';')
-        .map((c) => c.trim())
-        .find((c) => c.startsWith(`${ADMIN_SESSION_COOKIE}=`));
-      if (match) sessionId = decodeURIComponent(match.split('=')[1] ?? '');
-    }
+    const sessionId: string | undefined = req.cookies?.[ADMIN_SESSION_COOKIE];
 
     if (!sessionId) {
       res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'No autenticado.' } });

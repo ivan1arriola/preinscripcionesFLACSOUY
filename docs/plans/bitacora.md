@@ -11,11 +11,11 @@ Registro vivo y cronológico de ejecución de [plan-maestro.md](./plan-maestro.m
 
 ## Estado general de épicas
 
-> Estado verificado al 2026-11-26: `main` en GitHub está en `37480b5` (PR #13 GA4 Measurement Protocol); este incremento documental (`docs/plan-maestro-y-metodologia`) entra primero a `main`.
+> Estado verificado al 2026-11-26: `main` en GitHub está en `586a378` (PR #14: plan maestro v3, bitácora, metodología de agentes y `GA4_API_SECRET` en E6).
 
 | Épica | Estado | Rama | Responsable / Autor | Notas |
 |---|---|---|---|---|
-| **E0** Hotfixes inmediatos | Completada en rama local (pendiente de rebasar sobre `main` y fusionar por PR) | `epica/e0-hotfixes` (`96ee2cf`) | Iván Arriola + Claude (código/plan); Codex y Antigravity (revisiones previas) | 6 commits locales (código, tests y plan maestro v3). |
+| **E0** Hotfixes inmediatos | Completada (PR a `main`) | `fix/e0-hotfixes` (sobre `main` `586a378`) | Iván Arriola + Claude (código/plan); Codex y Antigravity (revisiones, QA e integración) | 4 commits de código E0 sobre `main` (`586a378`) + `.max-w-md`/`.shadow-xl`/`border: 0`, `keepMessages` en `AdminSpreadsheetSettingsCard`, no disparo GA4/Meta sin sesión y `overflow-x: clip` en E2E. |
 | **E1** Base de calidad (reducida) | **En curso** (pendiente de PRs y CI en GitHub) | `epica/e1-base-calidad` (`8b874a3`) | Iván Arriola (decisiones), Antigravity (planificación y ejecución) y Codex (CI y despliegue) | Incrementos 1–5 implementados en la rama local. Restan PRs, CI en GitHub y activación de protección de `main`. |
 | **E2** Dependencias (`a` / `b` / `c`) | **En curso** (E2a adelantada localmente; E2b y E2c pendientes) | `epica/e2-dependencias` (`56f8ee6`) | Por asignar | E2a adelantada localmente (pendiente de alinear tras cerrar E1); E2b y E2c bloqueadas hasta cerrar E1 y protección de `main`. |
 | **E3** Seguridad (reducida) | Pendiente | — | Por asignar | — |
@@ -43,6 +43,18 @@ Decisiones operativas propuestas por Antigravity tras contrastar E1 con el estad
 
 ## Registro de entregas
 
+### 2026-11-26 15:20 -03:00 — E0: Hotfixes inmediatos en main
+- **Quién y rama.** Iván Arriola + Claude (commits originales `96ad0f7`, `72f71f1`, `75a7ae2`, `a496b2d`); Antigravity en integración sobre `main` (`586a378`): `Orchestrator` (`Gemini 4 Carbon Medium`), `Explorer` (`flash`), `Implementer` (`inherit`), `Reviewer` (`pro`), `QA` (`inherit` / `qa-verifier`). Rama: `fix/e0-hotfixes`.
+- **Qué se hizo.**
+  - Aplicación de los 4 hotfixes de E0 sobre `main` (`586a378`): orden CSS en `main.tsx`, reparación de selectores `\\:` en `app.css`, `overflow-x: clip`, `.phone-input` en `form.css`, estilos de botones/modales (`.max-w-md`, `.shadow-xl`, `border: 0` y `.fixed.inset-0`), `keepMessages` en `AdminDriveSettingsCard`, `AdminRecoverySettingsCard` y `AdminSpreadsheetSettingsCard` (con tests), provisión explícita de planillas, rechazo temprano `400` con archivos sin sesión antes de guardar/cupo/Meta/GA4 (`submission-routes.ts`, probado en `submission-pinning.test.ts`), retiro de parseo manual redundante de cookies (`admin-session.ts`, `admin-auth-routes.ts`), `umask 077` en `scripts/deploy-production.sh` y `overflow-x: clip` en `tests/e2e/mobile-preinscription.spec.ts`.
+- **Revisión independiente.** `Reviewer` (`pro`): 1.ª pasada detectó `medium` (`.max-w-md`/`.shadow-xl` faltantes) y 4 `low`; corregidos por `Implementer` (`inherit`). 2.ª pasada sobre el diff completo y archivos reales emitida como **`APROBADO`** (0 críticos/altos/medios; 1 observación `low` de seguimiento para E4 en `admin-responsive.css:183` para el modal de `AdminNotificationsSettingsCard` en `<= 760 px`).
+- **Verificaciones (`QA`).**
+  - `pnpm --filter @flacso/contracts build`, `pnpm typecheck`, `pnpm build` y `bash -n scripts/deploy-production.sh`: en verde (`exit 0`, `195` módulos Vite).
+  - `pnpm test` (sin `PREINSCRIPTIONS_TEST_DATABASE_URL`): `apps/api` **83** suites en verde y **13** saltadas (`96` total; **683** tests en verde y **68** saltados de `751`: `66` por falta de PostgreSQL 16 y `2` por plataforma `win32`); `apps/web` **37/37** suites en verde (**182/182** tests).
+  - Verificación visual a `1280 px` y `360 px` (`vite preview` + mocks API, 18 capturas): `0` desbordamientos horizontales (`scrollWidth` 1280/360), `0` imágenes rotas, `0` errores de consola/página, `.phone-input` a 1 columna en móvil, `0` llamadas a `provision` al montar `AdminSpreadsheetSettingsCard` y modales/contraste conformes (observación `low` en `.target-list-card-actions` a `1280 px` con `gapPx: 0` para seguir en E7).
+  - **No verificado localmente:** `pnpm e2e` (`Timed out` en `webServer` porque `/api/health` responde `503 database: down` sin Docker Desktop / PostgreSQL 16 en este entorno Windows) ni las 13 suites reales de PostgreSQL 16; quedan sujetos a la puerta de CI en GitHub Actions.
+- **Pendiente.** `push`, PR hacia `main`, validación en verde de CI en GitHub y merge squash, para iniciar a continuación **E1** (Incrementos 1–5).
+
 ### 2026-11-26 14:02 -03:00 — Documentación inicial en main: plan maestro v3, bitácora, metodología de agentes y GA4_API_SECRET en E6 (Incremento 0)
 - **Quién y rama.** Iván Arriola (decisiones) y Antigravity — nota de transparencia sobre modelos respecto a los IDs de [`AGENTS.md`](../../AGENTS.md): la sesión expuso `Orchestrator` en `Gemini 4 Carbon Medium` (en lugar de `gemini-4-neon-medium`), `Implementer` en tier `inherit` (hereda `Gemini 4 Carbon Medium` en lugar de `gemini-4-carbon-medium`) y `Reviewer` en tier `pro` (en lugar de `gemini-4-neon-high`); rama `docs/plan-maestro-y-metodologia` creada desde `origin/main` (`37480b5`).
 - **Qué se hizo.**
@@ -52,7 +64,7 @@ Decisiones operativas propuestas por Antigravity tras contrastar E1 con el estad
   - Limpieza de ref huérfana de Codex que bloqueaba `git fetch` y actualización de la tabla de estado general de épicas al 2026-11-26.
 - **Verificaciones.** `git diff --check` limpio; chequeo de correos `@flacso.edu.uy` limpio (solo excepción documentada `inscripciones@flacso.edu.uy` y regex); `pnpm install --frozen-lockfile`, `pnpm --filter @flacso/contracts build`, `pnpm typecheck` y `pnpm build` en verde; `pnpm test` (sin `PREINSCRIPTIONS_TEST_DATABASE_URL`): `apps/api` 83 suites en verde y 13 saltadas (682 tests en verde, 68 saltados de 750) y `apps/web` 36/36 suites en verde (178/178 tests). Sin ejecutar en este incremento documental: `pnpm e2e`, `docker compose config` y suites reales contra PostgreSQL 16.
 - **Revisión.** `Reviewer` independiente (`pro`): 1.ª pasada detectó citas de línea en `plan-maestro.md` (`medium`) y ajustes menores (`low`), todos corregidos por `Implementer` (`inherit`); 2.ª pasada sobre el diff completo y código real de `origin/main` emitida como **`APROBADO`** (0 críticos/altos/medios; 2 menores resueltos en este cierre).
-- **Pendiente.** Publicar y fusionar por squash este PR hacia `main` (autorización permanente otorgada por Iván el `2026-11-26 14:03 -03:00` para `push`, abrir PR y fusionar con CI verde, registrando cada acción y modelo en la bitácora) y luego retomar E0 (`epica/e0-hotfixes` rebasada sobre `main`).
+- **Cierre e integración.** El **PR #14** pasó CI en verde y se fusionó por squash en `main` (`586a378`), habilitando el inicio de la integración de E0 sobre `main`.
 
 ### 2026-11-26 13:09 -03:00 — E4 y E6 (planificación): especificación de pantallas del panel, «Estructura de los formularios» y panel como única fuente de configuración
 - **Quién y rama.** Iván Arriola decidió y Claude (Opus 5.5) exploró el código y redactó. Solo cambia documentación; se hizo en la rama de trabajo `epica/e2-dependencias`, sin commit.

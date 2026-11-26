@@ -71,7 +71,7 @@ export const TargetList: React.FC<TargetListProps> = ({ targets, onSelectTarget 
                 <button
                   type="button"
                   onClick={() => onSelectTarget(target)}
-                  className="target-card-primary-action"
+                  className={`btn ${isOperational ? 'btn-primary' : 'btn-secondary'} target-card-primary-action`}
                 >
                   {isOperational ? 'Completar preinscripción' : 'Ver información del destino'}
                 </button>
