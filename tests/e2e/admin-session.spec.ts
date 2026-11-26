@@ -14,7 +14,6 @@ test.describe('Admin session seeded in PostgreSQL', () => {
     const pool = new pg.Pool({ connectionString: databaseUrl! });
     const sessionId = `sess_e2e_${crypto.randomBytes(16).toString('hex')}`;
     const csrfToken = `csrf_e2e_${crypto.randomBytes(12).toString('hex')}`;
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
     const adminUser = {
       id: 'e2e-admin',
       email: 'admin@example.test',
@@ -22,10 +21,11 @@ test.describe('Admin session seeded in PostgreSQL', () => {
       role: 'admin',
     };
 
+    // expires_at no guarda zona horaria; el margen cubre la diferencia entre el host y la API.
     await pool.query(
       `INSERT INTO admin_sessions (id, user_id, email, user_data, csrf_token, expires_at)
-       VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
-      [sessionId, adminUser.id, adminUser.email, JSON.stringify(adminUser), csrfToken, expiresAt]
+       VALUES ($1, $2, $3, $4::jsonb, $5, CURRENT_TIMESTAMP + INTERVAL '2 days')`,
+      [sessionId, adminUser.id, adminUser.email, JSON.stringify(adminUser), csrfToken]
     );
 
     try {

@@ -4,10 +4,10 @@
 .env
 .env.*
 !.env.production.example
-node_modules
-dist
-build
-coverage
+**/node_modules
+**/dist
+**/build
+**/coverage
 test-results
 playwright-report
 backups

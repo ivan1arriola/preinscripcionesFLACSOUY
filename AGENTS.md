@@ -8,7 +8,7 @@ Registro de entregas y estado actual: [`docs/plans/bitacora.md`](docs/plans/bita
 - `apps/web`: SPA React 18 + Vite 6 con CSS propio (`app.css`, `form.css`, `pages/admin-responsive.css`).
 - `packages/contracts`: tipos compartidos y definición canónica de formularios (`@flacso/contracts`). API y web lo consumen desde `dist/`.
 - `tests/e2e`: pruebas de extremo a extremo con Playwright.
-- `deploy/` y `scripts/`: despliegue en producción (`deploy/docker-compose.production.yml`, `scripts/deploy-production.sh`) y scripts de CI (`scripts/ci/`, a incorporar en E1).
+- `deploy/` y `scripts/`: despliegue en producción (`deploy/docker-compose.production.yml`, `scripts/deploy-production.sh`) y scripts de CI (`scripts/ci/`).
 
 ## Comandos principales
 - `pnpm --filter @flacso/contracts build`: compila contratos (necesario tras cambios en `packages/contracts` antes de validar API/web).
