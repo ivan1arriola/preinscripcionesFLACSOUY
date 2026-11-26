@@ -96,6 +96,7 @@ integrationDescribe('PostgresTelegramAlertRepository (Integration)', () => {
       submissionId: testSubId,
       chatId: '10003',
       message: 'Alerta a enviar',
+      availableAt: now,
     });
     expect(alert).toBeDefined();
 
@@ -117,6 +118,7 @@ integrationDescribe('PostgresTelegramAlertRepository (Integration)', () => {
       submissionId: testSubId,
       chatId: '10004',
       message: 'Alerta a fallar',
+      availableAt: now,
     });
     expect(alert).toBeDefined();
 
@@ -147,6 +149,7 @@ integrationDescribe('PostgresTelegramAlertRepository (Integration)', () => {
       submissionId: testSubId,
       chatId: '10005',
       message: 'Alerta permanente',
+      availableAt: now,
     });
 
     const [claimed] = await repository.claimPending(1, now, 60_000);

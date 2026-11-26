@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "pnpm -r --parallel run dev",
     "test": "pnpm -r --workspace-concurrency=1 run test",
+    "test:coverage": "pnpm -r --workspace-concurrency=1 run test:coverage",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "build": "pnpm -r run build",

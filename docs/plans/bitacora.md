@@ -11,12 +11,12 @@ Registro vivo y cronológico de ejecución de [plan-maestro.md](./plan-maestro.m
 
 ## Estado general de épicas
 
-> Estado verificado al 2026-11-26: `main` en GitHub está en `e9041e1` (**PR #16**: E1 / Incremento 1).
+> Estado verificado al 2026-11-26: `main` en GitHub está en `bfa4959` (**PR #17**: E1 / Incremento 2).
 
 | Épica | Estado | Rama | Responsable / Autor | Notas |
 |---|---|---|---|---|
 | **E0** Hotfixes inmediatos | Cerrada en `main` (PR #15) | `main` (`cbe04e6`) | Iván Arriola + Claude (código/plan); Codex y Antigravity (revisiones, QA e integración) | 4 commits de código E0 sobre `main` (`586a378`) + `.max-w-md`/`.shadow-xl`/`border: 0`, `keepMessages` en `AdminSpreadsheetSettingsCard`, no disparo GA4/Meta sin sesión y `overflow-x: clip` en E2E; fusionada por squash en `cbe04e6`. |
-| **E1** Base de calidad (reducida) | En curso (E1.1 en main #16; E1.2 en PR; E1.3–E1.5 en rama local) | `chore/e1-2-entidades-tests-e2e` (sobre `main` `e9041e1`) | Iván Arriola (decisiones), Antigravity (planificación y ejecución) y Codex (CI y despliegue) | E1.1 fusionado en `main` (`e9041e1`, PR #16); E1.2 en `chore/e1-2-entidades-tests-e2e`; E1.3–E1.5 implementados en `epica/e1-base-calidad` (`8b874a3`). Restan PRs, CI en GitHub y activación de protección de `main`. |
+| **E1** Base de calidad (reducida) | En curso (E1.1–E1.2 en main #16–#17; E1.3 en PR; E1.4–E1.5 en rama local) | `chore/e1-3-cobertura-v8` (sobre `main` `bfa4959`) | Iván Arriola (decisiones), Antigravity (planificación y ejecución) y Codex (CI y despliegue) | E1.1–E1.2 fusionados en `main` (`e9041e1` PR #16, `bfa4959` PR #17); E1.3 en `chore/e1-3-cobertura-v8`; E1.4–E1.5 implementados en `epica/e1-base-calidad` (`8b874a3`). Restan PRs, CI en GitHub y activación de protección de `main`. |
 | **E2** Dependencias (`a` / `b` / `c`) | **En curso** (E2a adelantada localmente; E2b y E2c pendientes) | `epica/e2-dependencias` (`56f8ee6`) | Por asignar | E2a adelantada localmente (pendiente de alinear tras cerrar E1); E2b y E2c bloqueadas hasta cerrar E1 y protección de `main`. |
 | **E3** Seguridad (reducida) | Pendiente | — | Por asignar | — |
 | **E4** Panel: navegación y base de UI | Asignada (no iniciada) | — | Antigravity con equipo de agentes (ver [`AGENTS.md`](../../AGENTS.md)); Iván Arriola (decisiones) | Roles y modelos en [`AGENTS.md`](../../AGENTS.md). Arranca cuando E1, E2, E3 y E5 estén cerradas y `main` protegida. |
@@ -26,7 +26,7 @@ Registro vivo y cronológico de ejecución de [plan-maestro.md](./plan-maestro.m
 | **E8** Analítica mínima | Pendiente | — | Por asignar | — |
 | **E9** Documentación mínima | Pendiente | — | Por asignar | — |
 | **E10** Cierre de calidad | Pendiente | — | Por asignar | — |
-| **E11** Rendimiento (quick wins) | Pendiente (repartida) | — | Por asignar | Línea base se mide en E1 / Incremento 3. |
+| **E11** Rendimiento (quick wins) | Pendiente (repartida) | — | Por asignar | Línea base medida en E1 / Incremento 3 (ver `plan-maestro.md`). |
 
 ---
 
@@ -43,12 +43,19 @@ Decisiones operativas propuestas por Antigravity tras contrastar E1 con el estad
 
 ## Registro de entregas
 
+### 2026-11-26 16:44 -03:00 — E1 / Incremento 3: Cobertura V8 con candado, tsconfig.build.json y Dockerfiles pnpm@12.14.0
+- **Quién y rama.** Antigravity (ejecución/mediciones iniciales `fdecfa2`, integración sobre `main` `bfa4959`): `Orchestrator` (`Gemini 4 Carbon Medium`), `Implementer` (`inherit`), `Reviewer` (`pro`), `QA` (`inherit` / `qa-verifier`). Rama: `chore/e1-3-cobertura-v8`.
+- **Qué se hizo.** Instalación de `@vitest/coverage-v8@3.2.7` en `api` y `web` sin alterar otras dependencias del lockfile; `pnpm@12.14.0` en `apps/api/Dockerfile` y `apps/web/Dockerfile`; `apps/api/tsconfig.build.json` (`0` archivos `*.test.js` en `dist/`); candados de cobertura V8 (`api`: `78/78/87/79` cuando hay `CI` o `PREINSCRIPTIONS_TEST_DATABASE_URL`; `web`: `80/80/63/79`); fix de reloj `availableAt: now` en `postgres-telegram-alert-repository.test.ts`; actualización de `README.md` y `AGENTS.md:17`.
+- **Revisión independiente.** `Reviewer` (`pro`): **`APROBADO`** (0 críticos/altos/medios; 4 observaciones menores no bloqueantes).
+- **Verificaciones (`QA`).** `pnpm install --frozen-lockfile` OK (`256 ms`); `pnpm --filter @flacso/contracts build` y `pnpm typecheck` en verde; limpieza de `apps/api/dist` + `pnpm build` en verde (`0` archivos `*.test.js`/`*.spec.js` en `dist/` y `apps/api/dist/main.js` presente); `$env:CI=""; $env:PREINSCRIPTIONS_TEST_DATABASE_URL=""; pnpm test:coverage`: `apps/api` **83/96** suites (**679/747** tests, `68` saltados: `66` sin PostgreSQL 16 local y `2` `win32`; V8 sin PG: `68.35/68.35/75.21/79.40`) y `apps/web` **37/37** suites (**182/182** tests, V8 con candado `80/80/63/79` en verde: `80.41/80.41/63.79/80.09`). **No verificado localmente:** candado de `apps/api` (`78/78/87/79`), 13 suites PostgreSQL 16 (incluido `postgres-telegram-alert-repository.test.ts`), 2 tests `win32`, `docker build` y `pnpm e2e` (entran en E1.4).
+- **Pendiente.** `push`, PR hacia `main`, validación de CI en verde y merge squash; luego **E1.4** (tubería CI paralela de 6 puertas + corrección MIME `.mjs` en `apps/web/nginx.conf`).
+
 ### 2026-11-26 16:28 -03:00 — E1 / Incremento 2: Entidades HTML, limpieza de tests obsoletos y preparación de Playwright
 - **Quién y rama.** Antigravity (implementación inicial `4949437`, integración sobre `main` `e9041e1`): `Orchestrator` (`Gemini 4 Carbon Medium`), `Implementer` (`inherit`), `Reviewer` (`pro`), `QA` (`inherit` / `qa-verifier`). Rama: `chore/e1-2-entidades-tests-e2e`.
 - **Qué se hizo.** Ampliación de `NAMED_ENTITIES` (+41 entidades) en `apps/api/src/infrastructure/wordpress/html-entities.ts` y `html-entities.test.ts`; consolidación de `admin-profile-routes.test.ts` usando `admin@example.test`; limpieza de `profileVersionId` obsoletos en `form-validation.test.ts` y `spreadsheet-schema.test.ts`; preparación de `playwright.config.ts` (`WEB_URL` sin `webServer` y `admin@example.test`), actualización de `tests/e2e/document-flow.spec.ts` y `preinscriptions.spec.ts`, incorporación de `tests/e2e/admin-session.spec.ts`, y actualización de `AGENTS.md:19`.
 - **Revisión independiente.** `Reviewer` (`pro`): **`APROBADO`** (0 críticos/altos/medios; 4 observaciones menores no bloqueantes, incluyendo el ajuste de reloj `NOW()` de `admin-session.spec.ts` previsto para E1.4).
 - **Verificaciones (`QA`).** Cero `@flacso.edu.uy` nuevos en diff y archivos tocados; `pnpm --filter @flacso/contracts build`, `pnpm typecheck` y `pnpm build` en verde (`195` módulos Vite); `pnpm test` (sin `PREINSCRIPTIONS_TEST_DATABASE_URL`): `apps/api` **83/96** suites (**679/747** tests, con `admin-profile-routes.test.ts` 1/1, `html-entities.test.ts` 7/7, `form-validation.test.ts` 13/13, `spreadsheet-schema.test.ts` 11/11; 13 suites / 66 tests saltados por falta de PostgreSQL 16 local y 2 por plataforma `win32`) y `apps/web` **37/37** suites (**182/182** tests); `playwright test --list` (default y con `WEB_URL`) listó 14 tests en 4 specs. **No verificado localmente:** `pnpm e2e` en vivo (sin stack ni PostgreSQL 16 local; entra con el job `e2e` en E1.4) ni `tsc` sobre `tests/e2e/`.
-- **Pendiente.** `push`, PR hacia `main`, validación de CI en verde y merge squash; luego **E1.3** (cobertura V8 con candado, `tsconfig.build.json` y Dockerfiles `pnpm@12.14.0`).
+- **Pendiente.** Ninguno: el **PR #17** pasó CI en verde y se fusionó por squash en `main` (`bfa4959`), habilitando **E1.3** (cobertura V8 con candado, `tsconfig.build.json` y Dockerfiles `pnpm@12.14.0`).
 
 ### 2026-11-26 16:17 -03:00 — E1 / Incremento 1: Retiro del worker duplicado e integración sobre main
 - **Quién y rama.** Antigravity (planificación/implementación inicial `81011f8`, integración sobre `main` `cbe04e6`): `Orchestrator` (`Gemini 4 Carbon Medium`), `Implementer` (`inherit`), `Reviewer` (`pro`), `QA` (`inherit` / `qa-verifier`). Rama: `chore/e1-1-retiro-worker`.

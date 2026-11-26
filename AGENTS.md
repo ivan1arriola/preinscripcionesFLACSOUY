@@ -14,7 +14,7 @@ Registro de entregas y estado actual: [`docs/plans/bitacora.md`](docs/plans/bita
 - `pnpm --filter @flacso/contracts build`: compila contratos (necesario tras cambios en `packages/contracts` antes de validar API/web).
 - `pnpm typecheck`: verificación de tipos en todo el monorepo.
 - `pnpm test`: ejecuta pruebas unitarias y de integración (`PREINSCRIPTIONS_TEST_DATABASE_URL` habilita las suites reales contra PostgreSQL 16).
-- `pnpm test:coverage`: ejecuta Vitest con cobertura V8 y candado mínimo (definido a partir de E1).
+- `pnpm test:coverage`: ejecuta Vitest con cobertura V8 y candado mínimo.
 - `pnpm build`: compila `contracts`, `api` y `web`.
 - `pnpm e2e`: corre Playwright (con `WEB_URL` apunta a un stack ya levantado sin lanzar servidores de desarrollo).
 - `docker compose config --quiet` / `docker compose --env-file .env.production.example -f deploy/docker-compose.production.yml config --quiet`: valida sintaxis y variables requeridas de Compose.

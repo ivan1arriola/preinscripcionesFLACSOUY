@@ -1,6 +1,6 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
-RUN npm install -g pnpm@12.8.1
+RUN npm install -g pnpm@12.14.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/api/package.json ./apps/api/package.json
