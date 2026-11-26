@@ -62,8 +62,8 @@ export const UploadingFileRow: React.FC<{ upload?: PendingUpload; onRetry?: () =
         </span>
         {upload?.error && <span className="field-error" role="alert">{upload.error}</span>}
         {(onRetry || onDismiss) && <div className="uploading-row__actions">
-          {onRetry && <button type="button" className="btn btn--secondary" onClick={onRetry}>Reanudar carga</button>}
-          {onDismiss && <button type="button" className="btn btn--secondary" onClick={onDismiss}>Quitar</button>}
+          {onRetry && <button type="button" className="btn btn-secondary" onClick={onRetry}>Reanudar carga</button>}
+          {onDismiss && <button type="button" className="btn btn-secondary" onClick={onDismiss}>Quitar</button>}
         </div>}
       </div>
     </div>

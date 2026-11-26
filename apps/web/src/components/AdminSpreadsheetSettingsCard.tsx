@@ -28,9 +28,10 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
   const [statusFilter, setStatusFilter] = useState<SpreadsheetTargetStatusFilter>('all');
   const [expandedTargetId, setExpandedTargetId] = useState<string | null>(null);
 
-  const load = async (synchronizeMissing = true) => {
+  // keepMessages evita borrar el error o el aviso que acaba de dejar una acción (p. ej. planillas bloqueadas).
+  const load = async (synchronizeMissing = true, keepMessages = false) => {
     setLoading(true);
-    setError(null);
+    if (!keepMessages) setError(null);
     try {
       const data = await apiClient.getAdminSpreadsheets();
       setTargets(data.targets);
@@ -51,7 +52,8 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
     }
   };
 
-  useEffect(() => { load(); }, []);
+  // Crear planillas en Drive es una acción explícita (botón «Sincronizar formato»), no un efecto de abrir la pestaña.
+  useEffect(() => { load(false); }, []);
 
   const provision = async () => {
     setProvisioning(true);
@@ -64,7 +66,7 @@ export const AdminSpreadsheetSettingsCard: React.FC<AdminSpreadsheetSettingsCard
       } else {
         setSummary('Planillas sincronizadas con el formato del formulario.');
       }
-      await load(false);
+      await load(false, true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudieron sincronizar las planillas automáticamente.');
     } finally {

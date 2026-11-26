@@ -272,7 +272,7 @@ describe('Submission HTTP Routes', () => {
   it('POST /api/targets/:id/submissions returns 404 for unknown target', async () => {
     const res = await fetch(`${baseUrl}/api/targets/target-no-existe/submissions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-preinscription-session': 'session-test' },
       body: JSON.stringify(validPayload),
     });
 

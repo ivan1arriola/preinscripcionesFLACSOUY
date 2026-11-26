@@ -100,7 +100,7 @@ test -f "\$RELEASE/\$COMPOSE_FILE" || { echo "Falta el Compose en \$RELEASE" >&2
 
 STAMP="\$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="\$BACKUPS/\$STAMP-\$SHA"
-mkdir -p "\$BACKUP_DIR"
+install -d -m 700 "\$BACKUP_DIR"
 if [[ -e "\$ENV_FILE" ]]; then
   install -m 600 "\$ENV_FILE" "\$BACKUP_DIR/.env.production"
 fi
@@ -113,7 +113,8 @@ if [[ -L "\$CURRENT" || -d "\$CURRENT" ]]; then
     DB_USER="\$(grep '^POSTGRES_USER=' "\$ENV_FILE" | cut -d= -f2-)"
     DB_NAME="\$(grep '^POSTGRES_DB=' "\$ENV_FILE" | cut -d= -f2-)"
     test -n "\$DB_USER" && test -n "\$DB_NAME" || { echo "Faltan POSTGRES_USER o POSTGRES_DB en \$ENV_FILE" >&2; exit 1; }
-    docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T postgres pg_dump --username "\$DB_USER" --dbname "\$DB_NAME" --clean --if-exists --no-owner --no-privileges < /dev/null > "\$BACKUP_DIR/database.sql"
+    # El volcado contiene datos personales: solo el usuario que despliega puede leerlo.
+    ( umask 077; docker compose --env-file "\$ENV_FILE" -f "\$CURRENT/\$COMPOSE_FILE" exec -T postgres pg_dump --username "\$DB_USER" --dbname "\$DB_NAME" --clean --if-exists --no-owner --no-privileges < /dev/null > "\$BACKUP_DIR/database.sql" )
   fi
 fi
 

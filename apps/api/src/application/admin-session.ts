@@ -93,18 +93,9 @@ export interface RequestWithAdminSession extends Request {
   adminSession?: AdminSession;
 }
 
+// cookie-parser ya corre en createApp antes de cualquier ruta admin: no hace falta leer la cabecera a mano.
 function extractSessionId(req: Request): string | null {
-  if (req.cookies && req.cookies[ADMIN_SESSION_COOKIE]) {
-    return req.cookies[ADMIN_SESSION_COOKIE];
-  }
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) return null;
-  const match = cookieHeader
-    .split(';')
-    .map((c) => c.trim())
-    .find((c) => c.startsWith(`${ADMIN_SESSION_COOKIE}=`));
-  if (!match) return null;
-  return decodeURIComponent(match.split('=')[1] ?? '');
+  return req.cookies?.[ADMIN_SESSION_COOKIE] || null;
 }
 
 /** Comparación en tiempo constante: el token CSRF no debe poder deducirse midiendo respuestas. */

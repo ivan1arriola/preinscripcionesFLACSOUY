@@ -142,7 +142,7 @@ export function App() {
       <header className="app-header">
         <div className="app-header-content max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div
-            className="app-brand flex items-center space-x-3 cursor-pointer"
+            className="app-brand flex items-center cursor-pointer"
             onClick={handleGoHome}
             role="button"
             tabIndex={0}

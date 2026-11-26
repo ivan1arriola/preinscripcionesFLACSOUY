@@ -23,9 +23,10 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const loadSettings = async () => {
+  // keepMessages evita borrar el error o el aviso que acaba de dejar una acción (p. ej. planillas bloqueadas).
+  const loadSettings = async (keepMessages = false) => {
     setLoading(true);
-    setError(null);
+    if (!keepMessages) setError(null);
     try {
       const data = await apiClient.getAdminSettings();
       setCurrentFolderId(data.googleDriveFolderId);
@@ -70,7 +71,7 @@ export const AdminDriveSettingsCard: React.FC<AdminDriveSettingsCardProps> = ({ 
       } else {
         setSuccess('Carpeta de Google Drive actualizada correctamente.');
       }
-      loadSettings();
+      loadSettings(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al guardar la carpeta de Google Drive');
     } finally {

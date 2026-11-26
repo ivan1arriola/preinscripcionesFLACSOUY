@@ -40,7 +40,7 @@
 
 /* El panel previo usaba clases fixed/inset-0/z-50 que NO existen en app.css.
    El detalle debe ser un diálogo real, independiente del flujo del documento. */
-.admin-recovery-panel .fixed {
+.fixed.inset-0 {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -180,7 +180,7 @@
     font-size: .85rem;
   }
 
-  .admin-recovery-panel .fixed { padding: 0; align-items: stretch; }
+  .fixed.inset-0 { padding: 0; align-items: stretch; }
   .admin-recovery-dialog {
     width: 100%;
     max-width: none;

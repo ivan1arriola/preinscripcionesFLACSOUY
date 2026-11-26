@@ -165,4 +165,55 @@ describe('AdminSpreadsheetSettingsCard Component', () => {
     expect(window.confirm).toHaveBeenCalled();
     expect(apiClient.unlinkAdminSpreadsheet).toHaveBeenCalledWith('t1', 'test-csrf');
   });
+
+  it('no crea planillas al abrir la pestaña: solo al pulsar «Sincronizar formato»', async () => {
+    vi.mocked(apiClient.getAdminSpreadsheets).mockResolvedValue({ targets: mockTargets });
+
+    render(<AdminSpreadsheetSettingsCard csrfToken="test-csrf" />);
+
+    // t3 no tiene planilla; antes eso disparaba POST /spreadsheets/provision al montar.
+    expect(await screen.findByText(/Diploma en Género/i)).toBeInTheDocument();
+    expect(apiClient.provisionAdminSpreadsheets).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /Sincronizar formato/i }));
+    await waitFor(() => expect(apiClient.provisionAdminSpreadsheets).toHaveBeenCalledTimes(1));
+  });
+
+  it('conserva visible el aviso de error cuando provisionAdminSpreadsheets queda blocked y getAdminSpreadsheets resuelve después', async () => {
+    let resolveRefetch!: (value: { targets: typeof mockTargets }) => void;
+    const refetchPromise = new Promise<{ targets: typeof mockTargets }>((resolve) => {
+      resolveRefetch = resolve;
+    });
+
+    vi.mocked(apiClient.getAdminSpreadsheets)
+      .mockResolvedValueOnce({ targets: mockTargets })
+      .mockReturnValueOnce(refetchPromise);
+
+    vi.mocked(apiClient.provisionAdminSpreadsheets).mockResolvedValue({
+      targets: mockTargets,
+      reconciliation: { status: 'blocked', targets: [] },
+    } as any);
+
+    render(<AdminSpreadsheetSettingsCard csrfToken="test-csrf" />);
+
+    expect(await screen.findByText('Maestría en Educación y Sociedad')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Sincronizar formato/i }));
+
+    await waitFor(() => {
+      expect(apiClient.getAdminSpreadsheets).toHaveBeenCalledTimes(2);
+    });
+    expect(
+      screen.getByText(/Algunas planillas no pudieron crearse porque la cuenta de servicio no tiene acceso suficiente a Google Drive/i),
+    ).toBeInTheDocument();
+
+    resolveRefetch({ targets: mockTargets });
+
+    await waitFor(() => {
+      expect(screen.getByText('Maestría en Educación y Sociedad')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/Algunas planillas no pudieron crearse porque la cuenta de servicio no tiene acceso suficiente a Google Drive/i),
+    ).toBeInTheDocument();
+  });
 });

@@ -17,7 +17,7 @@ for (const viewport of viewports) {
 
     await expect(page.getByRole('button', { name: /Comenzar preinscripción/i })).toBeVisible();
     await expect(page.locator('#input-nombre1')).toHaveCount(0);
-    await expect(page.locator('body')).toHaveCSS('overflow-x', 'hidden');
+    await expect(page.locator('body')).toHaveCSS('overflow-x', 'clip');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     await page.getByRole('button', { name: /Comenzar preinscripción/i }).click();

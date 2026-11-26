@@ -346,6 +346,7 @@ input[type="file"].file-input::file-selector-button:hover { background: var(--fl
 
 /* ---------- Pantallas angostas ---------- */
 @media (max-width: 640px) {
+  .phone-input { grid-template-columns: 1fr; }
   .app-shell .app-header-content { min-height: 4.25rem; }
   .app-brand { gap: .7rem; }
   .app-brand-logo { height: 2.1rem; }
