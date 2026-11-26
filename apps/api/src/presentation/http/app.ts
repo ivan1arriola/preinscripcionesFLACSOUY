@@ -8,6 +8,7 @@ import { healthResponse, type CatalogHealthResponse } from './health.js';
 import { createTargetRoutes } from './target-routes.js';
 import { createSubmissionRoutes, type LeaseOptions } from './submission-routes.js';
 import { createMetaCapiTrackerFromEnv, type MetaCapiTracker } from '../../infrastructure/meta/meta-capi.js';
+import { createGa4TrackerFromEnv, type Ga4Tracker } from '../../infrastructure/ga4/ga4-measurement-protocol.js';
 import { errorHandler } from './error-handler.js';
 import type { TemporaryFileStoragePort } from '../../ports/file-storage.js';
 import { createUploadRoutes } from './upload-routes.js';
@@ -105,6 +106,8 @@ export interface AppDependencies {
   submissionLease?: LeaseOptions;
   /** Conversions API de Meta (SubmitApplication). Por defecto se arma con META_PIXEL_ID y META_CAPI_ACCESS_TOKEN. */
   metaTracker?: MetaCapiTracker;
+  /** GA4 por Measurement Protocol (submit_application). Por defecto con GA4_MEASUREMENT_ID y GA4_API_SECRET. */
+  ga4Tracker?: Ga4Tracker;
   telegramAlertRepository?: TelegramAlertRepository;
   getTelegramChatIds?: () => Promise<string[]> | string[];
   getTelegramPreinscriptionChatIds?: () => Promise<string[]> | string[];
@@ -175,6 +178,7 @@ export function createApp(dependencies: AppDependencies): Express {
     new EncryptedSettingsService(settingsRepo, process.env.APP_SETTINGS_ENCRYPTION_KEY);
 
   const metaTracker = dependencies.metaTracker ?? createMetaCapiTrackerFromEnv();
+  const ga4Tracker = dependencies.ga4Tracker ?? createGa4TrackerFromEnv();
 
   // Configuración pública que necesita el navegador: sólo la clave del sitio de reCAPTCHA (no es secreta).
   app.get('/api/config', async (_req, res) => {
@@ -189,7 +193,7 @@ export function createApp(dependencies: AppDependencies): Express {
     }
     res.setHeader('Cache-Control', 'no-store');
     res.json({ recaptcha, meta: metaTracker ? { pixelId: metaTracker.pixelId } : { pixelId: null },
-      ga4: { measurementId: process.env.GA4_MEASUREMENT_ID?.trim() || null },
+      ga4: { measurementId: process.env.GA4_MEASUREMENT_ID?.trim() || null, serverEvents: Boolean(ga4Tracker) },
     });
   });
 
@@ -311,6 +315,7 @@ export function createApp(dependencies: AppDependencies): Express {
     rateLimits ? { perEmail: rateLimits.submissionsPerEmail } : undefined,
     dependencies.submissionLease,
     metaTracker,
+    ga4Tracker,
   );
 
   targetRoutes.use('/:id/submissions', submissionRoutes);
