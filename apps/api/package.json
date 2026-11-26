@@ -12,7 +12,6 @@
     "lint": "tsc --noEmit",
     "db:migrate": "tsx src/infrastructure/database/migrate.ts",
     "sweep:once": "tsx src/sweep-once.ts",
-    "worker:notifications": "tsx src/worker-notifications.ts",
     "migrate:spreadsheets": "tsx ../../scripts/migrate-spreadsheets.ts"
   },
   "dependencies": {

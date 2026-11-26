@@ -11,12 +11,12 @@ Registro vivo y cronológico de ejecución de [plan-maestro.md](./plan-maestro.m
 
 ## Estado general de épicas
 
-> Estado verificado al 2026-11-26: `main` en GitHub está en `586a378` (PR #14: plan maestro v3, bitácora, metodología de agentes y `GA4_API_SECRET` en E6).
+> Estado verificado al 2026-11-26: `main` en GitHub está en `cbe04e6` (**PR #15**: E0 Hotfixes inmediatos).
 
 | Épica | Estado | Rama | Responsable / Autor | Notas |
 |---|---|---|---|---|
-| **E0** Hotfixes inmediatos | Completada (PR a `main`) | `fix/e0-hotfixes` (sobre `main` `586a378`) | Iván Arriola + Claude (código/plan); Codex y Antigravity (revisiones, QA e integración) | 4 commits de código E0 sobre `main` (`586a378`) + `.max-w-md`/`.shadow-xl`/`border: 0`, `keepMessages` en `AdminSpreadsheetSettingsCard`, no disparo GA4/Meta sin sesión y `overflow-x: clip` en E2E. |
-| **E1** Base de calidad (reducida) | **En curso** (pendiente de PRs y CI en GitHub) | `epica/e1-base-calidad` (`8b874a3`) | Iván Arriola (decisiones), Antigravity (planificación y ejecución) y Codex (CI y despliegue) | Incrementos 1–5 implementados en la rama local. Restan PRs, CI en GitHub y activación de protección de `main`. |
+| **E0** Hotfixes inmediatos | Cerrada en `main` (PR #15) | `main` (`cbe04e6`) | Iván Arriola + Claude (código/plan); Codex y Antigravity (revisiones, QA e integración) | 4 commits de código E0 sobre `main` (`586a378`) + `.max-w-md`/`.shadow-xl`/`border: 0`, `keepMessages` en `AdminSpreadsheetSettingsCard`, no disparo GA4/Meta sin sesión y `overflow-x: clip` en E2E; fusionada por squash en `cbe04e6`. |
+| **E1** Base de calidad (reducida) | En curso (E1.1 en PR sobre `main`; E1.2–E1.5 en rama local) | `chore/e1-1-retiro-worker` (sobre `main` `cbe04e6`) | Iván Arriola (decisiones), Antigravity (planificación y ejecución) y Codex (CI y despliegue) | E1.1 en PR sobre `main` (`chore/e1-1-retiro-worker`); E1.2–E1.5 implementados en `epica/e1-base-calidad` (`8b874a3`). Restan PRs, CI en GitHub y activación de protección de `main`. |
 | **E2** Dependencias (`a` / `b` / `c`) | **En curso** (E2a adelantada localmente; E2b y E2c pendientes) | `epica/e2-dependencias` (`56f8ee6`) | Por asignar | E2a adelantada localmente (pendiente de alinear tras cerrar E1); E2b y E2c bloqueadas hasta cerrar E1 y protección de `main`. |
 | **E3** Seguridad (reducida) | Pendiente | — | Por asignar | — |
 | **E4** Panel: navegación y base de UI | Asignada (no iniciada) | — | Antigravity con equipo de agentes (ver [`AGENTS.md`](../../AGENTS.md)); Iván Arriola (decisiones) | Roles y modelos en [`AGENTS.md`](../../AGENTS.md). Arranca cuando E1, E2, E3 y E5 estén cerradas y `main` protegida. |
@@ -43,6 +43,13 @@ Decisiones operativas propuestas por Antigravity tras contrastar E1 con el estad
 
 ## Registro de entregas
 
+### 2026-11-26 16:17 -03:00 — E1 / Incremento 1: Retiro del worker duplicado e integración sobre main
+- **Quién y rama.** Antigravity (planificación/implementación inicial `81011f8`, integración sobre `main` `cbe04e6`): `Orchestrator` (`Gemini 4 Carbon Medium`), `Implementer` (`inherit`), `Reviewer` (`pro`), `QA` (`inherit` / `qa-verifier`). Rama: `chore/e1-1-retiro-worker`.
+- **Qué se hizo.** Eliminación de `apps/api/src/worker-notifications.ts` (conservando `worker-recovery.test.ts`), retiro de `"worker:notifications"` en `apps/api/package.json` y servicio `notification-worker` en `docker-compose.yml`, y actualización de `docs/ARQUITECTURA.md`, `docs/DEPLOY.md`, `docs/MAUTIC.md`, `docs/SES-NOTIFICACIONES.md` y `docs/TELEGRAM-Y-PLANILLAS.md`.
+- **Revisión independiente.** `Reviewer` (`pro`): **`APROBADO`** (0 críticos/altos/medios; observación menor en `docs/SES-NOTIFICACIONES.md:115` con mención genérica `"worker"` en tabla, a retirar en E9).
+- **Verificaciones (`QA`).** `git grep` limpio (0 referencias vivas); `docker compose -f docker-compose.yml config --quiet` y `docker compose --env-file .env.production.example -f deploy/docker-compose.production.yml config --quiet` OK; `pnpm --filter @flacso/contracts build`, `pnpm typecheck` y `pnpm build` en verde (`195` módulos Vite); `pnpm test` (sin `PREINSCRIPTIONS_TEST_DATABASE_URL`): `apps/api` **83/96** suites (**683/751** tests, `worker-recovery.test.ts` 3/3; 13 suites / 66 tests saltados por falta de PostgreSQL 16 local y 2 por plataforma `win32`) y `apps/web` **37/37** suites (**182/182** tests). **No verificado localmente:** suites reales PostgreSQL 16, `pnpm e2e` y `docker build` (entran en E1.4).
+- **Pendiente.** `push`, PR hacia `main`, validación de CI en verde y merge squash; luego **E1.2** (entidades HTML, limpieza de tests obsoletos y preparación de Playwright).
+
 ### 2026-11-26 15:20 -03:00 — E0: Hotfixes inmediatos en main
 - **Quién y rama.** Iván Arriola + Claude (commits originales `96ad0f7`, `72f71f1`, `75a7ae2`, `a496b2d`); Antigravity en integración sobre `main` (`586a378`): `Orchestrator` (`Gemini 4 Carbon Medium`), `Explorer` (`flash`), `Implementer` (`inherit`), `Reviewer` (`pro`), `QA` (`inherit` / `qa-verifier`). Rama: `fix/e0-hotfixes`.
 - **Qué se hizo.**
@@ -53,7 +60,7 @@ Decisiones operativas propuestas por Antigravity tras contrastar E1 con el estad
   - `pnpm test` (sin `PREINSCRIPTIONS_TEST_DATABASE_URL`): `apps/api` **83** suites en verde y **13** saltadas (`96` total; **683** tests en verde y **68** saltados de `751`: `66` por falta de PostgreSQL 16 y `2` por plataforma `win32`); `apps/web` **37/37** suites en verde (**182/182** tests).
   - Verificación visual a `1280 px` y `360 px` (`vite preview` + mocks API, 18 capturas): `0` desbordamientos horizontales (`scrollWidth` 1280/360), `0` imágenes rotas, `0` errores de consola/página, `.phone-input` a 1 columna en móvil, `0` llamadas a `provision` al montar `AdminSpreadsheetSettingsCard` y modales/contraste conformes (observación `low` en `.target-list-card-actions` a `1280 px` con `gapPx: 0` para seguir en E7).
   - **No verificado localmente:** `pnpm e2e` (`Timed out` en `webServer` porque `/api/health` responde `503 database: down` sin Docker Desktop / PostgreSQL 16 en este entorno Windows) ni las 13 suites reales de PostgreSQL 16; quedan sujetos a la puerta de CI en GitHub Actions.
-- **Pendiente.** `push`, PR hacia `main`, validación en verde de CI en GitHub y merge squash, para iniciar a continuación **E1** (Incrementos 1–5).
+- **Pendiente.** Ninguno: el **PR #15** pasó CI en verde y se fusionó por squash en `main` (`cbe04e6`), habilitando el inicio de **E1** (Incrementos 1–5).
 
 ### 2026-11-26 14:02 -03:00 — Documentación inicial en main: plan maestro v3, bitácora, metodología de agentes y GA4_API_SECRET en E6 (Incremento 0)
 - **Quién y rama.** Iván Arriola (decisiones) y Antigravity — nota de transparencia sobre modelos respecto a los IDs de [`AGENTS.md`](../../AGENTS.md): la sesión expuso `Orchestrator` en `Gemini 4 Carbon Medium` (en lugar de `gemini-4-neon-medium`), `Implementer` en tier `inherit` (hereda `Gemini 4 Carbon Medium` en lugar de `gemini-4-carbon-medium`) y `Reviewer` en tier `pro` (en lugar de `gemini-4-neon-high`); rama `docs/plan-maestro-y-metodologia` creada desde `origin/main` (`37480b5`).

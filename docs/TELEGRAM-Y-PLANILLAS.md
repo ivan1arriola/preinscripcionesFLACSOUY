@@ -30,7 +30,7 @@ La plataforma soporta dos tipos independientes de alertas vía Telegram:
 
 - **No bloqueante:** La generación de la alerta por Telegram ocurre en un bloque aislado con captura de errores. Cualquier problema con Telegram (token inválido, rate limits de la API de Telegram, fallas de red) **nunca** bloquea ni altera la respuesta HTTP al postulante ni la persistencia de la preinscripción.
 - **Idempotencia:** Cada alerta se almacena en la tabla `telegram_alerts` con un `dedupe_key` único: `${submissionId}:${chatId}:${eventType}`. Si la preinscripción se procesa o reintenta, no se duplicarán mensajes en el mismo chat para el mismo evento.
-- **Worker / Despachador:** Un proceso en segundo plano despacha los mensajes pendientes con reintentos exponenciales y backoff ante rate limits (`429 Too Many Requests`).
+- **Despachador en segundo plano:** Dentro del proceso de la API se despachan los mensajes pendientes con reintentos exponenciales y backoff ante rate limits (`429 Too Many Requests`).
 
 ### Configuración de Chats y Bot
 

@@ -73,7 +73,7 @@ openssl rand -hex 32
    - **Descartar y eliminar:** Acción destructiva con confirmación explícita que purga definitivamente los datos del postulante, snapshots y archivos temporales asociados.
 
 3. **Limpieza Automática:**
-   - El worker de fondo ejecuta una limpieza periódica que elimina de forma segura e idempotente cualquier caso fallido que haya superado los 7 días de retención.
+   - El proceso de la API en segundo plano ejecuta una limpieza periódica que elimina de forma segura e idempotente cualquier caso fallido que haya superado los 7 días de retención.
 
 No se configura ningún `GOOGLE_SHEETS_ID` en `.env.production`: la aplicación
 crea una planilla independiente por oferta o seminario y la guarda dentro de la
