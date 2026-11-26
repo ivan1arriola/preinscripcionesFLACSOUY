@@ -99,6 +99,8 @@ scripts/deploy-production.sh --check
 
 Esto ejecuta pruebas, typecheck, build y verificación del diff. No realiza SSH ni cambios remotos.
 
+`scripts/deploy-production.sh --sha <sha> --dry-run` comprueba la autorización de despliegue en GitHub y termina antes de abrir la conexión SSH al servidor.
+
 ## Deploy de un SHA
 
 ```bash
@@ -107,16 +109,16 @@ scripts/deploy-production.sh --sha "$(git rev-parse HEAD)"
 
 El script:
 
-1. exige el working tree limpio;
-2. valida tests, tipos y build;
-3. copia el SHA a `/opt/flacso/preinscripcionesFLACSOUY/releases/<sha>`;
-4. respalda `.env.production` y la base nueva si ya existe;
-5. actualiza el enlace `current` de forma atómica;
-6. construye y levanta el Compose productivo;
-7. espera la salud de API y web;
-8. informa el puerto que Apache debe usar.
+1. Exige un árbol de trabajo limpio y GitHub CLI autenticado (`gh auth login`). Actualiza `origin/main` y comprueba que contiene el SHA.
+2. Exige los seis jobs exitosos en la ejecución más reciente de `ci.yml` para el *push* de ese SHA a `main`.
+3. Transfiere el árbol del commit a `/opt/flacso/preinscripcionesFLACSOUY/releases/<sha>` y conserva las releases existentes.
+4. Respalda la configuración y, cuando ya existe, la base de datos del stack de preinscripciones.
+5. Construye las imágenes y levanta Compose. Comprueba la web, `/api/health`, `/api/health/catalog` y `GET /api/targets` a través del puerto local. Una indisponibilidad temporal de WordPress se registra como aviso si el listado de ofertas sigue respondiendo.
+6. Tras superar la prueba de humo, actualiza `current` y registra el SHA activo y el anterior en `last-deploy`. Si falla la activación, muestra los logs de API y Web y conserva el registro del último despliegue confirmado.
 
 La plataforma legacy no se detiene: permanece en `127.0.0.1:3200` como `inscripciones-flacso.service`.
+
+El servidor usa `flock` para serializar despliegues y reversiones.
 
 ## Cambio de Apache
 
@@ -132,13 +134,21 @@ El script nunca edita directivas Apache.
 
 ## Rollback
 
-Si la nueva app falla antes del cambio de Apache, volver a desplegar el vhost legacy no requiere tocar la aplicación vieja.
+Para volver a la release anterior de preinscripciones:
 
-Si hay que volver atrás después del cambio de dominio:
+```bash
+scripts/deploy-production.sh --rollback
+```
+
+El comando toma el SHA anterior de `last-deploy`. Si quedó una activación incompleta, recupera el último SHA confirmado. La release debe seguir disponible en el servidor. Un primer despliegue requiere que exista una release previa confirmada para poder revertir.
+
+La reversión reconstruye las imágenes de API y Web desde la release elegida, levanta esos dos servicios y repite la prueba de humo antes de actualizar `current` y `last-deploy`. La compilación necesita las dependencias disponibles en la caché o en sus registros de origen. PostgreSQL conserva su volumen y los datos actuales. La API ejecuta su inicialización habitual al arrancar.
+
+Para volver a la plataforma legacy después del cambio de dominio:
 
 1. restaurar el vhost respaldado y recargar Apache;
 2. confirmar que `inscripciones-flacso.service` siga activo;
 3. conservar los logs y el backup informado en `last-deploy`;
 4. no borrar la release fallida hasta terminar el diagnóstico.
 
-La restauración de datos de PostgreSQL se hace únicamente después de identificar el backup correcto y aprobar la operación; no se ejecuta automáticamente.
+La restauración de datos de PostgreSQL es una operación separada que requiere identificar el backup correcto y aprobar su uso.

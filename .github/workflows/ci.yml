@@ -181,6 +181,11 @@ jobs:
       - name: Validar docker-compose de desarrollo
         run: docker compose -f docker-compose.yml config --quiet
 
+      - name: Probar despliegue y rollback con dobles locales
+        run: |
+          bash scripts/ci/test-deploy-production.sh
+          bash scripts/ci/test-deploy-production-remote.sh
+
   e2e:
     name: Playwright E2E sobre imágenes Docker
     runs-on: ubuntu-latest

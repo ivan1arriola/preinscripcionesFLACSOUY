@@ -30,17 +30,20 @@ class FakeXhr {
 }
 
 describe('apiClient.upload with progress', () => {
-  const file = new File(['contenido'], 'cv.pdf', { type: 'application/pdf' });
+  let file: File;
 
   beforeEach(() => {
+    file = new File(['contenido'], 'cv.pdf', { type: 'application/pdf' });
     FakeXhr.instances = [];
     vi.stubGlobal('XMLHttpRequest', FakeXhr);
   });
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
   it('reports the bytes sent and resolves with the file token', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
     const progress = vi.fn();
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ uploadId: 'partial-1', offset: 0 }) })
@@ -54,6 +57,7 @@ describe('apiClient.upload with progress', () => {
     expect(request.url).toContain('/api/uploads/resumable/partial-1');
     expect(request.headers['x-preinscription-session']).toBeTruthy();
 
+    now.mockReturnValue(1050);
     request.upload.onprogress?.({ lengthComputable: true, loaded: 3, total: 9 });
     request.upload.onprogress?.({ lengthComputable: false, loaded: 0, total: 0 });
     expect(progress).toHaveBeenLastCalledWith(33, 0.1);
